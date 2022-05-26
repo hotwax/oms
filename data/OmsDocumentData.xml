@@ -33,6 +33,8 @@
 
         <fields fieldSeqId="19" fieldPath="contactMechs:postalAddress:geoPoint:latitude"/>
         <fields fieldSeqId="20" fieldPath="contactMechs:postalAddress:geoPoint:longitude"/>
+
+        <conditions conditionSeqId="01" fieldNameAlias="facilityId" operator="not-equals" fieldValue="_NA_"/>
     </dataDocuments>
 
     <!-- Search Data Feed for Stores -->
