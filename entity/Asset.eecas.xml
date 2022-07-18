@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<eecas xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-eca-2.1.xsd">
+<eecas xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-eca-3.xsd">
 
     <!-- Update the product's last Inventory and computed Inventory when inventory is updated in system -->
     <eeca id="AssetDetailUpdateInventoryCount" entity="mantle.product.asset.AssetDetail" on-create="true">

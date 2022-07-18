@@ -1,7 +1,7 @@
 apply plugin: 'groovy'
 
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'
+// sourceCompatibility = '1.8'
+// targetCompatibility = '1.8'
 
 def moquiDir = projectDir.parentFile.parentFile.parentFile
 def frameworkDir = file(moquiDir.absolutePath + '/framework')
@@ -30,10 +30,10 @@ tasks.withType(JavaCompile) { options.compilerArgs << "-proc:none" }
 tasks.withType(GroovyCompile) { options.compilerArgs << "-proc:none" }
 
 dependencies {
-    compile project(':framework')
+    implementation project(':framework')
     //mySql Database jar
-    runtime 'mysql:mysql-connector-java:5.1.47'
-    compile 'com.googlecode.libphonenumber:libphonenumber:7.0.4'
+    runtimeOnly 'mysql:mysql-connector-java:5.1.47'
+    implementation 'com.googlecode.libphonenumber:libphonenumber:7.0.4'
 }
 
 // by default the Java plugin runs test on build, change to not do that (only run test if explicit task)
@@ -44,7 +44,7 @@ task cleanLib(type: Delete) { delete fileTree(dir: projectDir.absolutePath+'/lib
 clean.dependsOn cleanLib
 
 task copyDependencies { doLast {
-    copy { from (configurations.runtime - project(':framework').configurations.runtime - project(':framework').jar.archivePath)
+    copy { from (configurations.runtimeClasspath - project(':framework').configurations.runtimeClasspath - project(':framework').jar.archivePath)
         into file(projectDir.absolutePath + '/lib') }
 } }
 copyDependencies.dependsOn cleanLib

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- General Guideline Verbs: GET=find, POST=create, PUT=store (create or update), PATCH=update, DELETE=delete  -->
 
-<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-2.1.xsd"
+<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/rest-api-3.xsd"
           name="oms" displayName="Headless OMS APIs" version="1.0.0" description="Services for OMS">
 
     <resource name="lookup" description="Lookup from various entities by ID">
