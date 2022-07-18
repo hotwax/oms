@@ -1,4 +1,9 @@
 # gradle/build files
+build/
+lib/
+.gradle
+
+# gradle/build files
 .gradle
 node_modules
 static
