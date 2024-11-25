@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+    <!-- Service to cancel sales order item record -->
+    <service verb="cancel" noun="SalesOrderItem">
+        <description>cancel a sales order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="shipGroupSeqId" required="true"/>
+            <parameter name="reason"/>
+            <parameter name="comment"/>
+        </in-parameters>
+        <actions>
+            <!-- Validate the order item is already cancelled or completed -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItem">
+                <!-- Log the error message and return from the service -->
+                <log level="error" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return type="danger" error="true" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+            </if>
+
+            <!-- Validate the change reason Enumeration -->
+            <!-- TODO: confirm if we will receive EnumId or Code or Description -->
+            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="reasonEnum">
+                    <field-map field-name="enumId" from="reason"/>
+            </entity-find-one>
+            <if condition="!reasonEnum">
+                <!-- Log the error message and return from the service -->
+                <log level="error" message="Reason not found with reason-id=[${reason}]."/>
+                <return type="danger" error="true" message="Reason not found with reason-id=[${reason}]."/>
+            </if>
+
+            <!-- Validate if the order item is completed or already cancelled -->
+            <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
+                <!-- Log the error message and return from the service -->
+                <log level="error" message="Order item is already cancelled or completed."/>
+                <return type="danger" error="true" message="Order item is already cancelled or completed."/>
+            </if>
+
+            <!-- Update the order item cancel quantity -->
+            <set field="orderItem.cancelQuantity" value="1"/>
+            <entity-update value-field="orderItem"/>
+
+            <!-- Update the orderItemShipGroupAssoc cancel quantity -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="oisga">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+            <set field="oisga.cancelQuantity" value="1"/>
+            <entity-update value-field="oisga"/>
+
+            <!-- Call create#OrderItemChange service to register the cancellation -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderItemChange" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    shipGroupSeqId:shipGroupSeqId, reasonEnumId:reasonEnum.enumId, changeComments:comment, cancelQuantity:1,
+                    changeTypeEnumId:'ODR_ITM_CANCEL', changeDatetime:ec.user.nowTimestamp]"/>
+            <!-- TODO: changeUserLogin; changeUserLogin:context.userLogin -->
+
+            <!-- Call create#NoteData service to add information as a note -->
+            <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId,
+                    noteDateTime:ec.user.nowTimestamp]" out-map="noteDataResponse"/>
+            <!-- Call create#OrderHeaderNote service to associate the created note to the order -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:noteDataResponse.noteId]"/>
+            <!-- TODO: internalNote:Y or N ; Also we can save the comment/reason as a part of the note-->
+
+            <!-- Call cancel#OrderItemInvResQty to cancel the inventory reservation -->
+            <service-call name="co.hotwax.oms.order.OrderServices.cancel#OrderItemInvResQty" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    shipGroupSeqId:shipGroupSeqId]"/>
+
+            <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
+            <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    shipGroupSeqId:shipGroupSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
+            <set field="itemTaxTotal" from="orderItemSalesTaxTotalResponse.itemTaxTotal" type="BigDecimal" />
+            <log level="info" message="======itemTaxTotal===[${itemTaxTotal}]======Type: ${itemTaxTotal.class}======="/>
+
+            <!-- If taxTotal is greater than zero, then call create#OrderAdjustment inline to create negative sales tax amount for the order item-->
+            <if condition="itemTaxTotal.compareTo(BigDecimal.ZERO) &gt; 0">
+                <service-call name="create#org.apache.ofbiz.order.order.OrderAdjustment" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                        shipGroupSeqId:shipGroupSeqId, orderAdjustmentTypeId:'SALES_TAX', description:'Tax adjustment on item cancellation',
+                        amount:-itemTaxTotal]"/>
+            </if>
+
+            <!-- Call create#CommunicationEvent to register the event -->
+            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:orderId, communicationEventTypeId:'API_COMMUNICATION',
+                    content:'Shopify Order Item Cancel:' + orderItem.orderItemSeqId + ' Qty [' + BigDecimal.ONE.intValue() + ']', datetimeStarted:ec.user.nowTimestamp]"/>
+
+            <!-- Call change#SalesOrderItemStatus service to change the order item status -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    statusId:'ITEM_CANCELLED', changeReason:reasonEnum.enumId, statusDateTime:ec.user.nowTimestamp]"/>
+
+        </actions>
+    </service>
+
+    <service verb="get" noun="OrderItemSalesTaxTotal">
+        <description>Get the sales tax total for an order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="itemTaxTotal" required="true" type="BigDecimal"/>
+        </out-parameters>
+        <actions>
+            <!-- Validate the order item -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItem">
+                <log level="error" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return type="danger" error="true" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+            </if>
+
+            <!-- Validate the orderItemShipGroupAssoc -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="orderItemShipGroupAssoc">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItemShipGroupAssoc">
+                <log level="error" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}], orderItemSeqId=[${orderItemSeqId}] and shipGroupSeqId=[${shipGroupSeqId}]."/>
+                <return type="danger" error="true" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}], orderItemSeqId=[${orderItemSeqId}] and shipGroupSeqId=[${shipGroupSeqId}]."/>
+            </if>
+
+            <!-- Get the sales tax total for order item using the OrderAdjustment entity -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderAdjustments">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                <econdition field-name="orderAdjustmentTypeId" value="SALES_TAX"/>
+                <select-field field-name="amount"/>
+            </entity-find>
+
+            <!-- Get the sales tax total and see if it is greater than 0 -->
+            <set field="itemTaxTotal" from="0.0"/>
+            <iterate list="orderAdjustments" entry="orderAdjustment">
+                <set field="itemTaxTotal" value="itemTaxTotal + orderAdjustment.amount"/>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="cancel" noun="OrderItemInvResQty" authenticate="anonymous-all">
+        <description>Cancel inventory reservation for an order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="shipGroupSeqId" required="true"/>
+        </in-parameters>
+        <actions>
+            <!-- Find all the reservation records from the OrderItemShipGrpInvRes entity -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="oisgirs">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find>
+
+            <!-- Iterate each OISGIR record and delete it -->
+            <iterate list="oisgirs" entry="oisgir">
+                <!-- get the inventoryItemId from the OISGIR record, so we can record the changes in InventoryItemDetail -->
+                <set field="inventoryItemId" from="oisgir.inventoryItemId" />
+                <entity-delete value-field="oisgir"/>
+
+                <!-- Call create#InventoryItemDetail inline to register the inventoryItem change and mark it available for reservation -->
+                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp, quantityOnHandDiff:0, availableToPromiseDiff:1, accountingQuantityDiff:0, description: 'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId]"/>
+            </iterate>
+
+        </actions>
+    </service>
+
+    <service verb="change" noun="SalesOrderItemStatus">
+        <description>Change the status of a sales order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="statusId" required="true"/>
+            <parameter name="changeReason"/>
+            <parameter name="statusDateTime"/>
+        </in-parameters>
+        <actions>
+            <!-- Get the order item -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <!-- Log and return with error if order item doesn't exist -->
+            <if condition="!orderItem">
+                <log level="error" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return error="true" type="danger" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+            </if>
+
+            <!-- Check if the status change is valid -->
+            <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderItem.statusId, statusIdTo:statusId]" out-map="statusValidChangeResponse"/>
+            <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
+            <if condition="!isValidChange">
+                <!-- Log error message and return from the service -->
+                <log level="error" message="Invalid status change requested."/>
+                <return error="true" type="danger" message="Invalid status change requested."/>
+            </if>
+
+            <!-- Update the status of the order item -->
+            <set field="orderItem.statusId" from="statusId"/>
+            <entity-update value-field="orderItem"/>
+
+            <!-- Call create#OrderStatus to register the order item cancellation status change event-->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime]"/>
+
+            <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED -->
+            <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
+                <!-- Call checkCancelComplete#SalesOrder service to confirm if we need to completely cancel or complete the sales order -->
+                <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#SalesOrder" in-map="[orderId:orderId, changeReason:changeReason]"/>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="checkCancelComplete" noun="SalesOrder">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="changeReason"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="oldStatusId"/>
+            <parameter name="statusChanged" type="Boolean"/>
+        </out-parameters>
+        <actions>
+            <set field="statusChanged" from="false"/>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                <econdition field-name="orderId"/>
+            </entity-find>
+            <set field="allCancelled" from="true"/>
+            <set field="anyCompleted" from="false"/>
+            <set field="allCancelledOrCompleted" from="true"/>
+            <iterate list="orderItemList" entry="curOrderItem">
+                <if condition="curOrderItem.statusId in ['ITEM_REJECTED', 'ITEM_CANCELLED']"><continue/></if>
+                <if condition="curOrderItem.statusId == 'ITEM_COMPLETED'">
+                    <set field="allCancelled" from="false"/>
+                    <set field="anyCompleted" from="true"/>
+                    <continue/>
+                </if>
+                <set field="allCancelled" from="false"/>
+                <set field="allCancelledOrCompleted" from="false"/>
+            </iterate>
+            <if condition="allCancelled">
+                <then>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
+                </then>
+                <else-if condition="anyCompleted &amp;&amp; allCancelledOrCompleted">
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
+                </else-if>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="change" noun="SalesOrderStatus">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="statusId" required="true"/>
+            <parameter name="changeReason"/>
+            <parameter name="setItemStatus" type="Boolean" default="true"/>
+        </in-parameters>
+        <actions>
+            <!-- Get the orderHeader record -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+
+            <!-- Check if the status change of the order is a valid change -->
+            <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderHeader.statusId, statusIdTo:statusId]" out-map="statusValidChangeResponse"/>
+            <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
+            <if condition="!isValidChange">
+                <log level="error" message="Invalid status change requested."/>
+                <return error="true" type="danger" message="Invalid status change requested."/>
+            </if>
+
+            <!-- Update the status of the OrderHeader -->
+            <set field="orderHeader.statusId" from="statusId"/>
+            <entity-update value-field="orderHeader"/>
+
+            <!-- Create OrderStatus record to register the status change -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp]"/>
+
+            <if condition="setItemStatus">
+                <!-- If setItemStatus is true then get all the order items -->
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <!-- Iterate through the order items and call change#SalesOrderItemStatus service to update their status as well -->
+                <iterate list="orderItemList" entry="orderItem">
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="check" noun="ValidStatusChange">
+        <in-parameters>
+            <parameter name="statusId" required="true"/>
+            <parameter name="statusIdTo" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="isValidChange" required="true"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.common.status.StatusValidChange" value-field="checkStatus"/>
+            <set field="isValidChange" from="checkStatus != null"/>
+        </actions>
+    </service>
+
+</services>
