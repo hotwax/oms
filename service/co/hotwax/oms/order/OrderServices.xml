@@ -35,7 +35,6 @@ under the License.
             </entity-find-one>
             <if condition="!orderItem">
                 <!-- Log the error message and return from the service -->
-                <log level="error" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
                 <return type="danger" error="true" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
             </if>
 
@@ -46,14 +45,12 @@ under the License.
             </entity-find-one>
             <if condition="!reasonEnum">
                 <!-- Log the error message and return from the service -->
-                <log level="error" message="Reason not found with reason-id=[${reason}]."/>
                 <return type="danger" error="true" message="Reason not found with reason-id=[${reason}]."/>
             </if>
 
             <!-- Validate if the order item is completed or already cancelled -->
             <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
                 <!-- Log the error message and return from the service -->
-                <log level="error" message="Order item is already cancelled or completed."/>
                 <return type="danger" error="true" message="Order item is already cancelled or completed."/>
             </if>
 
@@ -88,21 +85,21 @@ under the License.
                     shipGroupSeqId:shipGroupSeqId]"/>
 
             <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
-            <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                    shipGroupSeqId:shipGroupSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
             <set field="itemTaxTotal" from="orderItemSalesTaxTotalResponse.itemTaxTotal" type="BigDecimal" />
-            <log level="info" message="======itemTaxTotal===[${itemTaxTotal}]======Type: ${itemTaxTotal.class}======="/>
 
             <!-- If taxTotal is greater than zero, then call create#OrderAdjustment inline to create negative sales tax amount for the order item-->
             <if condition="itemTaxTotal.compareTo(BigDecimal.ZERO) &gt; 0">
                 <service-call name="create#org.apache.ofbiz.order.order.OrderAdjustment" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                        shipGroupSeqId:shipGroupSeqId, orderAdjustmentTypeId:'SALES_TAX', description:'Tax adjustment on item cancellation',
+                        shipGroupSeqId:'_NA_', orderAdjustmentTypeId:'SALES_TAX', description:'Tax adjustment on item cancellation',
                         amount:-itemTaxTotal]"/>
+                <!-- TODO: Discuss the setting of shipGroupSeqId=_NA_ -->
             </if>
 
             <!-- Call create#CommunicationEvent to register the event -->
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:orderId, communicationEventTypeId:'API_COMMUNICATION',
-                    content:'Shopify Order Item Cancel:' + orderItem.orderItemSeqId + ' Qty [' + BigDecimal.ONE.intValue() + ']', datetimeStarted:ec.user.nowTimestamp]"/>
+                    content:'Shopify Order Item Cancel: OrderId:' + orderId + ', itemSeqId: ' + orderItem.orderItemSeqId + ', Qty [' + BigDecimal.ONE.intValue() + ']', datetimeStarted:ec.user.nowTimestamp]"/>
+            <!-- TODO: Discuss messaging in the communicationEvent logging -->
 
             <!-- Call change#SalesOrderItemStatus service to change the order item status -->
             <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
@@ -127,34 +124,26 @@ under the License.
                 <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
             </entity-find-one>
             <if condition="!orderItem">
-                <log level="error" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
                 <return type="danger" error="true" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
             </if>
 
-            <!-- Validate the orderItemShipGroupAssoc -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="orderItemShipGroupAssoc">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find-one>
-            <if condition="!orderItemShipGroupAssoc">
-                <log level="error" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}], orderItemSeqId=[${orderItemSeqId}] and shipGroupSeqId=[${shipGroupSeqId}]."/>
-                <return type="danger" error="true" message="Order item or orderItemShipGroupAssoc not found with orderId=[${orderId}], orderItemSeqId=[${orderItemSeqId}] and shipGroupSeqId=[${shipGroupSeqId}]."/>
-            </if>
+            <set field="itemTaxTotal" from="0.0"/>
 
             <!-- Get the sales tax total for order item using the OrderAdjustment entity -->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderAdjustments">
                 <econdition field-name="orderId" from="orderId"/>
                 <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
                 <econdition field-name="orderAdjustmentTypeId" value="SALES_TAX"/>
                 <select-field field-name="amount"/>
             </entity-find>
+            <if condition="!orderAdjustments">
+                <!-- If no sales tax adjustments are found then return -->
+                <return/>
+            </if>
 
-            <!-- Get the sales tax total and see if it is greater than 0 -->
-            <set field="itemTaxTotal" from="0.0"/>
+            <!-- Get the sales tax total amount by adding each adjustment's amount -->
             <iterate list="orderAdjustments" entry="orderAdjustment">
-                <set field="itemTaxTotal" value="itemTaxTotal + orderAdjustment.amount"/>
+                <set field="itemTaxTotal" from="itemTaxTotal.add(orderAdjustment.amount)"/>
             </iterate>
         </actions>
     </service>
@@ -204,7 +193,6 @@ under the License.
             </entity-find-one>
             <!-- Log and return with error if order item doesn't exist -->
             <if condition="!orderItem">
-                <log level="error" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
                 <return error="true" type="danger" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
             </if>
 
@@ -213,7 +201,6 @@ under the License.
             <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
             <if condition="!isValidChange">
                 <!-- Log error message and return from the service -->
-                <log level="error" message="Invalid status change requested."/>
                 <return error="true" type="danger" message="Invalid status change requested."/>
             </if>
 
@@ -222,6 +209,7 @@ under the License.
             <entity-update value-field="orderItem"/>
 
             <!-- Call create#OrderStatus to register the order item cancellation status change event-->
+            <!-- TODO: Add statusUserLogin information -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
                     statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime]"/>
 
@@ -288,7 +276,6 @@ under the License.
             <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderHeader.statusId, statusIdTo:statusId]" out-map="statusValidChangeResponse"/>
             <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
             <if condition="!isValidChange">
-                <log level="error" message="Invalid status change requested."/>
                 <return error="true" type="danger" message="Invalid status change requested."/>
             </if>
 
