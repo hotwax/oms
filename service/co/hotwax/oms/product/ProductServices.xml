@@ -88,7 +88,7 @@ under the License.
                     <entity-update value-field="productPriceRecord"/>
                     <script>productPriceList.add(productPriceRecord)</script>
                 </if>
-                <script>productJson.put("org.apache.ofbiz.product.feature.ProductFeatureAppl", productFeatureApplList) </script>
+                <script>productJson.put("org.apache.ofbiz.product.price.ProductPrice", productPriceList) </script>
                 <set field="productJson.productPriceList" from="productPriceList"/>
             </if>
 
