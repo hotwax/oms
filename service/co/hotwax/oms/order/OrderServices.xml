@@ -35,22 +35,22 @@ under the License.
             </entity-find-one>
             <if condition="!orderItem">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Validate the change reason Enumeration -->
-            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="reasonEnum">
+            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="reasonEnum" cache="true">
                     <field-map field-name="enumId" from="reason"/>
             </entity-find-one>
             <if condition="!reasonEnum">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="Reason not found with reason-id=[${reason}]."/>
+                <return type="warning" error="true" message="Cancel Reason Enumeration [EnumId:${reason}] - Not found"/>
             </if>
 
             <!-- Validate if the order item is completed or already cancelled -->
             <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="Order item is already cancelled or completed."/>
+                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Already cancelled or completed"/>
             </if>
 
             <!-- Update the order item cancel quantity -->
@@ -123,7 +123,7 @@ under the License.
                 <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
             </entity-find-one>
             <if condition="!orderItem">
-                <return type="warning" error="true" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <set field="itemTaxTotal" from="0.0"/>
@@ -137,7 +137,7 @@ under the License.
             </entity-find>
             <if condition="!orderAdjustments">
                 <!-- If no sales tax adjustments are found then return -->
-                <return/>
+                <return type="warning" message="Sales Tax OrderAdjustment [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Get the sales tax total amount by adding each adjustment's amount -->
@@ -163,7 +163,7 @@ under the License.
             </entity-find>
 
             <if condition="!oisgirs">
-                <return type="info" error="false" message="No reservations found for order item (${orderId}:${orderItemSeqId})."/>
+                <return type="info" error="false" message="Order Reservations [OrderItem ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Iterate each OISGIR record and delete it; ideally it will have 1 record-->
@@ -196,7 +196,7 @@ under the License.
             </entity-find-one>
             <!-- Log and return with error if order item doesn't exist -->
             <if condition="!orderItem">
-                <return error="true" type="warning" message="Order item not found with orderId=[${orderId}] and orderItemSeqId=[${orderItemSeqId}]."/>
+                <return error="true" type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Check if the status change is valid -->
@@ -204,7 +204,7 @@ under the License.
             <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
             <if condition="!isValidChange">
                 <!-- Log error message and return from the service -->
-                <return error="true" type="warning" message="Invalid status change requested."/>
+                <return error="true" type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Invalid status transition to ${statusId}"/>
             </if>
 
             <!-- Update the status of the order item -->
@@ -225,6 +225,7 @@ under the License.
     </service>
 
     <service verb="checkCancelComplete" noun="SalesOrder">
+        <description>This service checks if we need to completely cancel or complete a sales order</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="changeReason"/>
@@ -238,6 +239,10 @@ under the License.
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
                 <econdition field-name="orderId"/>
             </entity-find>
+            <if condition="!orderItemList">
+                <return type="warning" error="true" message="OrderItem [ID: ${orderId}] - Not found"/>
+            </if>
+
             <set field="allCancelled" from="true"/>
             <set field="anyCompleted" from="false"/>
             <set field="allCancelledOrCompleted" from="true"/>
@@ -263,6 +268,7 @@ under the License.
     </service>
 
     <service verb="change" noun="SalesOrderStatus">
+        <description>This service validates and then changes the status of a sales order</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="statusId" required="true"/>
@@ -275,22 +281,22 @@ under the License.
                 <field-map field-name="orderId" from="orderId"/>
             </entity-find-one>
             <if condition="!orderHeader">
-                <return error="true" type="warning" message="Order not found with orderId=[${orderId}]."/>
+                <return error="true" type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
             </if>
 
-            <!-- Validate the statusId -->
-            <entity-find-one entity-name="org.apache.ofbiz.common.status.StatusItem" value-field="statusItem">
+            <!-- Check if statusId is a valid status -->
+            <entity-find-one entity-name="org.apache.ofbiz.common.status.StatusItem" value-field="statusItem" cache="true">
                 <field-map field-name="statusId" from="statusId"/>
             </entity-find-one>
             <if condition="!statusItem">
-                <return error="true" type="warning" message="Status not found with statusId=[${statusId}]."/>
+                <return error="true" type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
             </if>
 
             <!-- Check if the status change of the order is a valid change -->
             <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderHeader.statusId, statusIdTo:statusId]" out-map="statusValidChangeResponse"/>
             <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
             <if condition="!isValidChange">
-                <return error="true" type="warning" message="Invalid status change requested."/>
+                <return error="true" type="warning" message="OrderHeader [ID: ${orderId}] - Invalid status transition to ${statusId}"/>
             </if>
 
             <!-- Update the status of the OrderHeader -->
@@ -314,6 +320,7 @@ under the License.
     </service>
 
     <service verb="check" noun="ValidStatusChange">
+        <description>This service checks the validity of a status change</description>
         <in-parameters>
             <parameter name="statusId" required="true"/>
             <parameter name="statusIdTo" required="true"/>
@@ -322,7 +329,7 @@ under the License.
             <parameter name="isValidChange" required="true"/>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.common.status.StatusValidChange" value-field="checkStatus"/>
+            <entity-find-one entity-name="org.apache.ofbiz.common.status.StatusValidChange" value-field="checkStatus" cache="true"/>
             <set field="isValidChange" from="checkStatus != null"/>
         </actions>
     </service>
