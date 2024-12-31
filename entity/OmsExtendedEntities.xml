@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/entity-definition-2.1.xsd">
+
+    <extend-entity entity-name="ContactMech" package="org.apache.ofbiz.party.contact">
+        <relationship type="one" related="org.apache.ofbiz.party.contact.TelecomNumber" short-alias="telecomNumber" mutable="true">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="one" related="org.apache.ofbiz.party.contact.PostalAddress" short-alias="postalAddress" mutable="true">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMech" short-alias="facilityEmail">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.party.contact.PartyContactMech" short-alias="partyEmail">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderContactMech" short-alias="orderEmail">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <master>
+            <detail relationship="postalAddress"/>
+            <detail relationship="telecomNumber"/>
+        </master>
+        <master name="facilityPhone">
+            <detail relationship="telecomNumber" use-master="facility"/>
+        </master>
+        <master name="facilityAddress">
+            <detail relationship="postalAddress" use-master="facility"/>
+        </master>
+        <master name="facilityEmail">
+            <detail relationship="facilityEmail" use-master="purpose"/>
+        </master>
+        <master name="partyPhone">
+            <detail relationship="telecomNumber" use-master="party"/>
+        </master>
+        <master name="partyAddress">
+            <detail relationship="postalAddress" use-master="party"/>
+        </master>
+        <master name="partyEmail">
+            <detail relationship="partyEmail" use-master="purpose"/>
+        </master>
+        <master name="orderPhone">
+            <detail relationship="telecomNumber" use-master="order"/>
+        </master>
+        <master name="orderAddress">
+            <detail relationship="postalAddress" use-master="order"/>
+        </master>
+        <master name="orderEmail">
+            <detail relationship="orderEmail"/>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="TelecomNumber" package="org.apache.ofbiz.party.contact">
+        <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMech" short-alias="facilityContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.party.contact.PartyContactMech" short-alias="partyContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderContactMech" short-alias="orderContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <master name="facility">
+            <detail relationship="facilityContact" use-master="purpose"></detail>
+        </master>
+        <master name="party">
+            <detail relationship="partyContact" use-master="purpose"></detail>
+        </master>
+        <master name="order">
+            <detail relationship="orderContact"></detail>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="PostalAddress" package="org.apache.ofbiz.party.contact">
+        <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMech" short-alias="facilityContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.party.contact.PartyContactMech" short-alias="partyContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderContactMech" short-alias="orderContact">
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <master name="facility">
+            <detail relationship="facilityContact" use-master="purpose"></detail>
+        </master>
+        <master name="party">
+            <detail relationship="partyContact" use-master="purpose"></detail>
+        </master>
+        <master name="order">
+            <detail relationship="orderContact"></detail>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="FacilityContactMech" package="org.apache.ofbiz.product.facility">
+        <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMechPurpose" short-alias="facilityContactMechPurpose">
+            <key-map field-name="facilityId"/>
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <master name="purpose">
+            <detail relationship="facilityContactMechPurpose"/>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="PartyContactMech" package="org.apache.ofbiz.party.contact">
+        <relationship type="many" related="org.apache.ofbiz.party.contact.PartyContactMechPurpose" short-alias="partyContactMechPurpose">
+            <key-map field-name="partyId"/>
+            <key-map field-name="contactMechId"/>
+        </relationship>
+        <master name="purpose">
+            <detail relationship="partyContactMechPurpose"/>
+        </master>
+    </extend-entity>
+</entities>
