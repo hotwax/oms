@@ -128,4 +128,29 @@ under the License.
             <detail relationship="partyContactMechPurpose"/>
         </master>
     </extend-entity>
+
+    <extend-entity entity-name="ShopifyShop" package="co.hotwax.shopify">
+        <relationship type="one" fk-name="SHPFY_SHOP_PS" related="org.apache.ofbiz.product.store.ProductStore" short-alias="shopifyShopProductStore">
+            <key-map field-name="productStoreId"/>
+        </relationship>
+        <relationship type="many" fk-name="SHOP_CONF" related="co.hotwax.shopify.ShopifyConfig" short-alias="shopifyConfig">
+            <key-map field-name="shopId"/>
+        </relationship>
+        <master>
+            <detail relationship="shopifyConfig">
+                <detail relationship="accessScopeEnum"/>
+            </detail>
+            <detail relationship="shopifyShopProductStore"/>
+        </master>
+        <master name="config"><detail relationship="shopifyConfig"/></master>
+    </extend-entity>
+
+    <extend-entity entity-name="ShopifyConfig" package="co.hotwax.shopify">
+        <relationship type="one" fk-name="SHPFY_ACC_SCOPE" title="Access" related="moqui.basic.Enumeration" short-alias="accessScopeEnum">
+            <key-map field-name="accessScopeEnumId" related="enumId"/>
+        </relationship>
+        <master>
+            <detail relationship="accessScopeEnum"/>
+        </master>
+    </extend-entity>
 </entities>

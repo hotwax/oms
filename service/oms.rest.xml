@@ -198,6 +198,4 @@ under the License.
             <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="orderEmail"/></method>
         </resource>
     </resource>
-
-
 </resource>
