@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="create" noun="SalesOrder">
+        <description>
+            This service will take in the order JSON in OMSNewOrdersFeed and set up a complete order by performing any surrounding crud operations as needed.
+        </description>
+        <in-parameters>
+            <parameter name="orderJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId" required="true"/>
+        </out-parameters>
+        <actions>
+            <!-- TODO: Discuss the return error part -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                <field-map field-name="productStoreId" from="orderJson.productStoreId"/>
+            </entity-find-one>
+            <if condition="!productStore">
+                <return error="true" type="warning" message="ProductStore [ID: ${orderJson.productStoreId}] - Not found"/>
+            </if>
+
+            <set field="orderContext" from="[:]"/>
+            <set field="orderContext.externalId" from="orderJson.externalId"/>
+            <set field="orderContext.orderTypeId" from="SALES_ORDER"/>
+            <set field="orderContext.orderName" from="orderJson.name"/>
+            <set field="orderContext.salesChannelEnumId" from="orderJson.salesChannelEnumId"/>
+            <set field="orderContext.orderDate" from="orderJson.createdAt"/>
+            <set field="orderContext.currencyUomId" from="orderJson.currencyUom"/>
+            <set field="orderContext.presentmentCurrencyUomId" from="orderJson.presentmentCurrencyUom"/>
+            <set field="orderContext.grandTotal" from="orderJson.grandTotal"/>
+            <set field="orderContext.remainingSubTotal" from="orderJson.remainingSubTotal"/>
+            <set field="orderContext.statusId" from="orderJson.statusId"/>
+            <set field="orderContext.productStoreId" from="orderJson.productStoreId"/>
+            <set field="orderContext.adjustments" from="orderJson.adjustments"/>
+            <set field="orderContext.attributes" from="orderJson.attributes"/>
+
+            <set field="orderRoles" from="[]"/>
+            <entity-find entity-name="Party" list="customerParty" limit="1">
+                <econdition field-name="externalId" from="orderJson.customer.externalId"/>
+            </entity-find>
+            <if condition="customerParty">
+                <set field="customerPartyId" from="customerParty.partyId"/>
+                <else>
+                    <service-call name="create#org.apache.ofbiz.party.party.Party" in-map="orderJson.customerMap" out-map="createCustomerOutput"/>
+                    <set field="customerPartyId" from="createCustomerOutput.partyId"/>
+                </else>
+            </if>
+            <set field="nowTimestamp" from="ec.user.nowTimestamp"/>
+            <script>
+                orderRoles.add([partyId:customerPartyId, roleTypeId:"SHIP_TO_CUSTOMER", formDate:nowTimestamp])
+                orderRoles.add([partyId:productStore.payToPartyId, roleTypeId:"SHIP_TO_CUSTOMER", formDate:nowTimestamp])
+                orderContext.put("roles", orderRoles)
+            </script>
+
+            <set field="orderContactMechs" from="[]"/>
+            <!-- Shipping Address -->
+            <service-call name="co.hotwax.oms.order.OrderServices.create#PostalAddress" in-map="[postalAddressJson:orderJson.shipToAddress]" out-map="createPostalAddressOutput"/>
+            <set field="shipToAddressContactMechId" from="createPostalAddressOutput.contactMechId"/>
+            <script>
+                orderContactMechs.add([contactMechId:shipToAddressContactMechId, contactMechPurposeTypeId:"SHIPPING_LOCATION"])
+            </script>
+
+            <!-- Shipping Phone -->
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'TELECOM_NUMBER', infoString:orderJson.shipToPhone]" out-map="createContactMechOutput"/>
+            <set field="shipToPhoneContactMechId" from="createContactMechOutput.contactMechId"/>
+            <script>
+                orderContactMechs.add([contactMechId:shipToPhoneContactMechId, contactMechPurposeTypeId:"PHONE_SHIPPING"])
+            </script>
+
+            <!-- Order Email -->
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderJson.email]" out-map="createContactMechOutput"/>
+            <script>
+                orderContactMechs.add([contactMechId:createContactMechOutput.contactMechId, contactMechPurposeTypeId:"ORDER_EMAIL"])
+            </script>
+
+            <!-- Billing Address -->
+            <if condition="orderJson.billToAddress">
+                <service-call name="create#org.apache.ofbiz.party.contact.PostalAddress" in-map="orderJson.billToAddress" out-map="createPostalAddressOutput"/>
+                <script>
+                    orderContactMechs.add([contactMechId:createPostalAddressOutput.contactMechId, contactMechPurposeTypeId:"BILLING_LOCATION"])
+                </script>
+            </if>
+
+            <!-- Billing Phone -->
+            <if condition="orderJson.billToPhone">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'TELECOM_NUMBER', infoString:orderJson.billToPhone]" out-map="createContactMechOutput"/>
+                <script>
+                    orderContactMechs.add([contactMechId:createContactMechOutput.contactMechId, contactMechPurposeTypeId:"PHONE_BILLING"])
+                </script>
+            </if>
+            <script>
+                orderContext.put("contactMechs", orderContactMechs)
+            </script>
+
+            <set field="orderItemShipGroups" from="[]"/>
+            <iterate list="orderJson.shipGroups" entry="shipGroup">
+                <iterate list="shipGroup.items" entry="item">
+                    <set field="productSku" from="item.productSku"/>
+                    <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Product" in-map="[internalName:productSku]" out-map="findOrCreateProductOutput"/>
+                    <set field="item.productId" from="findOrCreateProductOutput.productId"/>
+                </iterate>
+            </iterate>
+            <!--
+                Set orderContext.shipGroups = orderJson.shipGroups
+                8. Call create#org.apache.ofbiz.order.order.OrderHeader for orderContext
+             -->
+            <set field="orderContext.shipGroups" from="orderJson.shipGroups"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="orderContext" out-map="createOrderHeaderOutput"/>
+            <set field="orderId" from="createOrderHeaderOutput.orderId"/>
+        </actions>
+    </service>
+
+    <service verb="create" noun="PostalAddress">
+        <in-parameters>
+            <parameter name="postalAddressJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'POSTAL_ADDRESS', postalAddress:postalAddressJson]" out-map="createContactMechOutput"/>
+            <set field="contactMechId" from="createContactMechOutput.contactMechId"/>
+        </actions>
+    </service>
+
+    <service verb="findOrCreate" noun="Product">
+        <description>This service either finds a product by its internal name or creates a new one</description>
+        <in-parameters>
+            <parameter name="internalName" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId" required="true"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="product" limit="1">
+                <econdition field-name="internalName" from="internalName"/>
+            </entity-find>
+            <if condition="product">
+                <set field="productId" from="product.productId"/>
+                <else>
+                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="[internalName:internalName]" out-map="createProductOutput"/>
+                    <set field="productId" from="createProductOutput.productId"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+    
+</services>
