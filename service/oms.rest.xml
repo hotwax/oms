@@ -23,6 +23,10 @@ under the License.
         <method type="get"><entity name="org.apache.ofbiz.order.order.OrderHeader" operation="list" masterName="default"/></method>
         <method type="post"><entity name="org.apache.ofbiz.order.order.OrderHeader" operation="create" masterName="default"/></method>
     </resource>
+    <resource name="return" require-authentication="anonymous-all">
+        <method type="get"><entity name="org.apache.ofbiz.order.return.ReturnHeader" operation="list" masterName="default"/></method>
+        <method type="post"><entity name="org.apache.ofbiz.order.return.ReturnHeader" operation="create" masterName="default"/></method>
+    </resource>
 
     <resource name="productStores">
         <method type="get"><entity name="co.hotwax.product.store.ProductStoreShipmentMethCount" operation="list"/></method>
