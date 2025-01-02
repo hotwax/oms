@@ -39,6 +39,10 @@ under the License.
         <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemShipGroup" short-alias="shipGroups">
             <key-map field-name="orderId"/>
         </relationship>
+        <!-- Adding at order level for exchange orders where orderItemSeqId="_NA_" -->
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAssoc" short-alias="itemAssocs">
+            <key-map field-name="orderId"/>
+        </relationship>
 
         <master>
             <detail relationship="roles"/>
@@ -48,6 +52,7 @@ under the License.
             <detail relationship="attributes"/>
             <detail relationship="notes"/>
             <detail relationship="shipGroups" use-master="default"/>
+            <detail relationship="itemAssocs"/>
         </master>
     </extend-entity>
     <extend-entity entity-name="OrderItemShipGroup" package="org.apache.ofbiz.order.order">
@@ -91,6 +96,19 @@ under the License.
 
         <master>
             <detail relationship="contactMech" use-master="default"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="ReturnHeader" package="org.apache.ofbiz.order.return">
+        <relationship type="many" related="org.apache.ofbiz.order.return.ReturnItem" short-alias="items">
+            <key-map field-name="returnId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.return.ReturnIdentification" short-alias="identifications">
+            <key-map field-name="returnId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="items"/>
+            <detail relationship="identifications"/>
         </master>
     </extend-entity>
 </entities>
