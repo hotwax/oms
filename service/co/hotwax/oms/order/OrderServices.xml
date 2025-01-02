@@ -53,20 +53,11 @@ under the License.
             <set field="orderContext.attributes" from="orderJson.attributes"/>
 
             <set field="orderRoles" from="[]"/>
-            <entity-find entity-name="Party" list="customerParty" limit="1">
-                <econdition field-name="externalId" from="orderJson.customer.externalId"/>
-            </entity-find>
-            <if condition="customerParty">
-                <set field="customerPartyId" from="customerParty.partyId"/>
-                <else>
-                    <service-call name="create#org.apache.ofbiz.party.party.Party" in-map="orderJson.customerMap" out-map="createCustomerOutput"/>
-                    <set field="customerPartyId" from="createCustomerOutput.partyId"/>
-                </else>
-            </if>
-            <set field="nowTimestamp" from="ec.user.nowTimestamp"/>
+            <!-- Get the customer party ID either by finding it or creating it -->
+            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Customer" in-map="orderJson.customer" out-map="findOrCreateCustomerOutput"/>
             <script>
-                orderRoles.add([partyId:customerPartyId, roleTypeId:"SHIP_TO_CUSTOMER", formDate:nowTimestamp])
-                orderRoles.add([partyId:productStore.payToPartyId, roleTypeId:"SHIP_TO_CUSTOMER", formDate:nowTimestamp])
+                orderRoles.add([partyId:findOrCreateCustomerOutput.partyId, roleTypeId:"SHIP_TO_CUSTOMER"])
+                orderRoles.add([partyId:productStore.payToPartyId, roleTypeId:"SHIP_FROM_VENDOR"])
                 orderContext.put("roles", orderRoles)
             </script>
 
@@ -162,5 +153,34 @@ under the License.
             </if>
         </actions>
     </service>
-    
+
+    <service verb="findOrCreate" noun="Party">
+        <description>This service either finds a party by its externalId or creates a new one</description>
+        <in-parameters>
+            <parameter name="externalId" required="true"/>
+            <parameter name="firstName" required="true"/>
+            <parameter name="lastName" required="true"/>
+            <parameter name="dataSourceId" required="true"/>
+            <parameter name="email" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId" required="true"/>
+        </out-parameters>
+        <actions>
+            <!-- Get the party -->
+            <entity-find entity-name="Party" list="customerParty" limit="1">
+                <econdition field-name="externalId" from="externalId"/>
+                <econdition field-name="dataSourceId" from="dataSourceId" ignore-if-empty="true"/>
+            </entity-find>
+            <if condition="customerParty">
+                <set field="partyId" from="customerParty.partyId"/>
+                <else>
+                    <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:email]" out-map="createContactMechOutput"/>
+                    <service-call name="create#org.apache.ofbiz.party.party.Party" in-map="[partyTypeId:'PERSON', dataSourceId:dataSourceId, person:[firstName:firstName, lastName:lastName], roles:[[roleTypeId:'CUSTOMER']], contactMechs:[createContactMechOutput.contactMechId, 'PRIMARY_EMAIL']]]" out-map="createPartyOutput"/>
+                    <set field="partyId" from="createPartyOutput.partyId"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+
 </services>
