@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+
+    <service verb="create" noun="PostalAddress">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk" />
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'POSTAL_ADDRESS']" out-map="createContactMechOutput"/>
+            <set field="contactMechId" from="createContactMechOutput.contactMechId"/>
+            <service-call name="create#org.apache.ofbiz.party.contact.PostalAddress" in-map="context"/>
+        </actions>
+    </service>
+
+    <service verb="create" noun="TelecomNumber">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk" />
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'TELECOM_NUMBER']" out-map="createContactMechOutput"/>
+            <set field="contactMechId" from="createContactMechOutput.contactMechId"/>
+            <service-call name="create#org.apache.ofbiz.party.contact.TelecomNumber" in-map="context"/>
+        </actions>
+    </service>
+
+    <!--
+     {
+          "toName": "Arun",
+          "attnName": "Arun",
+          "address1": "Address1",
+          "address2": "Address2",
+          "city": "NY",
+          "countryGeoId": "USA",
+          "stateProvinceGeoId": "NY",
+          "latitude": 10,
+          "longitude": 10,
+          "facilityId": "_NA_",
+          "contactMechPurposeTypeId": "PRIMARY_LOCATION"
+    }
+    -->
+    <service verb="create" noun="FacilityAddress">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="context" out-map="postalAddressOut"/>
+            <if condition="postalAddressOut.contactMechId">
+                <set field="contactMechId" from="postalAddressOut.contactMechId"/>
+                <service-call name="create#org.apache.ofbiz.product.facility.FacilityContactMech" in-map="context + [contactMechId:contactMechId, contactMechPurpose:[contactMechPurposeTypeId:contactMechPurposeTypeId]]" out-map="context"/>
+            </if>
+        </actions>
+    </service>
+
+    <!--
+       {
+          "countryCode": "1",
+          "areaCode": "234",
+          "contactNumber": "4567",
+          "facilityId": "_NA_",
+          "contactMechPurposeTypeId": "PRIMARY_PHONE"
+        }
+    -->
+    <service verb="create" noun="FacilityPhone">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="context" out-map="telecomNumberOut"/>
+            <if condition="telecomNumberOut.contactMechId">
+                <set field="contactMechId" from="telecomNumberOut.contactMechId"/>
+                <service-call name="create#org.apache.ofbiz.product.facility.FacilityContactMech" in-map="context + [contactMechId:contactMechId, contactMechPurpose:[contactMechPurposeTypeId:contactMechPurposeTypeId]]" out-map="context"/>
+            </if>
+        </actions>
+    </service>
+
+    <!--
+        {
+          "facilityId": "_NA_",
+          "infoString": "abc1234@example.com",
+          "externalId": "1234",
+          "contactMechPurposeTypeId": "PRIMARY_EMAIL"
+        }
+    -->
+    <service verb="create" noun="FacilityEmail">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.ContactMech" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="context +[contactMechTypeId:'EMAIL_ADDRESS']" out-map="emailContactMechOut"/>
+            <if condition="emailContactMechOut.contactMechId">
+                <set field="contactMechId" from="emailContactMechOut.contactMechId"/>
+                <service-call name="create#org.apache.ofbiz.product.facility.FacilityContactMech" in-map="context + [contactMechId:contactMechId, contactMechPurpose:[contactMechPurposeTypeId:contactMechPurposeTypeId]]" out-map="context"/>
+            </if>
+        </actions>
+    </service>
+
+</services>

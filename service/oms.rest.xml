@@ -50,7 +50,7 @@ under the License.
             </resource>
             <resource name="facilityGroups">
                 <resource name="counts">
-                    <method type="get"><entity name="co.hotwax.product.store.ProductStoreFacilityGroup" operation="list"/></method>
+                    <method type="get"><entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/></method>
                 </resource>
                 <method type="get"><entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/></method>
                 <method type="post"><entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="store"/></method>
@@ -102,13 +102,13 @@ under the License.
     <resource name="facilityContactMechs">
         <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" operation="list"/></method>
         <resource name="facilityPhone" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="facilityPhone"/></method>
+            <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityPhone"/></method>
         </resource>
         <resource name="facilityAddress" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="facilityAddress"/></method>
+            <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityAddress"/></method>
         </resource>
         <resource name="facilityEmail" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="facilityEmail"/></method>
+            <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityEmail"/></method>
         </resource>
     </resource>
 
@@ -174,32 +174,12 @@ under the License.
         </id>
     </resource>
 
+    <!--
     <resource name="partyRoleAndPartyDetails" description="Get PartyRole And PartyDetails">
         <method type="get"><entity name="org.apache.ofbiz.party.party.PartyRoleAndPartyDetails" operation="list"/></method>
-    </resource>
+    </resource> -->
 
     <resource name="partyContactMechs">
         <method type="get"><entity name="org.apache.ofbiz.party.party.PartyContactMechDetails" operation="list"/></method>
-        <resource name="partyPhone" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="partyPhone"/></method>
-        </resource>
-        <resource name="partyAddress" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="partyAddress"/></method>
-        </resource>
-        <resource name="partyEmail" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="partyEmail"/></method>
-        </resource>
-    </resource>
-
-    <resource name="orderContactMechs">
-        <resource name="orderPhone" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="orderPhone"/></method>
-        </resource>
-        <resource name="orderAddress" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="orderAddress"/></method>
-        </resource>
-        <resource name="orderEmail" require-authentication="anonymous-all">
-            <method type="post"><entity name="org.apache.ofbiz.party.contact.ContactMech" operation="store" masterName="orderEmail"/></method>
-        </resource>
     </resource>
 </resource>
