@@ -102,7 +102,7 @@ under the License.
         <relationship type="many" related="org.apache.ofbiz.order.return.ReturnItem" short-alias="items">
             <key-map field-name="returnId"/>
         </relationship>
-        <relationship type="many" related="org.apache.ofbiz.order.return.ReturnIdentification" short-alias="identifications">
+        <relationship type="many" related="co.hotwax.order.return.ReturnIdentification" short-alias="identifications">
             <key-map field-name="returnId"/>
         </relationship>
 
