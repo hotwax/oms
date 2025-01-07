@@ -103,12 +103,15 @@ under the License.
         <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" operation="list"/></method>
         <resource name="facilityPhone" require-authentication="anonymous-all">
             <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityPhone"/></method>
+            <method type="put"><service name="co.hotwax.oms.ContactMechServices.update#FacilityPhone"/></method>
         </resource>
         <resource name="facilityAddress" require-authentication="anonymous-all">
             <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityAddress"/></method>
+            <method type="put"><service name="co.hotwax.oms.ContactMechServices.update#FacilityAddress"/></method>
         </resource>
         <resource name="facilityEmail" require-authentication="anonymous-all">
             <method type="post"><service name="co.hotwax.oms.ContactMechServices.create#FacilityEmail"/></method>
+            <method type="put"><service name="co.hotwax.oms.ContactMechServices.update#FacilityEmail"/></method>
         </resource>
     </resource>
 

@@ -116,4 +116,137 @@
         </actions>
     </service>
 
+    <!--
+    {
+      "toName": "Arun Patidar",
+      "address1": "New Address ",
+      "city": "NY",
+      "countryGeoId": "USA",
+      "stateProvinceGeoId": "NY",
+      "latitude": 100,
+      "longitude": 100,
+      "facilityId": "_NA_",
+      "contactMechId": "100871",
+      "contactMechPurposeTypeId": "PRIMARY_LOCATION"
+    }
+    -->
+    <service verb="update" noun="FacilityAddress">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId"/>
+        </out-parameters>
+        <actions>
+            <!-- Expire old FacilityContactMech record first  -->
+            <if condition="contactMechId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech" for-update="true"  list="facilityContactMechs" limit="1">
+                    <econdition field-name="facilityId" from="facilityId"/>
+                    <econdition field-name="contactMechId" from="contactMechId"/>
+                </entity-find>
+                <if condition="facilityContactMechs">
+                    <then>
+                        <set field="facilityContactMech" from="facilityContactMechs[0]"/>
+                        <set field="facilityContactMech.thruDate" from="ec.user.nowTimestamp"/>
+                        <entity-update value-field="facilityContactMech"/>
+                    </then><else>
+                    <log level="error" message="Address not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                    <return error="true" message="Address not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                </else>
+                </if>
+            </if>
+            <!-- Create new Address and association it with facility -->
+            <set field="contactMechId" value="" />
+            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityAddress" in-map="context" out-map="context"/>
+        </actions>
+    </service>
+
+    <!--
+        {
+        "countryCode": "1",
+        "areaCode": "345",
+        "contactNumber": "3456",
+        "facilityId": "_NA_",
+        "contactMechId": "100777",
+        "contactMechPurposeTypeId": "PRIMARY_PHONE"
+        }
+    -->
+    <service verb="update" noun="FacilityPhone">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId"/>
+        </out-parameters>
+        <actions>
+            <!-- Expire old FacilityContactMech record first  -->
+            <if condition="contactMechId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech" for-update="true"  list="facilityContactMechs" limit="1">
+                    <econdition field-name="facilityId" from="facilityId"/>
+                    <econdition field-name="contactMechId" from="contactMechId"/>
+                </entity-find>
+                <if condition="facilityContactMechs">
+                    <then>
+                        <set field="facilityContactMech" from="facilityContactMechs[0]"/>
+                        <set field="facilityContactMech.thruDate" from="ec.user.nowTimestamp"/>
+                        <entity-update value-field="facilityContactMech"/>
+                    </then><else>
+                    <log level="error" message="Phone not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                    <return error="true" message="Phone not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                </else>
+                </if>
+            </if>
+            <!-- Create new Telecom Number and association it with facility -->
+            <set field="contactMechId" value="" />
+            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityPhone" in-map="context" out-map="context"/>
+        </actions>
+    </service>
+
+    <!--
+    {
+        "infoString": "abc@example.com",
+        "facilityId": "_NA_",
+        "contactMechId": "100773",
+        "contactMechPurposeTypeId": "PRIMARY_EMAIL"
+    }
+    -->
+    <service verb="update" noun="FacilityEmail">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.party.contact.ContactMech" include="nonpk" />
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechId" required="true"/>
+            <parameter name="contactMechPurposeTypeId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="contactMechId"/>
+        </out-parameters>
+        <actions>
+            <!-- Expire old FacilityContactMech record first  -->
+            <if condition="contactMechId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech" for-update="true"  list="facilityContactMechs" limit="1">
+                    <econdition field-name="facilityId" from="facilityId"/>
+                    <econdition field-name="contactMechId" from="contactMechId"/>
+                </entity-find>
+                <if condition="facilityContactMechs">
+                    <then>
+                        <set field="facilityContactMech" from="facilityContactMechs[0]"/>
+                        <set field="facilityContactMech.thruDate" from="ec.user.nowTimestamp"/>
+                        <entity-update value-field="facilityContactMech"/>
+                    </then><else>
+                    <log level="error" message="Email not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                    <return error="true" message="Email not found for facility ${facilityId} with contactMechId  ${contactMechId}"/>
+                </else>
+                </if>
+            </if>
+            <!-- Create new Telecom Number and association it with facility -->
+            <set field="contactMechId" value="" />
+            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityEmail" in-map="context" out-map="context"/>
+        </actions>
+    </service>
 </services>
