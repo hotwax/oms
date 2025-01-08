@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="update" noun="ProductAndVariants">
+        <description>This service will update product and create new variants</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+        </in-parameters>
+        <actions>
+            <log level="info" message="====updateProductAndVariants============productJson: ${productJson}================"/>
+            <set field="productVariants" from="productJson.variants"/>
+            <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
+            <!-- Remove variants from the productJson -->
+            <script>
+                productJson.remove("variants")
+                productJson.remove("shopifyShopProduct")
+            </script>
+            <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
+            <if condition="productJson.productId == null">
+                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="productJson" out-map="prepareProductCreateOutput"/>
+                <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
+                <set field="parentProductId" from="createProductOutput.productId"/>
+                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
+                <else>
+                    <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
+                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="context" out-map="prepareUpdateProductOutput"/>
+                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareUpdateProductOutput" out-map="updateProductOutput" />
+                    <!-- TODO: We can remove the below commented block as this is not really needed for update flow -->
+                    <set field="parentProductId" from="productJson.productId"/>
+                    <!-- <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/> -->
+                    <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
+                    <iterate list="updateProductOutput.deleteProductFeatureAppls" entry="productFeatureAppl">
+                        <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                    </iterate>
+                </else>
+            </if>
+            <iterate list="productVariants" entry="productVariant">
+                <set field="productVariantMap" from="[:]"/>
+                <set field="productVariantMap.parentProductId" from="parentProductId"/>
+                <set field="productVariantMap.productVariantJson" from="productVariant"/>
+                <service-call name="co.hotwax.oms.product.ProductServices.update#ProductVariant" in-map="productVariantMap"/>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="prepare" noun="ProductUpdate">
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+            <parameter name="deleteProductFeatureAppls" type="List"/>
+        </out-parameters>
+        <actions>
+            <log level="info" message="====prepareProductUpdate============productJson: ${productJson}================"/>
+            <!-- Prepare the product price information -->
+            <if condition="productJson.price != null">
+                <set field="priceMap" from="[:]"/>
+                <set field="priceMap.price" from="productJson.price"/>
+                <script>productJson.remove("price")</script>
+                <if condition="priceMap.price != null">
+                    <set field="productPriceList" from="[]"/>
+                    <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPrices">
+                        <date-filter/>
+                        <econdition field-name="productId" from="productJson.productId"/>
+                        <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
+                        <econdition field-name="productPricePurposeId" value="PURCHASE"/>
+                    </entity-find>
+                    <set field="productPriceRecord" from="productPrices[0]"/>
+                    <set field="productPriceRecord.price" from="priceMap.price"/>
+                    <entity-update value-field="productPriceRecord"/>
+                    <script>productPriceList.add(productPriceRecord)</script>
+                </if>
+                <script>productJson.put("org.apache.ofbiz.product.price.ProductPrice", productPriceList) </script>
+                <set field="productJson.productPriceList" from="productPriceList"/>
+            </if>
+
+            <!-- Prepare the product features -->
+            <set field="features" from="productJson.features"/>
+            <if condition="features != null">
+                <set field="ProductFeatureApplList" from="[]"/>
+                <iterate list="features" entry="feature">
+                    <!-- Create new productFeatureTypeId if it doesn't exist -->
+                    <if condition="feature.productFeatureTypeId == null">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeId]" out-map="createProductFeatureTypeOutput"/>
+                        <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                    </if>
+                    <!-- Create new productFeatureId if it doesn't exist -->
+                    <if condition="feature.productFeatureId == null">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature" out-map="createProductFeatureOutput"/>
+                        <set field="feature.productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                    </if>
+                    <set field="productFeatureAppl" from="[:]"/>
+                    <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
+                    <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
+                    <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
+                    <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
+                    <script>ProductFeatureApplList.add(productFeatureAppl)</script>
+                </iterate>
+            </if>
+            <!-- Get the current active ProductFeatureAppl list for the product -->
+            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" list="currentProductFeatureAppls">
+                <date-filter/>
+                <econdition field-name="productId" from="productJson.productId"/>
+            </entity-find>
+            <set field="deleteProductFeatureAppls" from="[]"/>
+            <iterate list="currentProductFeatureAppls" entry="currentProductFeatureAppl">
+                <set field="toBeDeleted" value="false"/>
+                <iterate list="ProductFeatureApplList" entry="productFeatureAppl">
+                    <if condition="currentProductFeatureAppl.productFeatureId == productFeatureAppl.productFeatureId">
+                        <set field="toBeDeleted" value="true"/>
+                    </if>
+                </iterate>
+                <if condition="toBeDeleted">
+                    <script>deleteProductFeatureAppls.add(currentProductFeatureAppl)</script>
+                </if>
+            </iterate>
+            <if condition="productFeatureApplList != null">
+                <!-- TODO: Discuss this assignment -->
+                <script>productJson.put("org.apache.ofbiz.product.feature.ProductFeatureAppl", productFeatureApplList) </script>
+            </if>
+            <!-- Prepare the good identifications -->
+            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
+            <if condition="goodIdentifications != null">
+                <set field="goodIdentificationList" from="[]"/>
+                <iterate list="goodIdentifications" entry="goodIdentification">
+                    <set field="productGoodIdentification" from="[:]"/>
+                    <set field="productGoodIdentification.goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
+                    <set field="productGoodIdentification.idValue" from="goodIdentification.idValue"/>
+                    <set field="productGoodIdentification.fromDate" from="ec.user.nowTimestamp"/>
+                    <script>goodIdentificationList.add(productGoodIdentification)</script>
+                </iterate>
+            </if>
+            <if condition="goodIdentificationList != null">
+                <!-- TODO: Discuss this assignment -->
+                <script>productJson.put("org.apache.ofbiz.product.product.GoodIdentification", goodIdentificationList) </script>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="update" noun="ProductVariant">
+        <description>This service will update a product variant</description>
+        <in-parameters>
+            <parameter name="productVariantJson" type="Map" required="true"/>
+            <parameter name="parentProductId" required="true"/>
+        </in-parameters>
+        <actions>
+            <log level="info" message="====updateProductVariant============productVariantJson: ${productVariantJson}================"/>
+            <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
+            <script>productVariantJson.remove("shopifyShopProduct")</script>
+            <if condition="productVariantJson.productId == null">
+                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
+                <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
+                <else>
+                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
+                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="[productJson:prepareProductUpdateOutput.productJson]" out-map="updateProductOutput"/>
+                    <!-- Identify if parent product and updateProductOutput.productId are already associated in ProductAssoc entity-->
+                    <entity-find-one entity-name="org.apache.ofbiz.product.product.ProductAssoc" value-field="productAssoc">
+                        <field-map field-name="productId" from="parentProductId"/>
+                        <field-map field-name="productIdTo" from="updateProductOutput.productId"/>
+                        <field-map field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                    </entity-find-one>
+                    <if condition="!productAssoc">
+                        <!-- If not then create a new ProductAssoc record -->
+                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                    </if>
+                    <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:updateProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
+                    <iterate list="updateProductOutput.deleteProductFeatureAppls" entry="productFeatureAppl">
+                        <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                    </iterate>
+                </else>
+            </if>
+        </actions>
+    </service>
+</services>
