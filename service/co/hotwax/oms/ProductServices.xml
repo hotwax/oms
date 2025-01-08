@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+    
+    <service verb="create" noun="ProductAndVariants" transaction-timeout="1800">
+        <description>Service to create the virtual and variant products.</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true">
+                <description>TODO: add description here.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Set the productVariants field from the incoming productJson map -->
+            <set field="productVariants" from="productJson.variants"/>
+
+            <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
+            <if condition="productJson.productId!=null">
+                <then>
+                    <!-- Create ShopifyShopProduct record -->
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:productJson.shopifyShopProduct.shopId,
+                            productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
+                    <set field="parentProductId" from="productJson.productId"/>
+                </then>
+                <else>
+                    <!-- Set the shopifyShopProduct field -->
+                    <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
+                    <script>productJson.remove(shopifyShopProduct)</script>
+
+                    <!-- Call the prepare#ProductCreate service to get the json for creating product -->
+                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+                            out-map="prepareProductCreateOut"/>
+
+                    <!-- Call the create service on Product -->
+                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                            out-map="createProductOut"/>
+
+                    <!-- Set the parentProductId -->
+                    <set field="parentProductId" from="createProductOut.productId"/>
+
+                    <!-- Create ShopifyShopProduct record -->
+                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+
+                    <!-- Iterate the productVariants list -->
+                    <iterate list="productVariants" entry="productVariant">
+
+                        <!-- For each product variant call the create#ProductVariant service -->
+                        <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
+                                parentProductId:parentProductId]"/>
+                    </iterate>
+                </else>
+            </if>
+        </actions>
+    </service>
+    
+    <service verb="create" noun="ProductVariant" transaction-timeout="1800">
+        <description>Service to create Product Variant.</description>
+        <in-parameters>
+            <parameter name="productVariantJson" type="Map" required="true">
+                <description>The product variant json to be created.</description>
+            </parameter>
+            <parameter name="parentProductId" required="true">
+                <description>The parent product id for the variants.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Check if productId is not null -->
+            <if condition="productVariantJson.productId!=null">
+                <then>
+                    <!-- Create ShopifyShopProduct record -->
+                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
+                            productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId]" out-map="context"/>
+
+                    <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
+                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+                </then>
+                <else>
+                    <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
+                    <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
+                    <script>productVariantJson.remove(shopifyShopProduct)</script>
+
+                    <!-- Call prepare#ProductCreate for the productVariantJson map -->
+                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
+                                  out-map="prepareProductCreateOut"/>
+
+                    <!-- Create Product record for the variant product -->
+                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                            out-map="createProductOut"/>
+
+                    <!-- Create ProductAssoc record for the variant product -->
+                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+
+                    <!-- Create ShopifyShopProduct record for the variant product -->
+                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="prepare" noun="ProductCreate" transaction-timeout="1800">
+        <description>Service to create the json map required for creating the product and its related records.</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true">
+                <description>The input json map for product.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productJson" type="Map">
+                <description>The output json map for the product.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <!-- Set the features list -->
+            <set field="features" from="productJson.features"/>
+
+            <!-- Set the goodIdentifications list -->
+            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
+
+            <!-- Remove the product features list and the goodIdentifications list -->
+            <script>productJson.remove(features)</script>
+            <script>productJson.remove(goodIdentifications)</script>
+
+            <!-- Set the price map from productJson.price -->
+            <set field="priceMap" from="productJson.price"/>
+
+            <script>productJson.remove(price)</script>
+
+            <!-- Check if priceMap is not null -->
+            <if condition="priceMap!=null">
+                <!-- If it's not null then initialize the productPrice list. -->
+                <set field="productPrice" from="[]"/>
+                <set field="priceMap.fromDate" from="ec.user.nowTimestamp"/>
+                <script>productPrice.add(priceMap)</script>
+                <script>productJson.put("org.apache.ofbiz.product.price.ProductPrice",productPrice)</script>
+            </if>
+
+            <!-- Check if features list is not null -->
+            <if condition="features!=null">
+                <!-- Initialize the productFeatureApplList -->
+                <set field="productFeatureApplList" from="[]"/>
+
+                <!-- Iterate through the features list -->
+                <iterate list="features" entry="feature">
+                    <!-- Check if productFeatureTypeId is null then create one and set the productFeatureTypeId -->
+                    <if condition="feature.productFeatureTypeId == null">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeId]" out-map="createProductFeatureTypeOutput"/>
+                        <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                    </if>
+                    <!-- Create new productFeatureId if it doesn't exist -->
+                    <if condition="feature.productFeatureId == null">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature" out-map="createProductFeatureOutput"/>
+                        <set field="feature.productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                    </if>
+                    <set field="productFeatureAppl" from="[:]"/>
+                    <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
+                    <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
+                    <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
+                    <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
+                    <script>productFeatureApplList.add(productFeatureAppl)</script>
+                    <if condition="productFeatureApplList!=null">
+                        <script>productJson.put("org.apache.ofbiz.product.feature.ProductFeatureAppl", productFeatureApplList)</script>
+                    </if>
+                </iterate>
+            </if>
+            <!-- Set goodIdentifications from productJson -->
+            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
+
+            <!-- Check if goodIdentifications is not null. -->
+            <if condition="goodIdentifications!=null">
+                <!-- Set goodIdentifications list -->
+                <set field="goodIdentificationList" from="[]"/>
+                <!-- Iterate the goodIdentifications list -->
+                <iterate list="goodIdentifications" entry="goodIdentification">
+                    <set field="productGoodIdentification" from="[:]"/>
+                    <set field="productGoodIdentification.goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
+                    <set field="productGoodIdentification.idValue" from="goodIdentification.idValue"/>
+                    <set field="productGoodIdentification.fromDate" from="ec.user.nowTimestamp"/>
+                    <script>goodIdentificationList.add(productGoodIdentification)</script>
+                </iterate>
+            </if>
+            <if condition="goodIdentificationList != null">
+                <script>productJson.put("org.apache.ofbiz.product.product.GoodIdentification", goodIdentificationList) </script>
+            </if>
+        </actions>
+    </service>
+</services>
