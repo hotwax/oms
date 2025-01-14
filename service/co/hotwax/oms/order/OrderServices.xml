@@ -54,7 +54,7 @@ under the License.
 
             <set field="orderRoles" from="[]"/>
             <!-- Get the customer party ID either by finding it or creating it -->
-            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Customer" in-map="orderJson.customer" out-map="findOrCreateCustomerOutput"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Person" in-map="orderJson.customer" out-map="findOrCreateCustomerOutput"/>
             <script>
                 orderRoles.add([partyId:findOrCreateCustomerOutput.partyId, roleTypeId:"SHIP_TO_CUSTOMER"])
                 orderRoles.add([partyId:productStore.payToPartyId, roleTypeId:"SHIP_FROM_VENDOR"])
@@ -63,38 +63,44 @@ under the License.
 
             <set field="orderContactMechs" from="[]"/>
             <!-- Shipping Address -->
-            <service-call name="co.hotwax.oms.order.OrderServices.create#PostalAddress" in-map="[postalAddressJson:orderJson.shipToAddress]" out-map="createPostalAddressOutput"/>
-            <set field="shipToAddressContactMechId" from="createPostalAddressOutput.contactMechId"/>
+            <!-- First create the GeoPoint details -->
+            <service-call name="create#moqui.basic.GeoPoint" in-map="orderJson.shipToAddress.geoPoint" out-map="createGeoPointOutput"/>
+            <script>
+                orderJson.shipToAddress.remove("geoPoint")
+                orderJson.shipToAddress.put("geoPointId", createGeoPointOutput.geoPointId)
+            </script>
+            <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="orderJson.shipToAddress" out-map="createShipToAddressOutput"/>
+            <set field="shipToAddressContactMechId" from="createShipToAddressOutput.contactMechId"/>
             <script>
                 orderContactMechs.add([contactMechId:shipToAddressContactMechId, contactMechPurposeTypeId:"SHIPPING_LOCATION"])
             </script>
 
             <!-- Shipping Phone -->
-            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'TELECOM_NUMBER', infoString:orderJson.shipToPhone]" out-map="createContactMechOutput"/>
-            <set field="shipToPhoneContactMechId" from="createContactMechOutput.contactMechId"/>
+            <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="[contactNumber:orderJson.shipToPhone]" out-map="createShipToPhoneOutput"/>
+            <set field="shipToPhoneContactMechId" from="createShipToPhoneOutput.contactMechId"/>
             <script>
                 orderContactMechs.add([contactMechId:shipToPhoneContactMechId, contactMechPurposeTypeId:"PHONE_SHIPPING"])
             </script>
 
             <!-- Order Email -->
-            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderJson.email]" out-map="createContactMechOutput"/>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderJson.email]" out-map="createOrderEmailOutput"/>
             <script>
-                orderContactMechs.add([contactMechId:createContactMechOutput.contactMechId, contactMechPurposeTypeId:"ORDER_EMAIL"])
+                orderContactMechs.add([contactMechId:createOrderEmailOutput.contactMechId, contactMechPurposeTypeId:"ORDER_EMAIL"])
             </script>
 
             <!-- Billing Address -->
             <if condition="orderJson.billToAddress">
-                <service-call name="create#org.apache.ofbiz.party.contact.PostalAddress" in-map="orderJson.billToAddress" out-map="createPostalAddressOutput"/>
+                <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="orderJson.billToAddress" out-map="createBillToAddressOutput"/>
                 <script>
-                    orderContactMechs.add([contactMechId:createPostalAddressOutput.contactMechId, contactMechPurposeTypeId:"BILLING_LOCATION"])
+                    orderContactMechs.add([contactMechId:createBillToAddressOutput.contactMechId, contactMechPurposeTypeId:"BILLING_LOCATION"])
                 </script>
             </if>
 
             <!-- Billing Phone -->
             <if condition="orderJson.billToPhone">
-                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'TELECOM_NUMBER', infoString:orderJson.billToPhone]" out-map="createContactMechOutput"/>
+                <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="[contactNumber:orderJson.billToPhone]" out-map="createBillToPhoneOutput"/>
                 <script>
-                    orderContactMechs.add([contactMechId:createContactMechOutput.contactMechId, contactMechPurposeTypeId:"PHONE_BILLING"])
+                    orderContactMechs.add([contactMechId:createBillToPhoneOutput.contactMechId, contactMechPurposeTypeId:"PHONE_BILLING"])
                 </script>
             </if>
             <script>
@@ -109,26 +115,12 @@ under the License.
                     <set field="item.productId" from="findOrCreateProductOutput.productId"/>
                 </iterate>
             </iterate>
-            <!--
-                Set orderContext.shipGroups = orderJson.shipGroups
-                8. Call create#org.apache.ofbiz.order.order.OrderHeader for orderContext
-             -->
             <set field="orderContext.shipGroups" from="orderJson.shipGroups"/>
+            <log level="info" message="==============orderContext: ${orderContext}==========="/>
+
+            <!-- Save the OrderHeader and related information -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="orderContext" out-map="createOrderHeaderOutput"/>
             <set field="orderId" from="createOrderHeaderOutput.orderId"/>
-        </actions>
-    </service>
-
-    <service verb="create" noun="PostalAddress">
-        <in-parameters>
-            <parameter name="postalAddressJson" type="Map" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="contactMechId" required="true"/>
-        </out-parameters>
-        <actions>
-            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'POSTAL_ADDRESS', postalAddress:postalAddressJson]" out-map="createContactMechOutput"/>
-            <set field="contactMechId" from="createContactMechOutput.contactMechId"/>
         </actions>
     </service>
 
@@ -154,14 +146,16 @@ under the License.
         </actions>
     </service>
 
-    <service verb="findOrCreate" noun="Party">
+    <service verb="findOrCreate" noun="Person">
         <description>This service either finds a party by its externalId or creates a new one</description>
         <in-parameters>
             <parameter name="externalId" required="true"/>
             <parameter name="firstName" required="true"/>
             <parameter name="lastName" required="true"/>
             <parameter name="dataSourceId" required="true"/>
-            <parameter name="email" required="true"/>
+            <parameter name="contactMechs" type="List"/>
+            <parameter name="roles" type="List"/>
+            <parameter name="identifications" type="List"/>
         </in-parameters>
         <out-parameters>
             <parameter name="partyId" required="true"/>
@@ -175,9 +169,12 @@ under the License.
             <if condition="customerParty">
                 <set field="partyId" from="customerParty.partyId"/>
                 <else>
-                    <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:email]" out-map="createContactMechOutput"/>
-                    <service-call name="create#org.apache.ofbiz.party.party.Party" in-map="[partyTypeId:'PERSON', dataSourceId:dataSourceId, person:[firstName:firstName, lastName:lastName], roles:[[roleTypeId:'CUSTOMER']], contactMechs:[createContactMechOutput.contactMechId, 'PRIMARY_EMAIL']]]" out-map="createPartyOutput"/>
-                    <set field="partyId" from="createPartyOutput.partyId"/>
+                    <!-- If party doesn't exist, then create one -->
+                    <if condition="!firstName &amp;&amp; !lastName">
+                        <return error="true" type="warning" message="Party not found with externalId: ${externalId}. Couldn't create a Party for null firstName and lastName."/>
+                    </if>
+                    <service-call name="co.hotwax.oms.party.PartyServices.create#Person" in-map="context" out-map="createPersonOutput"/>
+                    <set field="partyId" from="createPersonOutput.partyId"/>
                 </else>
             </if>
         </actions>
