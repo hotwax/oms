@@ -91,11 +91,11 @@ under the License.
     </extend-entity>
     <extend-entity entity-name="OrderContactMech" package="org.apache.ofbiz.order.order">
         <relationship type="one" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
-            <key-map field-name="contactMechId"/>
+            <key-map field-name="orderId"/>
         </relationship>
 
         <master>
-            <detail relationship="contactMech" use-master="default"/>
+            <detail relationship="contactMech"/>
         </master>
     </extend-entity>
     <extend-entity entity-name="ReturnHeader" package="org.apache.ofbiz.order.return">
