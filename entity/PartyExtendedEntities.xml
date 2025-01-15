@@ -59,9 +59,8 @@ under the License.
             <key-map field-name="partyId"/>
             <key-map field-name="contactMechId"/>
         </relationship>
-
         <master>
-            <detail relationship="contactMech""/>
+            <detail relationship="contactMech"/>
             <detail relationship="purposes"/>
         </master>
     </extend-entity>
