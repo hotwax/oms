@@ -76,7 +76,7 @@ under the License.
             </script>
 
             <!-- Shipping Phone -->
-            <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="[contactNumber:orderJson.shipToPhone]" out-map="createShipToPhoneOutput"/>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:orderJson.shipToPhone]" out-map="createShipToPhoneOutput"/>
             <set field="shipToPhoneContactMechId" from="createShipToPhoneOutput.contactMechId"/>
             <script>
                 orderContactMechs.add([contactMechId:shipToPhoneContactMechId, contactMechPurposeTypeId:"PHONE_SHIPPING"])
@@ -98,7 +98,7 @@ under the License.
 
             <!-- Billing Phone -->
             <if condition="orderJson.billToPhone">
-                <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="[contactNumber:orderJson.billToPhone]" out-map="createBillToPhoneOutput"/>
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:orderJson.billToPhone]" out-map="createBillToPhoneOutput"/>
                 <script>
                     orderContactMechs.add([contactMechId:createBillToPhoneOutput.contactMechId, contactMechPurposeTypeId:"PHONE_BILLING"])
                 </script>
@@ -133,11 +133,12 @@ under the License.
             <parameter name="productId" required="true"/>
         </out-parameters>
         <actions>
+            <log level="info" message="===========context=====${context}==============="/>
             <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="product" limit="1">
                 <econdition field-name="internalName" from="internalName"/>
             </entity-find>
             <if condition="product">
-                <set field="productId" from="product.productId"/>
+                <set field="productId" from="product[0].productId"/>
                 <else>
                     <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="[internalName:internalName]" out-map="createProductOutput"/>
                     <set field="productId" from="createProductOutput.productId"/>
@@ -162,12 +163,12 @@ under the License.
         </out-parameters>
         <actions>
             <!-- Get the party -->
-            <entity-find entity-name="Party" list="customerParty" limit="1">
+            <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="customerParty" limit="1">
                 <econdition field-name="externalId" from="externalId"/>
                 <econdition field-name="dataSourceId" from="dataSourceId" ignore-if-empty="true"/>
             </entity-find>
             <if condition="customerParty">
-                <set field="partyId" from="customerParty.partyId"/>
+                <set field="partyId" from="customerParty[0].partyId"/>
                 <else>
                     <!-- If party doesn't exist, then create one -->
                     <if condition="!firstName &amp;&amp; !lastName">
