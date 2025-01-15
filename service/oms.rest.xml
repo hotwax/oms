@@ -133,10 +133,10 @@ under the License.
     <resource name="shopifyShops" description="Get the Shopify Shops details ">
         <resource name="shops">
             <method type="get"><entity name="co.hotwax.shopify.ShopifyShop" operation="list" masterName="default"/></method>
-            <method type="post"><entity name="co.hotwax.shopify.ShopifyShop" operation="create" masterName="config"/></method>
+            <method type="post"><entity name="co.hotwax.shopify.ShopifyShop" operation="create" masterName="default"/></method>
             <id name="shopId">
                 <method type="get"><entity name="co.hotwax.shopify.ShopifyShop" operation="one" masterName="default"/></method>
-                <method type="put"><entity name="co.hotwax.shopify.ShopifyShop" operation="update" masterName="config"/></method>
+                <method type="put"><entity name="co.hotwax.shopify.ShopifyShop" operation="update" masterName="default"/></method>
             </id>
         </resource>
         <resource name="locations">
