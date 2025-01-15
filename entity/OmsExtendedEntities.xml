@@ -18,20 +18,6 @@ under the License.
 
 <entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/entity-definition-2.1.xsd">
 
-    <extend-entity entity-name="ContactMech" package="org.apache.ofbiz.party.contact">
-        <relationship type="one" related="org.apache.ofbiz.party.contact.TelecomNumber" short-alias="telecomNumber">
-            <key-map field-name="contactMechId"/>
-        </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.contact.PostalAddress" short-alias="postalAddress">
-            <key-map field-name="contactMechId"/>
-        </relationship>
-        <master>
-            <detail relationship="postalAddress"/>
-            <detail relationship="telecomNumber"/>
-        </master>
-    </extend-entity>
-
-
     <extend-entity entity-name="FacilityContactMech" package="org.apache.ofbiz.product.facility">
         <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMechPurpose" short-alias="contactMechPurpose">
             <key-map field-name="facilityId"/>
