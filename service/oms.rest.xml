@@ -326,4 +326,47 @@ under the License.
             <entity name="org.apache.ofbiz.party.party.PartyContactMechDetails" operation="list"/>
         </method>
     </resource>
+
+    <resource name="shippingGateways" require-authentication="anonymous-all">
+        <resource name="shipmentMethodTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="carrierShipmentMethods">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/>
+            </method>
+        </resource>
+        <resource name="shipmentBoxTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentBoxType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentBoxType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="carrierShipmentBoxTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="shopifyShopCarrierShipments">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="create"/>
+            </method>
+        </resource>
+    </resource>
 </resource>
