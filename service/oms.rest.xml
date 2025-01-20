@@ -178,26 +178,26 @@ under the License.
         </method>
         <resource name="facilityPhone" require-authentication="anonymous-all">
             <method type="post">
-                <service name="co.hotwax.oms.ContactMechServices.create#FacilityPhone"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityPhone"/>
             </method>
             <method type="put">
-                <service name="co.hotwax.oms.ContactMechServices.update#FacilityPhone"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityPhone"/>
             </method>
         </resource>
         <resource name="facilityAddress" require-authentication="anonymous-all">
             <method type="post">
-                <service name="co.hotwax.oms.ContactMechServices.create#FacilityAddress"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityAddress"/>
             </method>
             <method type="put">
-                <service name="co.hotwax.oms.ContactMechServices.update#FacilityAddress"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityAddress"/>
             </method>
         </resource>
         <resource name="facilityEmail" require-authentication="anonymous-all">
             <method type="post">
-                <service name="co.hotwax.oms.ContactMechServices.create#FacilityEmail"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityEmail"/>
             </method>
             <method type="put">
-                <service name="co.hotwax.oms.ContactMechServices.update#FacilityEmail"/>
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityEmail"/>
             </method>
         </resource>
     </resource>
