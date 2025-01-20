@@ -55,7 +55,7 @@
             <parameter name="contactMechId" required="true"/>
         </out-parameters>
         <actions>
-            <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="context" out-map="postalAddressOut"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress" in-map="context" out-map="postalAddressOut"/>
             <if condition="postalAddressOut.contactMechId">
                 <set field="contactMechId" from="postalAddressOut.contactMechId"/>
                 <service-call name="create#org.apache.ofbiz.product.facility.FacilityContactMech" in-map="context + [contactMechId:contactMechId, contactMechPurpose:[contactMechPurposeTypeId:contactMechPurposeTypeId]]" out-map="context"/>
@@ -82,7 +82,7 @@
             <parameter name="contactMechId" required="true"/>
         </out-parameters>
         <actions>
-            <service-call name="co.hotwax.oms.ContactMechServices.create#TelecomNumber" in-map="context" out-map="telecomNumberOut"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber" in-map="context" out-map="telecomNumberOut"/>
             <if condition="telecomNumberOut.contactMechId">
                 <set field="contactMechId" from="telecomNumberOut.contactMechId"/>
                 <service-call name="create#org.apache.ofbiz.product.facility.FacilityContactMech" in-map="context + [contactMechId:contactMechId, contactMechPurpose:[contactMechPurposeTypeId:contactMechPurposeTypeId]]" out-map="context"/>
@@ -160,7 +160,7 @@
             </if>
             <!-- Create new Address and association it with facility -->
             <set field="contactMechId" value="" />
-            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityAddress" in-map="context" out-map="context"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#FacilityAddress" in-map="context" out-map="context"/>
         </actions>
     </service>
 
@@ -204,7 +204,7 @@
             </if>
             <!-- Create new Telecom Number and association it with facility -->
             <set field="contactMechId" value="" />
-            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityPhone" in-map="context" out-map="context"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#FacilityPhone" in-map="context" out-map="context"/>
         </actions>
     </service>
 
@@ -246,7 +246,7 @@
             </if>
             <!-- Create new Telecom Number and association it with facility -->
             <set field="contactMechId" value="" />
-            <service-call name="co.hotwax.oms.ContactMechServices.create#FacilityEmail" in-map="context" out-map="context"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#FacilityEmail" in-map="context" out-map="context"/>
         </actions>
     </service>
 </services>
