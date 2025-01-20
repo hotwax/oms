@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/rest-api-3.xsd"
+          name="oms" displayName="OMS API" version="1.0.0" description="OMS REST api">
+
+    <resource name="order" require-authentication="anonymous-all">
+        <method type="get">
+            <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="list" masterName="default"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="create" masterName="default"/>
+        </method>
+    </resource>
+    <resource name="return" require-authentication="anonymous-all">
+        <method type="get">
+            <entity name="org.apache.ofbiz.order.return.ReturnHeader" operation="list" masterName="default"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.order.return.ReturnHeader" operation="create" masterName="default"/>
+        </method>
+    </resource>
+
+    <resource name="productStores">
+        <method type="get">
+            <entity name="co.hotwax.product.store.ProductStoreShipmentMethCount" operation="list"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.product.store.ProductStore" operation="create"/>
+        </method>
+        <id name="productStoreId">
+            <method type="get">
+                <entity name="org.apache.ofbiz.product.store.ProductStore" operation="one"/>
+            </method>
+            <method type="put">
+                <entity name="org.apache.ofbiz.product.store.ProductStore" operation="update"/>
+            </method>
+            <resource name="settings">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreSetting" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreSetting" operation="store"/>
+                </method>
+            </resource>
+            <resource name="shipmentMethods">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="list"/>
+                </method>
+            </resource>
+            <resource name="facilities">
+                <resource name="counts">
+                    <method type="get">
+                        <entity name="co.hotwax.product.store.ProductStoreFacilityCount" operation="list"/>
+                    </method>
+                </resource>
+                <method type="get">
+                    <entity name="co.hotwax.product.store.ProductStoreFacilityDetail" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreFacility" operation="store"/>
+                </method>
+            </resource>
+            <resource name="facilityGroups">
+                <resource name="counts">
+                    <method type="get">
+                        <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
+                    </method>
+                </resource>
+                <method type="get">
+                    <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="store"/>
+                </method>
+            </resource>
+        </id>
+    </resource>
+
+    <resource name="groupProductStores" description="ProductStores associated with facility group">
+        <method type="get">
+            <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
+        </method>
+    </resource>
+
+    <resource name="facilities">
+        <method type="get">
+            <entity name="co.hotwax.facility.FacilityAndType" operation="list"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.product.facility.Facility" operation="create"/>
+        </method>
+        <id name="facilityId">
+            <method type="get">
+                <entity name="org.apache.ofbiz.product.facility.Facility" operation="one"/>
+            </method>
+            <method type="put">
+                <entity name="org.apache.ofbiz.product.facility.Facility" operation="update"/>
+            </method>
+            <method type="delete">
+                <entity name="org.apache.ofbiz.product.facility.Facility" operation="delete"/>
+            </method>
+            <resource name="locations">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityLocation" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityLocation" operation="store"/>
+                </method>
+            </resource>
+            <resource name="identifications">
+                <method type="get">
+                    <entity name="co.hotwax.facility.FacilityIdentification" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="co.hotwax.facility.FacilityIdentification" operation="store"/>
+                </method>
+            </resource>
+            <resource name="groups">
+                <method type="get">
+                    <entity name="co.hotwax.facility.FacilityGroupAndMember" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityGroupMember" operation="store"/>
+                </method>
+            </resource>
+            <resource name="productStores">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreFacility" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreFacility" operation="store"/>
+                </method>
+            </resource>
+            <resource name="parties">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="store"/>
+                </method>
+            </resource>
+            <resource name="calendars">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityCalendar" operation="list"/>
+                </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityCalendar" operation="store"/>
+                </method>
+            </resource>
+        </id>
+        <resource name="facilityOrderCounts" description="Facility order count">
+            <method type="get">
+                <entity name="co.hotwax.facility.FacilityOrderCount" operation="list"/>
+            </method>
+        </resource>
+    </resource>
+
+    <resource name="facilityContactMechs">
+        <method type="get">
+            <entity name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" operation="list"/>
+        </method>
+        <resource name="facilityPhone" require-authentication="anonymous-all">
+            <method type="post">
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityPhone"/>
+            </method>
+            <method type="put">
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityPhone"/>
+            </method>
+        </resource>
+        <resource name="facilityAddress" require-authentication="anonymous-all">
+            <method type="post">
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityAddress"/>
+            </method>
+            <method type="put">
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityAddress"/>
+            </method>
+        </resource>
+        <resource name="facilityEmail" require-authentication="anonymous-all">
+            <method type="post">
+                <service name="co.hotwax.oms.contact.ContactMechServices.create#FacilityEmail"/>
+            </method>
+            <method type="put">
+                <service name="co.hotwax.oms.contact.ContactMechServices.update#FacilityEmail"/>
+            </method>
+        </resource>
+    </resource>
+
+    <resource name="facilityGroups" description="Get the facility groups">
+        <method type="get">
+            <entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="list"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="create"/>
+        </method>
+        <id name="facilityGroupId">
+            <method type="get">
+                <entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="one"/>
+            </method>
+            <method type="put">
+                <entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="update"/>
+            </method>
+            <method type="delete">
+                <entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="delete"/>
+            </method>
+        </id>
+    </resource>
+
+    <resource name="groupFacilities" description="Facilities associated with facility group">
+        <method type="get">
+            <entity name="co.hotwax.facility.FacilityGroupAndMember" operation="list"/>
+        </method>
+    </resource>
+
+    <!-- shopify shops records along with shopify config -->
+    <resource name="shopifyShops" description="Get the Shopify Shops details ">
+        <resource name="shops">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShop" operation="list" masterName="default"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShop" operation="create" masterName="default"/>
+            </method>
+            <id name="shopId">
+                <method type="get">
+                    <entity name="co.hotwax.shopify.ShopifyShop" operation="one" masterName="default"/>
+                </method>
+                <method type="put">
+                    <entity name="co.hotwax.shopify.ShopifyShop" operation="update" masterName="default"/>
+                </method>
+            </id>
+        </resource>
+        <resource name="locations">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShopLocation" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShopLocation" operation="store"/>
+            </method>
+        </resource>
+        <resource name="carrierShipments">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="store"/>
+            </method>
+        </resource>
+        <resource name="mappingTypes">
+            <method type="get">
+                <entity name="moqui.basic.Enumeration" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="moqui.basic.Enumeration" operation="store"/>
+            </method>
+        </resource>
+        <resource name="typeMappings">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShopTypeMapping" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShopTypeMapping" operation="store"/>
+            </method>
+        </resource>
+    </resource>
+
+    <resource name="ShopFacilityMappings">
+        <method type="get">
+            <entity name="co.hotwax.shopify.ShopifyShopLocationView" operation="list"/>
+        </method>
+    </resource>
+
+    <resource name="party" require-authentication="anonymous-all">
+        <method type="get">
+            <entity name="org.apache.ofbiz.party.party.Party" operation="list"/>
+        </method>
+        <method type="post">
+            <entity name="org.apache.ofbiz.party.party.Party" operation="create"/>
+        </method>
+        <id name="partyId">
+            <method type="get">
+                <entity name="org.apache.ofbiz.party.party.Party" operation="one"/>
+            </method>
+            <method type="delete">
+                <entity name="org.apache.ofbiz.party.party.Party" operation="delete"/>
+            </method>
+            <method type="put">
+                <entity name="org.apache.ofbiz.party.party.Party" operation="update"/>
+            </method>
+            <resource name="partyGroup" require-authentication="anonymous-all">
+                <method type="post">
+                    <entity name="org.apache.ofbiz.party.party.PartyGroup" operation="create" masterName="default"/>
+                </method>
+                <id name="partyId">
+                    <method type="delete">
+                        <entity name="org.apache.ofbiz.party.party.PartyGroup" operation="delete"/>
+                    </method>
+                </id>
+            </resource>
+        </id>
+    </resource>
+
+    <!--
+    <resource name="partyRoleAndPartyDetails" description="Get PartyRole And PartyDetails">
+        <method type="get"><entity name="org.apache.ofbiz.party.party.PartyRoleAndPartyDetails" operation="list"/></method>
+    </resource> -->
+
+    <resource name="partyContactMechs">
+        <method type="get">
+            <entity name="org.apache.ofbiz.party.party.PartyContactMechDetails" operation="list"/>
+        </method>
+    </resource>
+
+    <resource name="shippingGateways" require-authentication="anonymous-all">
+        <resource name="shipmentMethodTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="carrierShipmentMethods">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/>
+            </method>
+        </resource>
+        <resource name="shipmentBoxTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentBoxType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentBoxType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="carrierShipmentBoxTypes">
+            <method type="get">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="create"/>
+            </method>
+        </resource>
+        <resource name="shopifyShopCarrierShipments">
+            <method type="get">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="list"/>
+            </method>
+            <method type="post">
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="create"/>
+            </method>
+        </resource>
+    </resource>
+</resource>

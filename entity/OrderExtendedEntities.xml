@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/entity-definition-2.1.xsd">
+    <extend-entity entity-name="OrderHeader" package="org.apache.ofbiz.order.order">
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderRole" short-alias="roles">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderContactMech" short-alias="contactMechs">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderPaymentPreference" short-alias="paymentPreferences">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderAdjustment" short-alias="adjustments">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderAttribute" short-alias="attributes">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderHeaderNote" short-alias="notes">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemShipGroup" short-alias="shipGroups">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <!-- Adding at order level for exchange orders where orderItemSeqId="_NA_" -->
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAssoc" short-alias="itemAssocs">
+            <key-map field-name="orderId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="roles"/>
+            <detail relationship="contactMechs" use-master="default"/>
+            <detail relationship="paymentPreferences"/>
+            <detail relationship="adjustments" use-master="default"/>
+            <detail relationship="attributes"/>
+            <detail relationship="notes"/>
+            <detail relationship="shipGroups" use-master="default"/>
+            <detail relationship="itemAssocs"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="OrderItemShipGroup" package="org.apache.ofbiz.order.order">
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItem" short-alias="items">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="items" use-master="default"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="OrderItem" package="org.apache.ofbiz.order.order">
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderAdjustment" short-alias="adjustments">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAttribute" short-alias="attributes">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="adjustments" use-master="default"/>
+            <detail relationship="attributes"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="OrderAdjustment" package="org.apache.ofbiz.order.order">
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderAdjustmentAttribute" short-alias="attributes">
+            <key-map field-name="orderAdjustmentId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="attributes"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="OrderContactMech" package="org.apache.ofbiz.order.order">
+        <relationship type="one" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
+            <key-map field-name="orderId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="contactMech"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="ReturnHeader" package="org.apache.ofbiz.order.return">
+        <relationship type="many" related="org.apache.ofbiz.order.return.ReturnItem" short-alias="items">
+            <key-map field-name="returnId"/>
+        </relationship>
+        <relationship type="many" related="co.hotwax.order.return.ReturnIdentification" short-alias="identifications">
+            <key-map field-name="returnId"/>
+        </relationship>
+
+        <master>
+            <detail relationship="items"/>
+            <detail relationship="identifications"/>
+        </master>
+    </extend-entity>
+</entities>
