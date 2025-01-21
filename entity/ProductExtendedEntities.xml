@@ -24,6 +24,9 @@ under the License.
         <relationship type="many" related="org.apache.ofbiz.product.feature.ProductFeatureAppl" short-alias="featureAppls">
             <key-map field-name="productId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.product.product.ProductAssoc" short-alias="assocs">
+            <key-map field-name="productId"/>
+        </relationship>
         <relationship type="many" related="org.apache.ofbiz.product.product.GoodIdentification" short-alias="identifications">
             <key-map field-name="productId"/>
         </relationship>
@@ -34,6 +37,7 @@ under the License.
         <master>
             <detail relationship="prices"/>
             <detail relationship="featureAppls"/>
+            <detail relationship="assocs"/>
             <detail relationship="identifications"/>
             <detail relationship="keywords"/>
         </master>
