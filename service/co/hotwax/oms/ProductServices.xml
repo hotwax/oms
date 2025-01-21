@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
-
     <service verb="update" noun="ProductAndVariants">
         <description>This service will update product and create new variants</description>
         <in-parameters>
@@ -9,13 +7,9 @@
         </in-parameters>
         <actions>
             <log level="info" message="====updateProductAndVariants============productJson: ${productJson}================"/>
-            <set field="productVariants" from="productJson.variants"/>
-            <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
-            <!-- Remove variants from the productJson -->
-            <script>
-                productJson.remove("variants")
-                productJson.remove("shopifyShopProduct")
-            </script>
+            <set field="productVariants" from="productJson.remove('variants')"/>
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
             <if condition="productJson.productId == null">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="productJson" out-map="prepareProductCreateOutput"/>
@@ -32,6 +26,9 @@
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
                     <iterate list="updateProductOutput.deleteProductFeatureAppls" entry="productFeatureAppl">
                         <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                    </iterate>
+                    <iterate list="updateProductOutput.deleteProductKeywords" entry="productKeyword">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword" in-map="productKeyword"/>
                     </iterate>
                 </else>
             </if>
@@ -51,38 +48,21 @@
         <out-parameters>
             <parameter name="productJson" type="Map" required="true"/>
             <parameter name="deleteProductFeatureAppls" type="List"/>
+            <parameter name="deleteProductKeywords" type="List"/>
         </out-parameters>
         <actions>
             <log level="info" message="====prepareProductUpdate============productJson: ${productJson}================"/>
-            <!-- Prepare the product price information -->
-            <if condition="productJson.price != null">
-                <set field="priceMap" from="[:]"/>
-                <set field="priceMap.price" from="productJson.price"/>
-                <script>productJson.remove("price")</script>
-                <if condition="priceMap.price != null">
-                    <set field="productPriceList" from="[]"/>
-                    <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPrices">
-                        <date-filter/>
-                        <econdition field-name="productId" from="productJson.productId"/>
-                        <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
-                        <econdition field-name="productPricePurposeId" value="PURCHASE"/>
-                    </entity-find>
-                    <set field="productPriceRecord" from="productPrices[0]"/>
-                    <set field="productPriceRecord.price" from="priceMap.price"/>
-                    <entity-update value-field="productPriceRecord"/>
-                    <script>productPriceList.add(productPriceRecord)</script>
-                </if>
-                <script>productJson.put("org.apache.ofbiz.product.price.ProductPrice", productPriceList) </script>
-                <set field="productJson.productPriceList" from="productPriceList"/>
-            </if>
 
             <!-- Prepare the product features -->
             <set field="features" from="productJson.features"/>
             <if condition="features != null">
-                <set field="ProductFeatureApplList" from="[]"/>
+                <set field="featureAppls" from="[]"/>
                 <iterate list="features" entry="feature">
                     <!-- Create new productFeatureTypeId if it doesn't exist -->
-                    <if condition="feature.productFeatureTypeId == null">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" value-field="productFeatureType">
+                        <field-map field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
+                    </entity-find-one>
+                    <if condition="!productFeatureType">
                         <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeId]" out-map="createProductFeatureTypeOutput"/>
                         <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
                     </if>
@@ -96,9 +76,11 @@
                     <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
                     <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
                     <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
-                    <script>ProductFeatureApplList.add(productFeatureAppl)</script>
+                    <script>featureAppls.add(productFeatureAppl)</script>
                 </iterate>
             </if>
+
+            <!-- TODO: Add more comments -->
             <!-- Get the current active ProductFeatureAppl list for the product -->
             <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" list="currentProductFeatureAppls">
                 <date-filter/>
@@ -106,36 +88,47 @@
             </entity-find>
             <set field="deleteProductFeatureAppls" from="[]"/>
             <iterate list="currentProductFeatureAppls" entry="currentProductFeatureAppl">
-                <set field="toBeDeleted" value="false"/>
-                <iterate list="ProductFeatureApplList" entry="productFeatureAppl">
+                <set field="toBeDeleted" value="true"/>
+                <iterate list="featureAppls" entry="productFeatureAppl">
                     <if condition="currentProductFeatureAppl.productFeatureId == productFeatureAppl.productFeatureId">
-                        <set field="toBeDeleted" value="true"/>
+                        <set field="toBeDeleted" value="false"/>
+                        <script>featureAppls.remove(productFeatureAppl)</script>
                     </if>
                 </iterate>
                 <if condition="toBeDeleted">
-                    <script>deleteProductFeatureAppls.add(currentProductFeatureAppl)</script>
+                    <set field="deleteProductFeatureAppls" from="deleteProductFeatureAppls+currentProductFeatureAppl"/>
                 </if>
             </iterate>
-            <if condition="productFeatureApplList != null">
-                <!-- TODO: Discuss this assignment -->
-                <script>productJson.put("org.apache.ofbiz.product.feature.ProductFeatureAppl", productFeatureApplList) </script>
+
+            <if condition="featureAppls != null">
+                <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
-            <!-- Prepare the good identifications -->
-            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
-            <if condition="goodIdentifications != null">
-                <set field="goodIdentificationList" from="[]"/>
-                <iterate list="goodIdentifications" entry="goodIdentification">
-                    <set field="productGoodIdentification" from="[:]"/>
-                    <set field="productGoodIdentification.goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
-                    <set field="productGoodIdentification.idValue" from="goodIdentification.idValue"/>
-                    <set field="productGoodIdentification.fromDate" from="ec.user.nowTimestamp"/>
-                    <script>goodIdentificationList.add(productGoodIdentification)</script>
+
+            <!-- Fetch the current Product Keywords for the productId -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.ProductKeyword" list="currentProductKeywords">
+                <econdition field-name="productId" from="productJson.productId"/>
+            </entity-find>
+            <!-- Initialize the deleteProductKeywords list -->
+            <set field="deleteProductKeywords" from="[]"/>
+            <!-- Iterate the currentProductKeywords list -->
+            <iterate list="currentProductKeywords" entry="currentProductKeyword">
+                <!-- Initialize toBeDeleted to true -->
+                <set field="toBeDeleted" value="true"/>
+                <!-- Iterate the keywords list in the productJson -->
+                <iterate list="productJson.keywords" entry="newKeyword">
+                    <!-- If current keywords match the incoming keyword then it should not be created as it already exists -->
+                    <if condition="currentProductKeyword.keyword == newKeyword.keyword">
+                        <set field="toBeDeleted" value="false"/>
+                        <script>
+                            productJson.keywords.remove(newKeyword)
+                        </script>
+                    </if>
                 </iterate>
-            </if>
-            <if condition="goodIdentificationList != null">
-                <!-- TODO: Discuss this assignment -->
-                <script>productJson.put("org.apache.ofbiz.product.product.GoodIdentification", goodIdentificationList) </script>
-            </if>
+                <!-- If toBeDeleted is true then add that keyword map to the deleteProductKeywords list -->
+                <if condition="toBeDeleted">
+                    <set field="deleteProductKeywords" from="deleteProductKeywords+currentProductKeyword"/>
+                </if>
+            </iterate>
         </actions>
     </service>
 
