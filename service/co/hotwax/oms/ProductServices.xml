@@ -216,7 +216,7 @@
                     <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
                     <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
                     <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
-                    <script>featureAppls.add(productFeatureAppl)</script>
+                    <set field="featureAppls" from="featureAppls+productFeatureAppl"/>
                 </iterate>
             </if>
 
@@ -280,8 +280,7 @@
         </in-parameters>
         <actions>
             <log level="info" message="====updateProductVariant============productVariantJson: ${productVariantJson}================"/>
-            <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
-            <script>productVariantJson.remove("shopifyShopProduct")</script>
+            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
             <if condition="productVariantJson.productId == null">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
