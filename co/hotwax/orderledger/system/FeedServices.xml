@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="consume" noun="OMSFeedSystemMessage" transaction-timeout="1800">
+        <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
+        <in-parameters>
+            <parameter name="systemMessageId" type="String" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="sendSmrId" type="String"/>
+        </out-parameters>
+        <actions>
+            <!-- Fetch the SystemMessage record and the JSON file path-->
+            <entity-find-one entity-name="SystemMessageAndType" value-field="systemMessage"/>
+            <set field="filePathRef" from="systemMessage.messageText"/>
+
+            <set field="nowDatetime" from="ec.user.nowTimestamp"/>
+
+            <!-- Prepare error file -->
+            <set field="fileName" from="filePathRef.substring(filePathRef.lastIndexOf('/')+1)"/>
+            <set field="fileNameArray" from="fileName.split('\\.')"/>
+            <set field="errorFileName" from="fileNameArray[0] + '-Error.' + fileNameArray[1]"/>
+            <set field="errorFilePathRef" from="ec.resource.expand(systemMessage.sendPath, null, [contentRoot: ec.user.getPreference('mantle.content.root') ?: 'dbresource://datamanager', date:ec.l10n.format(nowDatetime, 'yyyy-MM-dd'), dateTime:ec.l10n.format(nowDatetime, 'yyyy-MM-dd-HH-mm-ss-SSS')], false) + '/error/' + errorFileName"/>
+            <set field="errorJsonFilePath" from="ec.resource.getLocationReference(errorFilePathRef).getUri().getPath()"/>
+            <!-- Create the error file on disk -->
+            <script>
+                import com.fasterxml.jackson.core.JsonGenerator
+                import com.fasterxml.jackson.core.JsonFactory
+                import com.fasterxml.jackson.databind.ObjectMapper
+                import java.nio.charset.StandardCharsets
+
+                try {
+                    File errorFile = new File(errorJsonFilePath)
+                    if (!errorFile.parentFile.exists()) feedFile.parentFile.mkdirs()
+                    JsonFactory jfactory = new JsonFactory()
+
+                    /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
+                    so that they are automatically closed regardless of whether the try statement completes normally or abruptly. */
+                    try (PrintWriter pw = new PrintWriter(StandardCharsets.UTF_8, errorFile);
+                            JsonGenerator jGenerator = jfactory.createGenerator(pw)) {
+                        jGenerator.writeStartArray()
+            </script>
+
+            <!-- Get the JSON file text content using the file path -->
+            <set field="jsonText" from="ec.resource.getLocationReference(filePathRef).getText()"/>
+            <set field="jsonList" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(jsonText, List.class)"/>
+            <if condition="!jsonList">
+                <return type="warning" error="true" message="System message [${systemMessageId}] for Type [${systemMessage?.systemMessageTypeId}] has messageText [${systemMessage.messageText}], with feed file having incorrect data and may contain null, not consuming the feed file."/>
+            </if>
+
+            <!-- Iterate through jsonList and for each entry call systemMessage.sendService in a new transaction -->
+            <iterate list="jsonList" entry="jsonEntry">
+                <service-call name="${systemMessage.sendServiceName}" in-map="[orderJson:jsonEntry]" out-map="serviceOutput" transaction="force-new"/>
+                <if condition="serviceOutput.errorMessageList">
+                    <!-- Write error record to error file -->
+                    <script>
+                        ObjectMapper objectMapper = new ObjectMapper()
+                        objectMapper.setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
+                        objectMapper.writerWithDefaultPrettyPrinter().writeValue(errorFile, ["json":jsonEntry, "error":serviceOutput.errorMessageList])
+                    </script>
+                </if>
+            </iterate>
+
+            <script>
+                        jGenerator.writeEndArray()
+                    }
+                } catch (IOException e) {
+                    logger.error("Error preparing OMS Update Products JSON Feed file", e)
+                }
+            </script>
+
+            <!-- Create SystemMessage record for the error file path reference if errorFile is not empty -->
+            <if condition="errorFile.length() != 0">
+              <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
+                      in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
+            </if>
+        </actions>
+    </service>
+
+</services>
