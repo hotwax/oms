@@ -6,7 +6,7 @@
         <description>Service to create the virtual and variant products.</description>
         <in-parameters>
             <parameter name="productJson" type="Map" required="true">
-                <description>TODO: add description here.</description>
+                <description>The productJson containing product and its variants.</description>
             </parameter>
         </in-parameters>
         <actions>
@@ -116,31 +116,13 @@
             <!-- Set the features list -->
             <set field="features" from="productJson.features"/>
 
-            <!-- Set the goodIdentifications list -->
-            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
-
-            <!-- Remove the product features list and the goodIdentifications list -->
+            <!-- Remove the product features list -->
             <script>productJson.remove(features)</script>
-            <script>productJson.remove(goodIdentifications)</script>
-
-            <!-- Set the price map from productJson.price -->
-            <set field="priceMap" from="productJson.price"/>
-
-            <script>productJson.remove(price)</script>
-
-            <!-- Check if priceMap is not null -->
-            <if condition="priceMap!=null">
-                <!-- If it's not null then initialize the productPrice list. -->
-                <set field="productPrice" from="[]"/>
-                <set field="priceMap.fromDate" from="ec.user.nowTimestamp"/>
-                <script>productPrice.add(priceMap)</script>
-                <script>productJson.put("org.apache.ofbiz.product.price.ProductPrice",productPrice)</script>
-            </if>
 
             <!-- Check if features list is not null -->
             <if condition="features!=null">
-                <!-- Initialize the productFeatureApplList -->
-                <set field="productFeatureApplList" from="[]"/>
+                <!-- Initialize the featureAppls list -->
+                <set field="featureAppls" from="[]"/>
 
                 <!-- Iterate through the features list -->
                 <iterate list="features" entry="feature">
@@ -159,31 +141,14 @@
                     <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
                     <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
                     <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
-                    <script>productFeatureApplList.add(productFeatureAppl)</script>
-                    <if condition="productFeatureApplList!=null">
-                        <script>productJson.put("org.apache.ofbiz.product.feature.ProductFeatureAppl", productFeatureApplList)</script>
+                    <set field="featureAppls" from="featureAppls+productFeatureAppl"/>
+                    <if condition="featureAppls!=null">
+                        <script>productJson.put("featureAppls", featureAppls)</script>
                     </if>
                 </iterate>
             </if>
-            <!-- Set goodIdentifications from productJson -->
-            <set field="goodIdentifications" from="productJson.goodIdentifications"/>
-
-            <!-- Check if goodIdentifications is not null. -->
-            <if condition="goodIdentifications!=null">
-                <!-- Set goodIdentifications list -->
-                <set field="goodIdentificationList" from="[]"/>
-                <!-- Iterate the goodIdentifications list -->
-                <iterate list="goodIdentifications" entry="goodIdentification">
-                    <set field="productGoodIdentification" from="[:]"/>
-                    <set field="productGoodIdentification.goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
-                    <set field="productGoodIdentification.idValue" from="goodIdentification.idValue"/>
-                    <set field="productGoodIdentification.fromDate" from="ec.user.nowTimestamp"/>
-                    <script>goodIdentificationList.add(productGoodIdentification)</script>
-                </iterate>
-            </if>
-            <if condition="goodIdentificationList != null">
-                <script>productJson.put("org.apache.ofbiz.product.product.GoodIdentification", goodIdentificationList) </script>
-            </if>
+             <!-- Adding log for testing -->
+            <log message="======productJson=====${productJson}===="/>
         </actions>
     </service>
 </services>
