@@ -15,41 +15,37 @@
 
             <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
             <if condition="productJson.productId!=null">
-                <then>
-                    <!-- Create ShopifyShopProduct record -->
-                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:productJson.shopifyShopProduct.shopId,
-                            productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
-                    <set field="parentProductId" from="productJson.productId"/>
-                </then>
-                <else>
-                    <!-- Set the shopifyShopProduct field -->
-                    <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
-                    <script>productJson.remove(shopifyShopProduct)</script>
-
-                    <!-- Call the prepare#ProductCreate service to get the json for creating product -->
-                    <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
-                            out-map="prepareProductCreateOut"/>
-
-                    <!-- Call the create service on Product -->
-                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                            out-map="createProductOut"/>
-
-                    <!-- Set the parentProductId -->
-                    <set field="parentProductId" from="createProductOut.productId"/>
-
-                    <!-- Create ShopifyShopProduct record -->
-                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
-                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
-
-                    <!-- Iterate the productVariants list -->
-                    <iterate list="productVariants" entry="productVariant">
-
-                        <!-- For each product variant call the create#ProductVariant service -->
-                        <service-call name="co.hotwax.oms.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
-                                parentProductId:parentProductId]"/>
-                    </iterate>
-                </else>
+                <!-- Create ShopifyShopProduct record -->
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:productJson.shopifyShopProduct.shopId,
+                        productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
+                <set field="parentProductId" from="productJson.productId"/>
+                <return/>
             </if>
+            <!-- Set the shopifyShopProduct field -->
+            <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
+            <script>productJson.remove(shopifyShopProduct)</script>
+
+            <!-- Call the prepare#ProductCreate service to get the json for creating product -->
+            <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+                    out-map="prepareProductCreateOut"/>
+
+            <!-- Call the create service on Product -->
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                    out-map="createProductOut"/>
+
+            <!-- Set the parentProductId -->
+            <set field="parentProductId" from="createProductOut.productId"/>
+
+            <!-- Create ShopifyShopProduct record -->
+            <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+
+            <!-- Iterate the productVariants list -->
+            <iterate list="productVariants" entry="productVariant">
+                <!-- For each product variant call the create#ProductVariant service -->
+                <service-call name="co.hotwax.oms.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
+                        parentProductId:parentProductId]"/>
+            </iterate>
         </actions>
     </service>
     
@@ -66,37 +62,35 @@
         <actions>
             <!-- Check if productId is not null -->
             <if condition="productVariantJson.productId!=null">
-                <then>
-                    <!-- Create ShopifyShopProduct record -->
-                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
-                            productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
-                            shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+                <!-- Create ShopifyShopProduct record -->
+                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
+                        productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
+                        shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
 
-                    <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
-                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
-                </then>
-                <else>
-                    <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
-                    <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
-                    <script>productVariantJson.remove(shopifyShopProduct)</script>
-
-                    <!-- Call prepare#ProductCreate for the productVariantJson map -->
-                    <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
-                                  out-map="prepareProductCreateOut"/>
-
-                    <!-- Create Product record for the variant product -->
-                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                            out-map="createProductOut"/>
-
-                    <!-- Create ProductAssoc record for the variant product -->
-                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
-
-                    <!-- Create ShopifyShopProduct record for the variant product -->
-                    <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
-                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
-                            shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
-                </else>
+                <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+                <return/>
             </if>
+
+            <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
+            <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
+            <script>productVariantJson.remove(shopifyShopProduct)</script>
+
+            <!-- Call prepare#ProductCreate for the productVariantJson map -->
+            <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
+                          out-map="prepareProductCreateOut"/>
+
+            <!-- Create Product record for the variant product -->
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                    out-map="createProductOut"/>
+
+            <!-- Create ProductAssoc record for the variant product -->
+            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+
+            <!-- Create ShopifyShopProduct record for the variant product -->
+            <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
+                    shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
         </actions>
     </service>
 
