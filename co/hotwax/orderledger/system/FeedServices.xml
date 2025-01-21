@@ -50,17 +50,18 @@
 
             <!-- Iterate through jsonList and for each entry call systemMessage.sendService in a new transaction -->
             <iterate list="jsonList" entry="jsonEntry">
-                <service-call name="${systemMessage.sendServiceName}" in-map="[orderJson:jsonEntry]" out-map="serviceOutput" transaction="force-new"/>
-                <if condition="serviceOutput.errorMessageList">
-                    <!-- Write error record to error file -->
-                    <script>
-                        ObjectMapper objectMapper = new ObjectMapper()
-                        objectMapper.setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
-                        objectMapper.writerWithDefaultPrettyPrinter().writeValue(errorFile, ["json":jsonEntry, "error":serviceOutput.errorMessageList])
-                    </script>
-                </if>
+                <script>try {</script>
+                <service-call name="${systemMessage.sendServiceName}" in-map="[orderJson:jsonEntry]" out-map="serviceOutput" transaction="force-new" ignore-error="true"/>
+                <log level="info" message="========serviceOutput============ ${serviceOutput}=========="/>
+                <script>} catch (Throwable t) { ec.message.addError(t.toString()) } finally {
+                        new ObjectMapper()
+                        .setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
+                        .writerWithDefaultPrettyPrinter().writeValue(jGenerator,["json":jsonEntry, "error":t.toString()])
+                    }
+                </script>
             </iterate>
 
+            <!-- Close the error file -->
             <script>
                         jGenerator.writeEndArray()
                     }
@@ -69,11 +70,9 @@
                 }
             </script>
 
-            <!-- Create SystemMessage record for the error file path reference if errorFile is not empty -->
-            <if condition="errorFile.length() != 0">
-              <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
-                      in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
-            </if>
+            <!-- Create SystemMessage record for the error file path reference -->
+            <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
+                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
         </actions>
     </service>
 
