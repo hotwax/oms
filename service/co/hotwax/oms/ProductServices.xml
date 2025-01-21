@@ -69,7 +69,8 @@
                 <then>
                     <!-- Create ShopifyShopProduct record -->
                     <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
-                            productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId]" out-map="context"/>
+                            productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
+                            shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
 
                     <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
                     <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
@@ -92,7 +93,8 @@
 
                     <!-- Create ShopifyShopProduct record for the variant product -->
                     <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
-                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+                            productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
+                            shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
                 </else>
             </if>
         </actions>
