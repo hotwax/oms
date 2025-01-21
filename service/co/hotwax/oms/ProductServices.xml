@@ -22,8 +22,7 @@
                 <return/>
             </if>
             <!-- Set the shopifyShopProduct field -->
-            <set field="shopifyShopProduct" from="productJson.shopifyShopProduct"/>
-            <script>productJson.remove(shopifyShopProduct)</script>
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
 
             <!-- Call the prepare#ProductCreate service to get the json for creating product -->
             <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
@@ -73,8 +72,7 @@
             </if>
 
             <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
-            <set field="shopifyShopProduct" from="productVariantJson.shopifyShopProduct"/>
-            <script>productVariantJson.remove(shopifyShopProduct)</script>
+            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
             <!-- Call prepare#ProductCreate for the productVariantJson map -->
             <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
@@ -107,11 +105,8 @@
             </parameter>
         </out-parameters>
         <actions>
-            <!-- Set the features list -->
-            <set field="features" from="productJson.features"/>
-
-            <!-- Remove the product features list -->
-            <script>productJson.remove(features)</script>
+            <!-- Set the features list and remove it from productJson -->
+            <set field="features" from="productJson.remove('features')"/>
 
             <!-- Check if features list is not null -->
             <if condition="features!=null">
@@ -137,12 +132,12 @@
                     <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
                     <set field="featureAppls" from="featureAppls+productFeatureAppl"/>
                     <if condition="featureAppls!=null">
-                        <script>productJson.put("featureAppls", featureAppls)</script>
+                        <set field="productJson.featureAppls" from="featureAppls"/>
                     </if>
                 </iterate>
             </if>
              <!-- Adding log for testing -->
-            <log message="======productJson=====${productJson}===="/>
+            <log message="The Product Json Prepared: ${productJson}"/>
         </actions>
     </service>
 </services>
