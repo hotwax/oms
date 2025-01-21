@@ -27,7 +27,7 @@
                     <script>productJson.remove(shopifyShopProduct)</script>
 
                     <!-- Call the prepare#ProductCreate service to get the json for creating product -->
-                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+                    <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
                             out-map="prepareProductCreateOut"/>
 
                     <!-- Call the create service on Product -->
@@ -45,7 +45,7 @@
                     <iterate list="productVariants" entry="productVariant">
 
                         <!-- For each product variant call the create#ProductVariant service -->
-                        <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
+                        <service-call name="co.hotwax.oms.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
                                 parentProductId:parentProductId]"/>
                     </iterate>
                 </else>
@@ -80,7 +80,7 @@
                     <script>productVariantJson.remove(shopifyShopProduct)</script>
 
                     <!-- Call prepare#ProductCreate for the productVariantJson map -->
-                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
+                    <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
                                   out-map="prepareProductCreateOut"/>
 
                     <!-- Create Product record for the variant product -->
