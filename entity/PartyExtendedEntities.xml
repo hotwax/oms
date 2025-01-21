@@ -16,20 +16,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/entity-definition-2.1.xsd">
-    <extend-entity entity-name="Party" package="org.apache.ofbiz.party.party">
-        <relationship type="one" related="org.apache.ofbiz.party.party.Person" short-alias="person">
-            <key-map field-name="partyId"/>
-        </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.party.PartyGroup" short-alias="partyGroup">
-            <key-map field-name="contactMechId"/>
-        </relationship>
-
-        <master>
-            <detail relationship="person"/>
-            <detail relationship="partyGroup"/>
-        </master>
-    </extend-entity>
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
     <extend-entity entity-name="Person" package="org.apache.ofbiz.party.party">
         <relationship type="many" related="org.apache.ofbiz.party.party.PartyRole" short-alias="roles">
             <key-map field-name="partyId"/>
@@ -68,13 +55,12 @@ under the License.
         <relationship type="one" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
             <key-map field-name="contactMechId"/>
         </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.contact.PartyContactMechPurpose" short-alias="purposes">
+        <relationship type="many" related="org.apache.ofbiz.party.contact.PartyContactMechPurpose" short-alias="purposes">
             <key-map field-name="partyId"/>
             <key-map field-name="contactMechId"/>
         </relationship>
-
         <master>
-            <detail relationship="contactMech" use-master="default"/>
+            <detail relationship="contactMech"/>
             <detail relationship="purposes"/>
         </master>
     </extend-entity>
