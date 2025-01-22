@@ -12,5 +12,5 @@
 
     <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="SHIP_AGGREGATOR" packagingTypeCode="YOURPACKAGING"/>
 
-    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="STORE.SHIP_AGGREGATOR" description="Shipping Aggregator for productStore STORE" sendUrl="https://shipping-aggregator-uat.hotwax.io" username="hotwax.user" currentPassword="hotwax@786"/>
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="STORE.SHIP_AGGREGATOR" description="Shipping service configuration for productStore STORE" sendUrl="https://shipping-aggregator-uat.hotwax.io" privateKey="a3Jld2U6bW9xdWk="/>
 </entity-facade-xml>
