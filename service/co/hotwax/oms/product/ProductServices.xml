@@ -25,7 +25,7 @@
             <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
 
             <!-- Call the prepare#ProductCreate service to get the json for creating product -->
-            <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
                           out-map="prepareProductCreateOut"/>
 
             <!-- Call the create service on Product -->
@@ -42,7 +42,7 @@
             <!-- Iterate the productVariants list -->
             <iterate list="productVariants" entry="productVariant">
                 <!-- For each product variant call the create#ProductVariant service -->
-                <service-call name="co.hotwax.oms.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
+                <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
                         parentProductId:parentProductId]"/>
             </iterate>
         </actions>
@@ -75,7 +75,7 @@
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
             <!-- Call prepare#ProductCreate for the productVariantJson map -->
-            <service-call name="co.hotwax.oms.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
                           out-map="prepareProductCreateOut"/>
 
             <!-- Create Product record for the variant product -->
@@ -126,7 +126,7 @@
                     </if>
 
                     <!-- Fetch feature record for the productFeatureId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature" value-field="productFeature">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeature" value-field="productFeature">
                         <field-map field-name="productFeatureId" from="feature.productFeatureId"/>
                     </entity-find-one>
                     <!-- Create new productFeatureId if it doesn't exist -->
@@ -218,7 +218,7 @@
                     </if>
 
                     <!-- Fetch feature record for the productFeatureId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature" value-field="productFeature">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeature" value-field="productFeature">
                         <field-map field-name="productFeatureId" from="feature.productFeatureId"/>
                     </entity-find-one>
                     <!-- Create new productFeatureId if it doesn't exist -->
