@@ -11,10 +11,10 @@
         </in-parameters>
         <actions>
             <!-- Set the productVariants field from the incoming productJson map -->
-            <set field="productVariants" from="productJson.variants"/>
+            <set field="productVariants" from="productJson.remove('variants')"/>
 
             <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
-            <if condition="productJson.productId!=null">
+            <if condition="productJson.productId">
                 <!-- Create ShopifyShopProduct record -->
                 <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:productJson.shopifyShopProduct.shopId,
                         productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
@@ -60,7 +60,7 @@
         </in-parameters>
         <actions>
             <!-- Check if productId is not null -->
-            <if condition="productVariantJson.productId!=null">
+            <if condition="productVariantJson.productId">
                 <!-- Create ShopifyShopProduct record -->
                 <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
                         productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
@@ -105,11 +105,12 @@
             </parameter>
         </out-parameters>
         <actions>
+            <log level="info" message="====prepareCreate============productJson: ${productJson}================"/>
             <!-- Set the features list and remove it from productJson -->
             <set field="features" from="productJson.remove('features')"/>
 
             <!-- Check if features list is not null -->
-            <if condition="features!=null">
+            <if condition="features">
                 <!-- Initialize the featureAppls list -->
                 <set field="featureAppls" from="[]"/>
 
@@ -120,42 +121,33 @@
                         <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
                     </entity-find>
 
-                    <!-- Get the first ProductFeatureType from the list -->
-                    <set field="productFeatureTypeFirst" from="productFeatureTypes?.first"/>
-
-                    <!-- Create new productFeatureTypeId if it doesn't exist -->
-                    <if condition="!productFeatureTypeFirst">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeDesc.trim()]"
-                                out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
+                                          out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                        </else>
                     </if>
-                    <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput?.productFeatureTypeId?:productFeatureTypeFirst.productFeatureTypeId"/>
 
                     <!-- Fetch feature record for the productFeatureId -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
                         <econdition field-name="description" from="feature.featureDesc.trim()"/>
-                        <econdition field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
                     </entity-find>
 
-                    <set field="productFeatureFirst" from="productFeatures?.first"/>
-
-                    <!-- Create new productFeatureId if it doesn't exist -->
-                    <if condition="!productFeatureFirst">
-                        <set field="feature.description" from="feature.featureDesc.trim()"/>
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature"
-                                out-map="createProductFeatureOutput" transaction="force-new"/>
+                    <if condition="productFeatures">
+                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
+                                          out-map="createProductFeatureOutput" transaction="force-new"/>
+                            <set field="productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                        </else>
                     </if>
-                    <set field="feature.productFeatureId" from="createProductFeatureOutput?.productFeatureId?:productFeatureFirst.productFeatureId"/>
 
-                    <set field="productFeatureAppl" from="[:]"/>
-                    <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
-                    <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
-                    <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
-                    <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
-                    <set field="featureAppls" from="featureAppls+productFeatureAppl"/>
-                    <if condition="featureAppls!=null">
-                        <set field="productJson.featureAppls" from="featureAppls"/>
-                    </if>
+                    <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
                 </iterate>
+                <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
             <!-- Adding log for testing -->
             <log message="The Product Json Prepared: ${productJson}"/>
@@ -216,46 +208,42 @@
 
             <!-- Prepare the product features -->
             <set field="features" from="productJson.features"/>
-            <if condition="features != null">
+            <if condition="features">
+                <!-- Initialize the featureAppls list -->
                 <set field="featureAppls" from="[]"/>
+
+                <!-- Iterate through the features list -->
                 <iterate list="features" entry="feature">
                     <!-- Fetch productFeatureType record for productFeatureTypeId -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
                         <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
                     </entity-find>
 
-                    <!-- Get the first ProductFeatureType from the list -->
-                    <set field="productFeatureTypeFirst" from="productFeatureTypes?.first"/>
-
-                    <!-- Create new productFeatureTypeId if it doesn't exist -->
-                    <if condition="!productFeatureTypeFirst">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeDesc.trim()]"
-                                out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
+                                          out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                        </else>
                     </if>
-                    <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput?.productFeatureTypeId?:productFeatureTypeFirst.productFeatureTypeId"/>
 
                     <!-- Fetch feature record for the productFeatureId -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
                         <econdition field-name="description" from="feature.featureDesc.trim()"/>
-                        <econdition field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
                     </entity-find>
 
-                    <set field="productFeatureFirst" from="productFeatures?.first"/>
-
-                    <!-- Create new productFeatureId if it doesn't exist -->
-                    <if condition="!productFeatureFirst">
-                        <set field="feature.description" from="feature.featureDesc.trim()"/>
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature"
-                                out-map="createProductFeatureOutput" transaction="force-new"/>
+                    <if condition="productFeatures">
+                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
+                                          out-map="createProductFeatureOutput" transaction="force-new"/>
+                            <set field="productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                        </else>
                     </if>
-                    <set field="feature.productFeatureId" from="createProductFeatureOutput?.productFeatureId?:productFeatureFirst.productFeatureId"/>
 
-                    <set field="productFeatureAppl" from="[:]"/>
-                    <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
-                    <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
-                    <set field="productFeatureAppl.sequenceNum" from="feature.position"/>
-                    <set field="productFeatureAppl.fromDate" from="ec.user.nowTimestamp"/>
-                    <set field="featureAppls" from="featureAppls+productFeatureAppl"/>
+                    <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
                 </iterate>
             </if>
 
@@ -268,18 +256,18 @@
             <set field="deleteProductFeatureAppls" from="[]"/>
             <iterate list="currentProductFeatureAppls" entry="currentProductFeatureAppl">
                 <set field="toBeDeleted" value="true"/>
-                <iterate list="featureAppls" entry="productFeatureAppl">
-                    <if condition="currentProductFeatureAppl.productFeatureId == productFeatureAppl.productFeatureId">
+                <iterate list="featureAppls" entry="featureAppl">
+                    <if condition="currentProductFeatureAppl.productFeatureId == featureAppls.productFeatureId">
                         <set field="toBeDeleted" value="false"/>
-                        <script>featureAppls.remove(productFeatureAppl)</script>
+                        <script>featureAppls.remove(featureAppl)</script>
                     </if>
                 </iterate>
                 <if condition="toBeDeleted">
-                    <set field="deleteProductFeatureAppls" from="deleteProductFeatureAppls+currentProductFeatureAppl"/>
+                    <set field="deleteProductFeatureAppls" from="deleteProductFeatureAppls + currentProductFeatureAppl"/>
                 </if>
             </iterate>
 
-            <if condition="featureAppls != null">
+            <if condition="featureAppls">
                 <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
 
@@ -298,9 +286,7 @@
                     <!-- If current keywords match the incoming keyword then it should not be created as it already exists -->
                     <if condition="currentProductKeyword.keyword == newKeyword.keyword">
                         <set field="toBeDeleted" value="false"/>
-                        <script>
-                            productJson.keywords.remove(newKeyword)
-                        </script>
+                        <script>productJson.keywords.remove(newKeyword)</script>
                     </if>
                 </iterate>
                 <!-- If toBeDeleted is true then add that keyword map to the deleteProductKeywords list -->
@@ -308,6 +294,8 @@
                     <set field="deleteProductKeywords" from="deleteProductKeywords+currentProductKeyword"/>
                 </if>
             </iterate>
+
+            <log message="The Product Json Prepared: ${productJson}"/>
         </actions>
     </service>
 
@@ -318,7 +306,6 @@
             <parameter name="parentProductId" required="true"/>
         </in-parameters>
         <actions>
-            <log level="info" message="====updateProductVariant============productVariantJson: ${productVariantJson}================"/>
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
             <if condition="productVariantJson.productId == null">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
@@ -328,6 +315,7 @@
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="[productJson:prepareProductUpdateOutput.productJson]" out-map="updateProductOutput"/>
+                    <log level="info" message="updateProductOutput: ${updateProductOutput}"/>
                     <!-- Identify if parent product and updateProductOutput.productId are already associated in ProductAssoc entity-->
                     <entity-find-one entity-name="org.apache.ofbiz.product.product.ProductAssoc" value-field="productAssoc">
                         <field-map field-name="productId" from="parentProductId"/>
@@ -338,7 +326,7 @@
                         <!-- If not then create a new ProductAssoc record -->
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
                     </if>
-                    <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:updateProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
+                    <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
                     <iterate list="updateProductOutput.deleteProductFeatureAppls" entry="productFeatureAppl">
                         <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
                     </iterate>
