@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="seed">
+
+    <!-- EnumerationType and Enumeration data for product sync jobs -->
+    <moqui.basic.EnumerationType enumTypeId="PRODUCT_SYS_JOB" description="Product Jobs"/>
+    <moqui.basic.Enumeration enumId="POL_NEWPRDTS_FD" enumCode="POL_NEWPRDTS_FD" description="Poll New Products Feed" enumTypeId="PRODUCT_SYS_JOB"/>
+    <moqui.basic.Enumeration enumId="POL_PRDTUPDTS_FD" enumCode="POL_PRDTUPDTS_FD" description="Poll Product Updates Feed" enumTypeId="PRODUCT_SYS_JOB"/>
+
+    <!-- SystemMessageType data for Error Feed file -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="FeedErrorFile"/>
+
+    <!-- TODO: Add receivePath -->
+    <!-- SystemMessageType data for consuming New Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
+            description="New Products Feed"
+            parentTypeId="LocalFeedFile"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            receivePath=""
+            receiveResponseEnumId="MsgRrMove"
+            receiveMovePath=""
+            sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
+            sendPath="${contentRoot}/oms/NewProductsFeed"/>
+
+    <!-- TODO: Add receivePath -->
+    <!-- SystemMessageType data for consuming Update Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
+            description="Product Updates Feed"
+            parentTypeId="LocalFeedFile"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            receivePath=""
+            receiveResponseEnumId="MsgRrMove"
+            receiveMovePath=""
+            sendService="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
+            sendPath="${contentRoot}/oms/ProductUpdatesFeed"/>
+
+    <!-- ServiceJob data for polling New Products Feed from SFTP -->
+    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_NewProductsFeed" jobTypeEnumId="POL_NEWPRDTS_FD" description="Poll New Products Feed"
+            serviceName="co.hotwax.ofbiz.SystemMessageServices.poll#SystemMessageFileSftp" cronExpression="0 0 * * * ?" paused="Y">
+        <parameters parameterName="systemMessageTypeId" parameterValue="NewProductsFeed"/>
+    </moqui.service.job.ServiceJob>
+
+    <!-- ServiceJob data for polling Update Products Feed from SFTP -->
+    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_ProductUpdatesFeed" jobTypeEnumId="POL_PRDTUPDTS_FD" description="Poll Product Updates Feed"
+            serviceName="co.hotwax.ofbiz.SystemMessageServices.poll#SystemMessageFileSftp" cronExpression="0 0 * * * ?" paused="Y">
+        <parameters parameterName="systemMessageTypeId" parameterValue="ProductUpdatesFeed"/>
+    </moqui.service.job.ServiceJob>
+
+</entity-facade-xml>
