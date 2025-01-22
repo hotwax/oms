@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="ext">
+    <org.apache.ofbiz.party.party.Party partyId="SHIP_AGGREGATOR" partyTypeId="PARTY_GROUP"/>
+    <org.apache.ofbiz.party.party.PartyGroup partyId="SHIP_AGGREGATOR" groupName="Shipping Agreegator"/>
+    <org.apache.ofbiz.party.party.PartyRole partyId="SHIP_AGGREGATOR" roleTypeId="CARRIER"/>
+
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="STANDARD" roleTypeId="CARRIER" deliveryDays="7"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="SECOND_DAY" roleTypeId="CARRIER" deliveryDays="2"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="THIRD_DAY" roleTypeId="CARRIER" deliveryDays="3"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="NEXT_DAY" roleTypeId="CARRIER" deliveryDays="1"/>
+
+    <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="SHIP_AGGREGATOR" packagingTypeCode="YOURPACKAGING"/>
+
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="STORE.SHIP_AGGREGATOR" description="Shipping service configuration for productStore STORE" sendUrl="" privateKey=""/>
+</entity-facade-xml>
