@@ -116,24 +116,36 @@
                 <!-- Iterate through the features list -->
                 <iterate list="features" entry="feature">
                     <!-- Fetch productFeatureType record for productFeatureTypeId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" value-field="productFeatureType">
-                        <field-map field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
-                    </entity-find-one>
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
+                    </entity-find>
+
+                    <!-- Get the first ProductFeatureType from the list -->
+                    <set field="productFeatureTypeFirst" from="productFeatureTypes?.first"/>
+
                     <!-- Create new productFeatureTypeId if it doesn't exist -->
-                    <if condition="!productFeatureType">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeId]" out-map="createProductFeatureTypeOutput"/>
-                        <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                    <if condition="!productFeatureTypeFirst">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeDesc.trim()]"
+                                out-map="createProductFeatureTypeOutput" transaction="force-new"/>
                     </if>
+                    <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput?.productFeatureTypeId?:productFeatureTypeFirst.productFeatureTypeId"/>
 
                     <!-- Fetch feature record for the productFeatureId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeature" value-field="productFeature">
-                        <field-map field-name="productFeatureId" from="feature.productFeatureId"/>
-                    </entity-find-one>
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="feature.featureDesc.trim()"/>
+                        <econdition field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
+                    </entity-find>
+
+                    <set field="productFeatureFirst" from="productFeatures?.first"/>
+
                     <!-- Create new productFeatureId if it doesn't exist -->
-                    <if condition="!productFeature">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature" out-map="createProductFeatureOutput"/>
-                        <set field="feature.productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                    <if condition="!productFeatureFirst">
+                        <set field="feature.description" from="feature.featureDesc.trim()"/>
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature"
+                                out-map="createProductFeatureOutput" transaction="force-new"/>
                     </if>
+                    <set field="feature.productFeatureId" from="createProductFeatureOutput?.productFeatureId?:productFeatureFirst.productFeatureId"/>
+
                     <set field="productFeatureAppl" from="[:]"/>
                     <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
                     <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
@@ -208,24 +220,36 @@
                 <set field="featureAppls" from="[]"/>
                 <iterate list="features" entry="feature">
                     <!-- Fetch productFeatureType record for productFeatureTypeId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" value-field="productFeatureType">
-                        <field-map field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
-                    </entity-find-one>
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
+                    </entity-find>
+
+                    <!-- Get the first ProductFeatureType from the list -->
+                    <set field="productFeatureTypeFirst" from="productFeatureTypes?.first"/>
+
                     <!-- Create new productFeatureTypeId if it doesn't exist -->
-                    <if condition="!productFeatureType">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeId]" out-map="createProductFeatureTypeOutput"/>
-                        <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                    <if condition="!productFeatureTypeFirst">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description: feature.productFeatureTypeDesc.trim()]"
+                                out-map="createProductFeatureTypeOutput" transaction="force-new"/>
                     </if>
+                    <set field="feature.productFeatureTypeId" from="createProductFeatureTypeOutput?.productFeatureTypeId?:productFeatureTypeFirst.productFeatureTypeId"/>
 
                     <!-- Fetch feature record for the productFeatureId -->
-                    <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeature" value-field="productFeature">
-                        <field-map field-name="productFeatureId" from="feature.productFeatureId"/>
-                    </entity-find-one>
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="feature.featureDesc.trim()"/>
+                        <econdition field-name="productFeatureTypeId" from="feature.productFeatureTypeId"/>
+                    </entity-find>
+
+                    <set field="productFeatureFirst" from="productFeatures?.first"/>
+
                     <!-- Create new productFeatureId if it doesn't exist -->
-                    <if condition="!productFeature">
-                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature" out-map="createProductFeatureOutput"/>
-                        <set field="feature.productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                    <if condition="!productFeatureFirst">
+                        <set field="feature.description" from="feature.featureDesc.trim()"/>
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="feature"
+                                out-map="createProductFeatureOutput" transaction="force-new"/>
                     </if>
+                    <set field="feature.productFeatureId" from="createProductFeatureOutput?.productFeatureId?:productFeatureFirst.productFeatureId"/>
+
                     <set field="productFeatureAppl" from="[:]"/>
                     <set field="productFeatureAppl.productFeatureId" from="feature.productFeatureId"/>
                     <set field="productFeatureAppl.productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
