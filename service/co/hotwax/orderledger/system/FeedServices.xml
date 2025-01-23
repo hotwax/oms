@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="consume" noun="OMSFeedSystemMessage" transaction-timeout="1800">
+    <service verb="consume" noun="OMSFeed" transaction-timeout="1800">
         <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
         <in-parameters>
             <parameter name="systemMessageId" type="String" required="true"/>
