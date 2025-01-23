@@ -50,13 +50,22 @@
 
             <!-- Iterate through jsonList and for each entry call systemMessage.sendService in a new transaction -->
             <iterate list="jsonList" entry="jsonEntry">
-                <script>try {</script>
-                <service-call name="${systemMessage.sendServiceName}" in-map="[orderJson:jsonEntry]" out-map="serviceOutput" transaction="force-new" ignore-error="true"/>
-                <log level="info" message="========serviceOutput============ ${serviceOutput}=========="/>
-                <script>} catch (Throwable t) { ec.message.addError(t.toString()) } finally {
+                <script>
+                    /* Calling the sendService in this way will allow us to identify
+                        if the service execution had exception or returned error so we can prepare the error file */
+                    actionResult = ec.service.sync().name(systemMessage.sendServiceName)
+                    .parameters([payLoad:jsonEntry])
+                    .requireNewTransaction(true)
+                    .call()
+                    if (ec.message.hasError()) {
+                        jsonEntry.put("error", ec.message.getErrorsString())
+                        ec.logger.warn(ec.message.getErrorsString())
+                        ec.message.clearAll()
+
+                        // write the jsonEntry to the Errorfile
                         new ObjectMapper()
                         .setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
-                        .writerWithDefaultPrettyPrinter().writeValue(jGenerator,["json":jsonEntry, "error":t.toString()])
+                        .writerWithDefaultPrettyPrinter().writeValue(jGenerator,["json":jsonEntry])
                     }
                 </script>
             </iterate>
