@@ -5,27 +5,27 @@
     <service verb="create" noun="ProductAndVariants" transaction-timeout="1800">
         <description>Service to create the virtual and variant products.</description>
         <in-parameters>
-            <parameter name="productJson" type="Map" required="true">
-                <description>The productJson containing product and its variants.</description>
+            <parameter name="inputJson" type="Map" required="true">
+                <description>The inputJson containing product and its variants.</description>
             </parameter>
         </in-parameters>
         <actions>
-            <!-- Set the productVariants field from the incoming productJson map -->
-            <set field="productVariants" from="productJson.remove('variants')"/>
+            <!-- Set the productVariants field from the incoming inputJson map -->
+            <set field="productVariants" from="inputJson.remove('variants')"/>
 
             <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
-            <if condition="productJson.productId">
+            <if condition="inputJson.productId">
                 <!-- Create ShopifyShopProduct record -->
-                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:productJson.shopifyShopProduct.shopId,
-                        productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
-                <set field="parentProductId" from="productJson.productId"/>
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"  in-map="[shopId:inputJson.shopifyShopProduct.shopId,
+                        productId:inputJson.productId,shopifyProductId:inputJson.shopifyShopProduct.shopifyProductId]"/>
+                <set field="parentProductId" from="inputJson.productId"/>
                 <return/>
             </if>
             <!-- Set the shopifyShopProduct field -->
-            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+            <set field="shopifyShopProduct" from="inputJson.remove('shopifyShopProduct')"/>
 
             <!-- Call the prepare#ProductCreate service to get the json for creating product -->
-            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:inputJson]"
                           out-map="prepareProductCreateOut"/>
 
             <!-- Call the create service on Product -->
@@ -156,16 +156,16 @@
     <service verb="update" noun="ProductAndVariants" transaction-timeout="1800">
         <description>This service will update product and create new variants</description>
         <in-parameters>
-            <parameter name="productJson" type="Map" required="true"/>
+            <parameter name="inputJson" type="Map" required="true"/>
         </in-parameters>
         <actions>
-            <log level="info" message="====updateProductAndVariants============productJson: ${productJson}================"/>
-            <set field="productVariants" from="productJson.remove('variants')"/>
-            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+            <log level="info" message="====updateProductAndVariants============inputJson: ${inputJson}================"/>
+            <set field="productVariants" from="inputJson.remove('variants')"/>
+            <set field="shopifyShopProduct" from="inputJson.remove('shopifyShopProduct')"/>
 
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
-            <if condition="productJson.productId == null">
-                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="productJson" out-map="prepareProductCreateOutput"/>
+            <if condition="inputJson.productId == null">
+                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="inputJson" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
                 <set field="parentProductId" from="createProductOutput.productId"/>
                 <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
@@ -174,8 +174,8 @@
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="context" out-map="prepareUpdateProductOutput"/>
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareUpdateProductOutput" out-map="updateProductOutput" />
                     <!-- TODO: We can remove the below commented block as this is not really needed for update flow -->
-                    <set field="parentProductId" from="productJson.productId"/>
-                    <!-- <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/> -->
+                    <set field="parentProductId" from="inputJson.productId"/>
+                    <!-- <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:inputJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/> -->
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
                     <iterate list="updateProductOutput.deleteProductFeatureAppls" entry="productFeatureAppl">
                         <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
