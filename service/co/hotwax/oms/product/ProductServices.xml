@@ -21,16 +21,47 @@
                 <set field="parentProductId" from="payload.productId"/>
                 <return/>
             </if>
-            <!-- Set the shopifyShopProduct field -->
-            <set field="shopifyShopProduct" from="payload.remove('shopifyShopProduct')"/>
 
             <!-- Call prepare#ProductCreate service to get the json for creating product -->
             <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:payload]"
-                          out-map="prepareProductCreateOut"/>
+                    out-map="prepareProductCreateOut"/>
 
-            <!-- Call create service on Product -->
-            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                          out-map="createProductOut"/>
+            <!-- Call the create#VirtualProduct service -->
+            <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
+                    in-map="[productJson:prepareProductCreateOut.productJson]" out-map="createVirtualProductOut" transaction="force-new"/>
+
+            <!-- Set the parentProductId returned from the create#VirtualProduct service -->
+            <set field="parentProductId" from="createVirtualProductOut.parentProductId"/>
+
+            <!-- Iterate the productVariants list -->
+            <iterate list="productVariants" entry="productVariant">
+
+                <!-- For each product variant call the create#ProductVariant service -->
+                <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
+                        parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="create" noun="VirtualProduct" transaction-timeout="1800">
+        <description>Service to create virtual product and its shopify shop product record.</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true">
+                <description>Product json to create the virtual product.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="parentProductId">
+                <description>The productId of the created virtual product.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <!-- Get the ShopifyShopProduct record and remove it from productJson -->
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+
+            <!-- Call create service for Virtual Product -->
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="productJson"
+                    out-map="createProductOut"/>
 
             <!-- Set the parentProductId -->
             <set field="parentProductId" from="createProductOut.productId"/>
@@ -38,13 +69,6 @@
             <!-- Create ShopifyShopProduct record -->
             <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
                     productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
-
-            <!-- Iterate the productVariants list -->
-            <iterate list="productVariants" entry="productVariant">
-                <!-- For each product variant call the create#ProductVariant service -->
-                <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
-                        parentProductId:parentProductId]"/>
-            </iterate>
         </actions>
     </service>
 
@@ -59,6 +83,13 @@
             </parameter>
         </in-parameters>
         <actions>
+
+            <!-- Check if internalName is present, if no return as for variant the internalName is used to
+                 uniquely identify the product and if missing then product should not be created. -->
+            <if condition="!productVariantJson.internalName">
+                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+            </if>
+
             <!-- Check if productId is not null -->
             <if condition="productVariantJson.productId">
                 <!-- Create ShopifyShopProduct record -->
