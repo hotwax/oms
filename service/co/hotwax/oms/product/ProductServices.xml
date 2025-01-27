@@ -24,7 +24,7 @@
 
             <!-- Call the create#VirtualProduct service -->
             <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
-                    in-map="[productJson:prepareProductCreateOut.productJson]" out-map="createVirtualProductOut" transaction="force-new"/>
+                    in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
 
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
             <set field="parentProductId" from="createVirtualProductOut.productId"/>
@@ -394,7 +394,7 @@
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
-                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
+                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
