@@ -191,23 +191,24 @@
         </in-parameters>
         <actions>
             <set field="productVariants" from="payload.remove('variants')"/>
-            <set field="shopifyShopProduct" from="payload.remove('shopifyShopProduct')"/>
 
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
             <if condition="!payload.productId">
-                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:payload]" out-map="prepareProductCreateOutput"/>
-                <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
-                <set field="parentProductId" from="createProductOutput.productId"/>
-                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
+
+                <!-- Call the create#VirtualProduct service -->
+                <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
+                        in-map="[productJson:prepareProductCreateOutput.productJson]" out-map="createVirtualProductOut" transaction="force-new"/>
+
+                <!-- Set the parentProductId returned from the create#VirtualProduct service -->
+                <set field="parentProductId" from="createVirtualProductOut.parentProductId"/>
                 <else>
                     <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:payload]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
                     <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
-                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput" />
-                    <!-- TODO: We can remove the below commented block as this is not really needed for update flow -->
+                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput" transaction="force-new"/>
                     <set field="parentProductId" from="payload.productId"/>
-                    <!-- <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:payload.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/> -->
+
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
                     <if condition="deleteProductFeatureAppls">
                         <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
@@ -222,7 +223,7 @@
                 </else>
             </if>
             <iterate list="productVariants" entry="productVariant">
-                <service-call name="co.hotwax.oms.product.ProductServices.update#ProductVariant" in-map="[productVariantJson:productVariant, parentProductId:parentProductId]"/>
+                <service-call name="co.hotwax.oms.product.ProductServices.update#ProductVariant" in-map="[productVariantJson:productVariant, parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
             </iterate>
         </actions>
     </service>
@@ -365,6 +366,13 @@
             <parameter name="parentProductId" required="true"/>
         </in-parameters>
         <actions>
+
+            <!-- Check if internalName is present, if no return as for variant the internalName is used to
+                 uniquely identify the product and if missing then product should not be created. -->
+            <if condition="!productVariantJson.internalName">
+                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+            </if>
+
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
             <if condition="!productVariantJson.productId">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
