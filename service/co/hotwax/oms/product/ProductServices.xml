@@ -191,11 +191,9 @@
         </in-parameters>
         <actions>
             <set field="productVariants" from="payload.remove('variants')"/>
-            <set field="shopifyShopProduct" from="payload.remove('shopifyShopProduct')"/>
 
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
             <if condition="!payload.productId">
-                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:payload]" out-map="prepareProductCreateOutput"/>
 
                 <!-- Call the create#VirtualProduct service -->
                 <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
