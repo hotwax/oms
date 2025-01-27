@@ -2,7 +2,7 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="create" noun="ProductAndVariants" transaction-timeout="1800">
+    <service verb="create" noun="ProductAndVariants">
         <description>Service to create the virtual and variant products.</description>
         <in-parameters>
             <parameter name="payload" type="Map" required="true">
@@ -39,7 +39,7 @@
         </actions>
     </service>
 
-    <service verb="create" noun="VirtualProduct" transaction-timeout="1800">
+    <service verb="create" noun="VirtualProduct">
         <description>Service to create virtual product and its shopify shop product record.</description>
         <in-parameters>
             <parameter name="productJson" type="Map" required="true">
@@ -72,7 +72,7 @@
         </actions>
     </service>
 
-    <service verb="create" noun="ProductVariant" transaction-timeout="1800">
+    <service verb="create" noun="ProductVariant">
         <description>Service to create Product Variant.</description>
         <in-parameters>
             <parameter name="productVariantJson" type="Map" required="true">
@@ -123,7 +123,7 @@
         </actions>
     </service>
 
-    <service verb="prepare" noun="ProductCreate" transaction-timeout="1800">
+    <service verb="prepare" noun="ProductCreate">
         <description>Service to create the json map required for creating the product and its related records.</description>
         <in-parameters>
             <parameter name="productJson" type="Map" required="true">
@@ -184,7 +184,7 @@
             <log message="productJson AFTER prepare create: ${productJson}"/>
         </actions>
     </service>
-    <service verb="update" noun="ProductAndVariants" transaction-timeout="1800">
+    <service verb="update" noun="ProductAndVariants">
         <description>This service will update product and create new variants</description>
         <in-parameters>
             <parameter name="payload" type="Map" required="true"/>
@@ -195,31 +195,18 @@
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
             <if condition="!payload.productId">
 
-                <!-- Call the create#VirtualProduct service -->
+                <!-- Call create#VirtualProduct service -->
                 <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
-                        in-map="[productJson:prepareProductCreateOutput.productJson]" out-map="createVirtualProductOut" transaction="force-new"/>
+                        in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
 
-                <!-- Set the parentProductId returned from the create#VirtualProduct service -->
-                <set field="parentProductId" from="createVirtualProductOut.parentProductId"/>
+                <!-- Set the parentProductId returned from create#VirtualProduct service -->
+                <set field="parentProductId" from="createVirtualProductOut.productId"/>
                 <else>
-                    <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
-                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:payload]" out-map="prepareProductUpdateOutput"/>
-                    <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
-                    <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
-                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput" transaction="force-new"/>
-                    <set field="parentProductId" from="payload.productId"/>
+                    <!-- Call update#VirtualProduct service -->
+                    <service-call name="co.hotwax.oms.product.ProductServices.update#VirtualProduct"
+                                  in-map="[productJson:payload]" out-map="updateVirtualProductOut" transaction="force-new"/>
 
-                    <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
-                    <if condition="deleteProductFeatureAppls">
-                        <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
-                            <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
-                        </iterate>
-                    </if>
-                    <if condition="deleteProductKeywords">
-                        <iterate list="deleteProductKeywords" entry="productKeyword">
-                            <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword" in-map="productKeyword"/>
-                        </iterate>
-                    </if>
+                    <set field="parentProductId" from="updateVirtualProductOut.productId"/>
                 </else>
             </if>
             <iterate list="productVariants" entry="productVariant">
@@ -228,7 +215,7 @@
         </actions>
     </service>
 
-    <service verb="prepare" noun="ProductUpdate" transaction-timeout="1800">
+    <service verb="prepare" noun="ProductUpdate">
         <in-parameters>
             <parameter name="productJson" type="Map" required="true"/>
         </in-parameters>
@@ -359,7 +346,36 @@
         </actions>
     </service>
 
-    <service verb="update" noun="ProductVariant" transaction-timeout="1800">
+    <service verb="update" noun="VirtualProduct">
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+        </out-parameters>
+        <actions>
+            <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
+            <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
+            <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
+            <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
+            <set field="productId" from="productJson.productId"/>
+
+            <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
+            <if condition="deleteProductFeatureAppls">
+                <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
+                    <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                </iterate>
+            </if>
+            <if condition="deleteProductKeywords">
+                <iterate list="deleteProductKeywords" entry="productKeyword">
+                    <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword" in-map="productKeyword"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="update" noun="ProductVariant">
         <description>This service will update a product variant</description>
         <in-parameters>
             <parameter name="productVariantJson" type="Map" required="true"/>
