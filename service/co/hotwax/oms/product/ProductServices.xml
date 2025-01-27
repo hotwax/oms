@@ -22,16 +22,12 @@
                 <return/>
             </if>
 
-            <!-- Call prepare#ProductCreate service to get the json for creating product -->
-            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:payload]"
-                    out-map="prepareProductCreateOut"/>
-
             <!-- Call the create#VirtualProduct service -->
             <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
                     in-map="[productJson:prepareProductCreateOut.productJson]" out-map="createVirtualProductOut" transaction="force-new"/>
 
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
-            <set field="parentProductId" from="createVirtualProductOut.parentProductId"/>
+            <set field="parentProductId" from="createVirtualProductOut.productId"/>
 
             <!-- Iterate the productVariants list -->
             <iterate list="productVariants" entry="productVariant">
@@ -51,7 +47,7 @@
             </parameter>
         </in-parameters>
         <out-parameters>
-            <parameter name="parentProductId">
+            <parameter name="productId">
                 <description>The productId of the created virtual product.</description>
             </parameter>
         </out-parameters>
@@ -59,16 +55,20 @@
             <!-- Get the ShopifyShopProduct record and remove it from productJson -->
             <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
 
+            <!-- Call prepare#ProductCreate service to get the json for creating product -->
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+                          out-map="prepareProductCreateOut"/>
+
             <!-- Call create service for Virtual Product -->
-            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="productJson"
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
                     out-map="createProductOut"/>
 
             <!-- Set the parentProductId -->
-            <set field="parentProductId" from="createProductOut.productId"/>
+            <set field="productId" from="createProductOut.productId"/>
 
             <!-- Create ShopifyShopProduct record -->
             <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
-                    productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+                    productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
         </actions>
     </service>
 
