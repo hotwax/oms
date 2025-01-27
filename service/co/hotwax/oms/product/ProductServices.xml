@@ -98,7 +98,7 @@
                         shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
 
                 <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
-                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                 <return/>
             </if>
 
@@ -114,7 +114,7 @@
                           out-map="createProductOut"/>
 
             <!-- Create ProductAssoc record for the variant product -->
-            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT']"/>
+            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
 
             <!-- Create ShopifyShopProduct record for the variant product -->
             <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
@@ -393,7 +393,7 @@
             <if condition="!productVariantJson.productId">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
-                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                 <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:parentProductId, shopId:shopifyShopProduct.shopId, shopifyShopProductId:shopifyShopProduct.shopifyShopProductId]"/>
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
@@ -409,7 +409,7 @@
                     </entity-find>
                     <!-- If not then create a new ProductAssoc record -->
                     <if condition="!productAssocs">
-                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                     </if>
                     <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
