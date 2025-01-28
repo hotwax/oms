@@ -44,12 +44,19 @@
         </out-parameters>
         <actions>
 
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productJson.internalName"/>
+            </entity-find>
+
+            <set field="productJson.productId" from="productsList?.first?.productId"/>
+
             <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
-            <if condition="payload.productId">
+            <if condition="productJson.productId">
                 <!-- Create ShopifyShopProduct record -->
-                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:payload.shopifyShopProduct.shopId,
-                        productId:payload.productId,shopifyProductId:payload.shopifyShopProduct.shopifyProductId]"/>
-                <set field="productId" from="payload.productId"/>
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productJson.shopifyShopProduct.shopId,
+                        productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
+                <set field="productId" from="productJson.productId"/>
                 <return/>
             </if>
 
@@ -90,6 +97,14 @@
             <if condition="!productVariantJson.internalName">
                 <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
             </if>
+
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productVariantJson.internalName"/>
+            </entity-find>
+
+            <!-- Set productId in the productVariantMap if the productId exists -->
+            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
 
             <!-- Check if productId is not null -->
             <if condition="productVariantJson.productId">
@@ -245,7 +260,7 @@
                         <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
-                                          out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                                    out-map="createProductFeatureTypeOutput" transaction="force-new"/>
                             <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
                         </else>
                     </if>
@@ -271,7 +286,7 @@
                         </if>
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
-                                          out-map="createProductFeatureOutput" transaction="force-new"/>
+                                    out-map="createProductFeatureOutput" transaction="force-new"/>
                             <set field="featureAppls" from="featureAppls + [productFeatureId:createProductFeatureOutput.productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
                         </else>
                     </if>
@@ -389,6 +404,15 @@
             <if condition="!productVariantJson.internalName">
                 <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
             </if>
+
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productVariantJson.internalName"/>
+            </entity-find>
+
+            <!-- Set productId in the productVariantMap if the productId exists -->
+            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+
 
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
             <if condition="!productVariantJson.productId">
