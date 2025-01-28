@@ -75,7 +75,7 @@
             <set field="productId" from="createProductOut.productId"/>
 
             <!-- Create ShopifyShopProduct record -->
-            <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+            <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
                     productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
         </actions>
     </service>
