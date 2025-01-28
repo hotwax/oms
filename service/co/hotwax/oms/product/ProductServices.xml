@@ -370,12 +370,20 @@
             <parameter name="productId"/>
         </out-parameters>
         <actions>
+
+            <!-- Set the shopifyShopProduct record form the productJson -->
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+
             <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
             <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
             <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
             <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
             <set field="productId" from="productJson.productId"/>
+
+            <!-- Create/update the ShopifyShopProduct record -->
+            <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
 
             <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
             <if condition="deleteProductFeatureAppls">
@@ -413,8 +421,9 @@
             <!-- Set productId in the productVariantMap if the productId exists -->
             <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
 
-
+            <!-- Set the shopifyShopProduct record from the productJson -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
+
             <if condition="!productVariantJson.productId">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
@@ -436,7 +445,7 @@
                     <if condition="!productAssocs">
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                     </if>
-                    <service-call name="update#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
                     <if condition="deleteProductFeatureAppls">
                         <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
