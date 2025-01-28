@@ -113,8 +113,17 @@
                         productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
                         shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
 
-                <!-- Create ProductAssoc record for the given productVariant and parentProductId -->
-                <service-call name="store#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:productVariantJson.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" from="productVariantJson.productId"/>
+                    <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                    <date-filter/>
+                </entity-find>
+                <!-- If not then create a new ProductAssoc record -->
+                <if condition="!productAssocs">
+                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                </if>
                 <return/>
             </if>
 
@@ -123,11 +132,11 @@
 
             <!-- Call prepare#ProductCreate for the productVariantJson map -->
             <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
-                          out-map="prepareProductCreateOut"/>
+                    out-map="prepareProductCreateOut"/>
 
             <!-- Create Product record for the variant product -->
             <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                          out-map="createProductOut"/>
+                    out-map="createProductOut"/>
 
             <!-- Create ProductAssoc record for the variant product -->
             <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
