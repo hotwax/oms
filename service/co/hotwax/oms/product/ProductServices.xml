@@ -428,7 +428,7 @@
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
-                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
