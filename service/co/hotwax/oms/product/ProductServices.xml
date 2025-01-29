@@ -20,13 +20,32 @@
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
             <set field="parentProductId" from="createVirtualProductOut.productId"/>
 
+            <!-- Set the createVariantResultError list to store the errors occurred while creating variant product -->
+            <set field="createVariantResultError" from="[]"/>
+
             <!-- Iterate the productVariants list -->
             <iterate list="productVariants" entry="productVariant">
 
                 <!-- For each product variant call the create#ProductVariant service -->
-                <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
-                        parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
+                <script><![CDATA[
+                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.create#ProductVariant")
+                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                    .requireNewTransaction(true)
+                    .call()
+
+                        // If any errors then add the error to createVariantResultError list
+                    if (ec.message.hasError()) {
+                        createVariantResultError.add(ec.message.getErrorsString())
+                    }
+                    ec.message.clearAll();
+                    ]]></script>
             </iterate>
+
+            <if condition="createVariantResultError">
+                <script>
+                    ec.message.addError(createVariantResultError.toString())
+                </script>
+            </if>
         </actions>
     </service>
 
@@ -95,7 +114,7 @@
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
                  uniquely identify the product and if missing then product should not be created. -->
             <if condition="!productVariantJson.internalName">
-                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
             </if>
 
             <!-- Check if the product already exists -->
@@ -234,9 +253,31 @@
                     <set field="parentProductId" from="updateVirtualProductOut.productId"/>
                 </else>
             </if>
+
+            <!-- Set the UpdateVariantResultError list to store the errors occurred while creating variant product -->
+            <set field="UpdateVariantResultError" from="[]"/>
+
             <iterate list="productVariants" entry="productVariant">
-                <service-call name="co.hotwax.oms.product.ProductServices.update#ProductVariant" in-map="[productVariantJson:productVariant, parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
+
+                <script><![CDATA[
+                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.update#ProductVariant")
+                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                    .requireNewTransaction(true)
+                    .call()
+
+                    // If any errors then add the error to UpdateVariantResultError list
+                    if (ec.message.hasError()) {
+                        UpdateVariantResultError.add(ec.message.getErrorsString())
+                    }
+                    ec.message.clearAll();
+                    ]]></script>
             </iterate>
+
+            <if condition="UpdateVariantResultError">
+                <script>
+                    ec.message.addError(UpdateVariantResultError.toString())
+                </script>
+            </if>
         </actions>
     </service>
 
@@ -419,7 +460,7 @@
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
                  uniquely identify the product and if missing then product should not be created. -->
             <if condition="!productVariantJson.internalName">
-                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
             </if>
 
             <!-- Check if the product already exists -->
