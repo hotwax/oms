@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <entity-facade-xml type="seed">
 
     <!-- EnumerationType and Enumeration data for product sync jobs -->
@@ -10,7 +9,6 @@
     <!-- SystemMessageType data for Error Feed file -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="FeedErrorFile"/>
 
-    <!-- TODO: Add receivePath -->
     <!-- SystemMessageType data for consuming New Products Feed -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
             description="New Products Feed"
@@ -22,7 +20,6 @@
             sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
             sendPath="${contentRoot}/oms/NewProductsFeed"/>
 
-    <!-- TODO: Add receivePath -->
     <!-- SystemMessageType data for consuming Update Products Feed -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
             description="Product Updates Feed"
@@ -46,4 +43,10 @@
         <parameters parameterName="systemMessageTypeId" parameterValue="ProductUpdatesFeed"/>
     </moqui.service.job.ServiceJob>
 
+    <artifactGroups artifactGroupId="OMS_API" description="Commerce OMS API (via root resource)">
+        <artifacts artifactTypeEnumId="AT_REST_PATH" inheritAuthz="Y" artifactName="/oms"/>
+        <!-- Full permissions for the ADMIN user group -->
+        <authz artifactAuthzId="OMS_API_ADMIN" userGroupId="ADMIN" authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>
+    </artifactGroups>
 </entity-facade-xml>
+
