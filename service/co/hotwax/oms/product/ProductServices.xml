@@ -20,13 +20,32 @@
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
             <set field="parentProductId" from="createVirtualProductOut.productId"/>
 
+            <!-- Set the createVariantResultError list to store the errors occurred while creating variant product -->
+            <set field="createVariantResultError" from="[]"/>
+
             <!-- Iterate the productVariants list -->
             <iterate list="productVariants" entry="productVariant">
 
                 <!-- For each product variant call the create#ProductVariant service -->
-                <service-call name="co.hotwax.oms.product.ProductServices.create#ProductVariant" in-map="[productVariantJson:productVariant,
-                        parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
+                <script><![CDATA[
+                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.create#ProductVariant")
+                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                    .requireNewTransaction(true)
+                    .call()
+
+                        // If any errors then add the error to createVariantResultError list
+                    if (ec.message.hasError()) {
+                        createVariantResultError.add([productVariantJson:productVariant,error: ec.message.getErrorsString()])
+                    }
+                    ec.message.clearAll();
+                    ]]></script>
             </iterate>
+
+            <if condition="createVariantResultError">
+                <script>
+                    ec.message.addError(createVariantResultError.toString())
+                </script>
+            </if>
         </actions>
     </service>
 
@@ -234,9 +253,31 @@
                     <set field="parentProductId" from="updateVirtualProductOut.productId"/>
                 </else>
             </if>
+
+            <!-- Set the UpdateVariantResultError list to store the errors occurred while creating variant product -->
+            <set field="UpdateVariantResultError" from="[]"/>
+
             <iterate list="productVariants" entry="productVariant">
-                <service-call name="co.hotwax.oms.product.ProductServices.update#ProductVariant" in-map="[productVariantJson:productVariant, parentProductId:parentProductId]" transaction="force-new" ignore-error="true"/>
+
+                <script><![CDATA[
+                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.update#ProductVariant")
+                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                    .requireNewTransaction(true)
+                    .call()
+
+                    // If any errors then add the error to UpdateVariantResultError list
+                    if (ec.message.hasError()) {
+                        UpdateVariantResultError.add([productVariantJson:productVariant,error: ec.message.getErrorsString()])
+                    }
+                    ec.message.clearAll();
+                    ]]></script>
             </iterate>
+
+            <if condition="UpdateVariantResultError">
+                <script>
+                    ec.message.addError(UpdateVariantResultError.toString())
+                </script>
+            </if>
         </actions>
     </service>
 
