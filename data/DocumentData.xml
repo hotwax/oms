@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<entity-facade-xml type="seed-initial">
+    <dataDocuments dataDocumentId="OmsProduct" indexName="oms" documentName="Product"
+                   primaryEntityName="org.apache.ofbiz.product.product.Product" documentTitle="ProductNameTemplate">
+        <fields fieldSeqId="01" fieldPath="productId"/>
+        <fields fieldSeqId="02" fieldPath="internalName"/>
+        <fields fieldSeqId="03" fieldPath="productName"/>
+        <fields fieldSeqId="04" fieldPath="productTypeId"/>
+        <fields fieldSeqId="05" fieldPath="detailImageUrl"/>
+        <fields fieldSeqId="06" fieldPath="primaryProductCategoryId"/>
+        <fields fieldSeqId="07" fieldPath="productWeight"/>
+        <fields fieldSeqId="08" fieldPath="shippingWeight"/>
+        <fields fieldSeqId="09" fieldPath="weightUomId"/>
+        <fields fieldSeqId="10" fieldPath="isVirtual"/>
+        <fields fieldSeqId="11" fieldPath="isVariant"/>
+
+        <fields fieldSeqId="12" fieldPath="categories:productCategoryId"/>
+        <fields fieldSeqId="13" fieldPath="categories:fromDate" fieldNameAlias="categoryFromDate"/>
+        <fields fieldSeqId="14" fieldPath="categories:thruDate" fieldNameAlias="categoryThruDate"/>
+
+        <fields fieldSeqId="15" fieldPath="featureAppls:productFeatureId"/>
+        <!--
+        <fields fieldSeqId="16" fieldPath="featureAppls:feature:featureType:description"/>
+        <fields fieldSeqId="17" fieldPath="featureAppls:feature:description"/>
+        -->
+        <fields fieldSeqId="18" fieldPath="featureAppls:fromDate" fieldNameAlias="featureFromDate"/>
+        <fields fieldSeqId="19" fieldPath="featureAppls:thruDate" fieldNameAlias="featureThruDate"/>
+
+        <fields fieldSeqId="20" fieldPath="identifications:goodIdentificationTypeId"/>
+        <fields fieldSeqId="21" fieldPath="identifications:idValue"/>
+        <fields fieldSeqId="22" fieldPath="identifications:fromDate" fieldNameAlias="identificationFromDate"/>
+        <fields fieldSeqId="23" fieldPath="identifications:thruDate" fieldNameAlias="identificationThruDate"/>
+
+        <fields fieldSeqId="24" fieldPath="keywords:keyword"/>
+    </dataDocuments>
+
+    <moqui.entity.feed.DataFeed dataFeedId="OmsProduct" dataFeedTypeEnumId="DTFDTP_RT_PUSH" indexOnStartEmpty="Y"
+            feedName="OMS Product Feed" feedReceiveServiceName="co.hotwax.oms.search.SearchServices.index#ProductSolr"
+            feedDeleteServiceName="org.moqui.search.SearchServices.delete#DataDocument">
+        <documents dataDocumentId="OmsProduct"/>
+    </moqui.entity.feed.DataFeed>
+</entity-facade-xml>
