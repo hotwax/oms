@@ -35,7 +35,7 @@
 
                         // If any errors then add the error to createVariantResultError list
                     if (ec.message.hasError()) {
-                        createVariantResultError.add([productVariantJson:productVariant,error: ec.message.getErrorsString()])
+                        createVariantResultError.add(ec.message.getErrorsString())
                     }
                     ec.message.clearAll();
                     ]]></script>
@@ -114,7 +114,7 @@
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
                  uniquely identify the product and if missing then product should not be created. -->
             <if condition="!productVariantJson.internalName">
-                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
             </if>
 
             <!-- Check if the product already exists -->
@@ -267,7 +267,7 @@
 
                     // If any errors then add the error to UpdateVariantResultError list
                     if (ec.message.hasError()) {
-                        UpdateVariantResultError.add([productVariantJson:productVariant,error: ec.message.getErrorsString()])
+                        UpdateVariantResultError.add(ec.message.getErrorsString())
                     }
                     ec.message.clearAll();
                     ]]></script>
@@ -460,7 +460,7 @@
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
                  uniquely identify the product and if missing then product should not be created. -->
             <if condition="!productVariantJson.internalName">
-                <return error="true" message="Either Shopify Product Id or Shopify Product SKU or Barcode is required to create Product"/>
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
             </if>
 
             <!-- Check if the product already exists -->
