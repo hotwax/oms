@@ -37,4 +37,28 @@ under the License.
     <extend-entity entity-name="ShipmentRouteSegment" package="org.apache.ofbiz.shipment.shipment">
         <field name="trackingUrl" type="text-medium"></field>
     </extend-entity>
+
+    <extend-entity entity-name="Picklist" package="org.apache.ofbiz.shipment.picklist">
+        <relationship type="many" related="org.apache.ofbiz.shipment.picklist.PicklistRole" short-alias="roles">
+            <key-map field-name="picklistId"/>
+        </relationship>
+        <master>
+            <detail relationship="roles"/>
+        </master>
+        <master name="picker">
+            <detail relationship="roles" use-master="party"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="PicklistRole" package="org.apache.ofbiz.shipment.picklist">
+        <relationship type="one" related="org.apache.ofbiz.party.party.Person" short-alias="person">
+            <key-map field-name="partyId"/>
+        </relationship>
+        <relationship type="one" related="org.apache.ofbiz.party.party.PartyGroup" short-alias="partyGroup">
+            <key-map field-name="partyId"/>
+        </relationship>
+        <master name="party">
+            <detail relationship="person"/>
+            <detail relationship="partyGroup"/>
+        </master>
+    </extend-entity>
 </entities>
