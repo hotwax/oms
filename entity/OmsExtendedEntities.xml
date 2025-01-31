@@ -61,4 +61,8 @@ under the License.
             <detail relationship="partyGroup"/>
         </master>
     </extend-entity>
+
+    <extend-entity entity-name="CarrierShipmentMethod" package="org.apache.ofbiz.shipment.shipment">
+        <field name="isTrackingRequired" type="text-indicator"/>
+    </extend-entity>
 </entities>
