@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="create" noun="SalesOrder">
+        <description>
+            This service will take in the order JSON in OMSNewOrdersFeed and set up a complete order by performing any surrounding crud operations as needed.
+        </description>
+        <in-parameters>
+            <parameter name="payLoad" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId" required="true"/>
+        </out-parameters>
+        <actions>
+            <!-- Validations -->
+            <!-- Check if the order is already created in the system -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader" limit="1">
+                <econdition field-name="externalId" from="payLoad.externalId"/>
+            </entity-find>
+            <if condition="orderHeader">
+                <return error="true" type="warning" message="OrderHeader [ID: ${orderHeader[0].orderId}] - Already exists"/>
+            </if>
+            <!-- TODO: Discuss the return error part -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                <field-map field-name="productStoreId" from="payLoad.productStoreId"/>
+            </entity-find-one>
+            <if condition="!productStore">
+                <return error="true" type="warning" message="ProductStore [ID: ${payLoad.productStoreId}] - Not found"/>
+            </if>
+
+            <set field="orderContext" from="[:]"/>
+            <set field="orderContext.externalId" from="payLoad.externalId"/>
+            <set field="orderContext.orderTypeId" value="SALES_ORDER"/>
+            <set field="orderContext.orderName" from="payLoad.orderName"/>
+            <set field="orderContext.salesChannelEnumId" from="payLoad.salesChannelEnumId"/>
+            <set field="orderContext.orderDate" from="payLoad.createdAt"/>
+            <set field="orderContext.currencyUomId" from="payLoad.currencyUom"/>
+            <set field="orderContext.presentmentCurrencyUomId" from="payLoad.presentmentCurrencyUom"/>
+            <set field="orderContext.grandTotal" from="payLoad.grandTotal"/>
+            <set field="orderContext.remainingSubTotal" from="payLoad.remainingSubTotal"/>
+            <set field="orderContext.statusId" from="payLoad.statusId"/>
+            <set field="orderContext.productStoreId" from="payLoad.productStoreId"/>
+            <set field="orderContext.adjustments" from="payLoad.adjustments"/>
+            <set field="orderContext.attributes" from="payLoad.attributes"/>
+
+            <set field="orderRoles" from="[]"/>
+            <!-- Get the customer party ID either by finding it or creating it -->
+            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Person" in-map="payLoad.customer" out-map="findOrCreateCustomerOutput"/>
+            <set field="orderRoles" from="orderRoles+[partyId:findOrCreateCustomerOutput.partyId, roleTypeId:'SHIP_TO_CUSTOMER']"/>
+            <set field="orderRoles" from="orderRoles+[partyId:productStore.payToPartyId, roleTypeId:'SHIP_FROM_VENDOR']"/>
+            <set field="orderContext.roles" from="orderRoles"/>
+
+            <set field="orderContactMechs" from="[]"/>
+            <!-- Shipping Address -->
+            <!-- Check if latitude and longitude is available and then create the GeoPoint record -->
+            <if condition="payLoad.shipToAddress.latitude &amp;&amp; payLoad.shipToAddress.longitude">
+                <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payLoad.shipToAddress.latitude, longitude:payLoad.shipToAddress.longitude]" out-map="createGeoPointOutput"/>
+                <set field="payLoad.shipToAddress.geoPointId" from="createGeoPointOutput.geoPointId"/>
+            </if>
+            <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="payLoad.shipToAddress" out-map="createShipToAddressOutput"/>
+            <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createShipToAddressOutput.contactMechId, contactMechPurposeTypeId:'SHIPPING_LOCATION']"/>
+
+            <!-- Shipping Phone -->
+            <if condition="payLoad.shipToPhone">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payLoad.shipToPhone]" out-map="createShipToPhoneOutput"/>
+                <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createShipToPhoneOutput.contactMechId, contactMechPurposeTypeId:'PHONE_SHIPPING']"/>
+            </if>
+
+            <!-- Order Email -->
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:payLoad.email]" out-map="createOrderEmailOutput"/>
+            <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createOrderEmailOutput.contactMechId, contactMechPurposeTypeId:'ORDER_EMAIL']"/>
+
+            <!-- Billing Address -->
+            <if condition="payLoad.billToAddress">
+                <!-- Check if latitude and longitude is available and then create the GeoPoint record -->
+                <if condition="payLoad.billToAddress.latitude &amp;&amp; payLoad.billToAddress.longitude">
+                    <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payLoad.billToAddress.latitude, longitude:payLoad.billToAddress.longitude]" out-map="createBillToGeoPointOutput"/>
+                    <set field="payLoad.billToAddress.geoPointId" from="createBillToGeoPointOutput.geoPointId"/>
+                </if>
+                <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="payLoad.billToAddress" out-map="createBillToAddressOutput"/>
+                <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createBillToAddressOutput.contactMechId, contactMechPurposeTypeId:'BILLING_LOCATION']"/>
+            </if>
+
+            <!-- Billing Phone -->
+            <if condition="payLoad.billToPhone">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payLoad.billToPhone]" out-map="createBillToPhoneOutput"/>
+                <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createBillToPhoneOutput.contactMechId, contactMechPurposeTypeId:'PHONE_BILLING']"/>
+            </if>
+            <set field="orderContext.contactMechs" from="orderContactMechs"/>
+
+            <set field="orderItemShipGroups" from="[]"/>
+            <iterate list="payLoad.shipGroups" entry="shipGroup">
+                <iterate list="shipGroup.items" entry="item">
+                    <set field="productSku" from="item.productSku"/>
+                    <if condition="productSku">
+                        <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Product" in-map="[internalName:productSku]" out-map="findOrCreateProductOutput"/>
+                        <set field="item.productId" from="findOrCreateProductOutput.productId"/>
+                        <else>
+                            <!-- TODO: Discuss the else case scenario handling-->
+                        </else>
+                    </if>
+                </iterate>
+            </iterate>
+            <set field="orderContext.shipGroups" from="payLoad.shipGroups"/>
+
+            <!-- Save the OrderHeader and related information -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="orderContext" out-map="createOrderHeaderOutput"/>
+            <set field="orderId" from="createOrderHeaderOutput.orderId"/>
+        </actions>
+    </service>
+
+    <service verb="findOrCreate" noun="Product">
+        <description>This service either finds a product by its internal name or creates a new one</description>
+        <in-parameters>
+            <parameter name="internalName" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId" required="true"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="product" limit="1">
+                <econdition field-name="internalName" from="internalName"/>
+            </entity-find>
+            <if condition="product">
+                <set field="productId" from="product[0].productId"/>
+                <else>
+                    <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="[internalName:internalName]" out-map="createProductOutput"/>
+                    <set field="productId" from="createProductOutput.productId"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="findOrCreate" noun="Person">
+        <description>This service either finds a party by its externalId or creates a new one</description>
+        <in-parameters>
+            <parameter name="externalId" required="true"/>
+            <parameter name="firstName" required="true"/>
+            <parameter name="lastName" required="true"/>
+            <parameter name="dataSourceId" required="true"/>
+            <parameter name="contactMechs" type="List"/>
+            <parameter name="roles" type="List"/>
+            <parameter name="identifications" type="List"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId" required="true"/>
+        </out-parameters>
+        <actions>
+            <!-- Get the party -->
+            <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="customerParty" limit="1">
+                <econdition field-name="externalId" from="externalId"/>
+                <econdition field-name="dataSourceId" from="dataSourceId" ignore-if-empty="true"/>
+            </entity-find>
+            <if condition="customerParty">
+                <set field="partyId" from="customerParty[0].partyId"/>
+                <else>
+                    <!-- If party doesn't exist, then create one -->
+                    <if condition="!firstName &amp;&amp; !lastName">
+                        <return error="true" type="warning" message="Party not found with externalId: ${externalId}. Couldn't create a Party for null firstName and lastName."/>
+                    </if>
+                    <service-call name="co.hotwax.oms.party.PartyServices.create#Person" in-map="context" out-map="createPersonOutput"/>
+                    <set field="partyId" from="createPersonOutput.partyId"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+
+</services>
