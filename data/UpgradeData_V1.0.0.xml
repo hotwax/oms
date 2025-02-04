@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<entity-facade-xml type="ext-upgrade">
+<entity-facade-xml type="ext-upgrade-v1.0.0">
 
     <!-- EnumerationType and Enumeration data for product sync jobs -->
     <moqui.basic.EnumerationType enumTypeId="PRODUCT_SYS_JOB" description="Product Jobs"/>
