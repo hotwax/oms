@@ -522,4 +522,82 @@ under the License.
             </if>
         </actions>
     </service>
+    <service verb="findOrCreate" noun="FacilityInventoryItem">
+        <in-parameters>
+            <parameter name="facilityId"/>
+            <parameter name="externalFacilityId"/>
+            <parameter name="productId"/>
+            <parameter name="productIdentType"/>
+            <parameter name="productIdentValue"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+            <parameter name="facilityId"/>
+            <parameter name="inventoryItemId"/>
+        </out-parameters>
+        <actions>
+            <if condition="productId &amp;&amp; facilityId">
+
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
+                    <field-map field-name="productId" from="productId"/>
+                    <field-map field-name="facilityId" from="facilityId"/>
+                </entity-find-one>
+
+                <else>
+                    <entity-find-one entity-name="org.apache.ofbiz.product.product.GoodIdentification" value-field="goodIdentification">
+                        <field-map field-name="goodIdentificationTypeId" from="productIdentType"/>
+                        <field-map field-name="idValue" from="productIdentValue"/>
+                    </entity-find-one>
+
+                    <if condition="!goodIdentification">
+                        <return error="true" message="Could not find product with ident type ${productIdentType} and value ${productIdentValue}"/>
+                    </if>
+
+                    <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility">
+                        <field-map field-name="externalId" from="externalFacilityId"/>
+                    </entity-find-one>
+
+                    <if condition="!facility">
+                        <return error="true" message="Could not find facility with external ID ${externalFacilityId}"/>
+                    </if>
+
+                    <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
+                        <field-map field-name="productId" from="goodIdentification.productId"/>
+                        <field-map field-name="facilityId" from="facility.facilityId"/>
+                    </entity-find-one>
+
+                </else>
+
+            </if>
+
+            <if condition="productFacility &amp;&amp; productFacility.inventoryItemId">
+
+                <set field="inventoryItemId" from="productFacility.inventoryItemId"/>
+
+                <else>
+                    <if condition="!productFacility">
+                        <set field="productFacilityMap" type="NewMap" from="[productId: productId, facilityId: facilityId]"/>
+                        <service-call name="create#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacilityMap" out-map="productFacilityOut"/>
+                        <set field="productFacility" from="productFacilityOut"/>
+                    </if>
+
+                    <set field="inventoryItemMap" type="NewMap" from="[
+                        productId: productId,
+                        facilityId: facilityId,
+                        inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
+                    ]"/>
+                    <!--                    But we should not directly create InventoryItem it should be created using seca of inventory item detail-->
+                    <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItemMap" out-map="inventoryItemOut"/>
+                    <set field="inventoryItemId" from="inventoryItemOut.inventoryItemId"/>
+                </else>
+
+                <set field="productFacility.inventoryItemId" from="inventoryItemId"/>
+                <service-call name="update#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacility"/>
+
+            </if>
+
+            <return message="[productId: ${productId}, facilityId: ${facilityId}, inventoryItemId: ${inventoryItemId}"/>
+
+        </actions>
+    </service>
 </services>
