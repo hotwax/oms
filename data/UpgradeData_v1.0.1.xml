@@ -39,4 +39,8 @@
             feedDeleteServiceName="org.moqui.search.SearchServices.delete#DataDocument">
         <documents dataDocumentId="OmsProduct"/>
     </moqui.entity.feed.DataFeed>
+
+    <!-- Remove jobTypeEnumId from following jobs -->
+    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_NewProductsFeed" jobTypeEnumId=""/>
+    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_ProductUpdatesFeed" jobTypeEnumId=""/>
 </entity-facade-xml>

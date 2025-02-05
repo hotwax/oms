@@ -262,39 +262,10 @@ under the License.
                 <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
 
-            <!-- Set the identifications list -->
-            <set field="productJson.identifications" from="[]"/>
-
             <!-- Set the goodIdentifications from the incoming productJson -->
-            <set field="goodIdentifications" from="productJson.remove('goodIdentifications')"/>
-
-            <!-- If goodIdentifications then iterate the goodIdentifications list and check in GoodIdentification entity
-                 if the goodIdentificationType is already present -->
-            <if condition="goodIdentifications">
-
-                <iterate list="goodIdentifications" entry="goodIdentification">
-
-                <!-- Fetch the goodIdentifications for the productId -->
-                <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentificationList">
-                    <econdition field-name="productId" from="productJson?.productId"/>
-                    <econdition field-name="goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
-                    <date-filter/>
-                </entity-find>
-
-                    <!-- If goodIdentifications list then set the values from the list if not then set the values from the incoming goodIdentifications -->
-                    <if condition="goodIdentificationList"><then>
-                        <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
-                             idValue:goodIdentificationList[0].idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
-                    </then>
-                        <else>
-                            <set field="identification" from="[goodIdentificationTypeId:goodIdentification.goodIdentificationTypeId,
-                                 idValue:goodIdentification.idValue]"/>
-                        </else>
-                    </if>
-
-                    <set field="productJson.identifications" from="productJson.identifications+identification"/>
-                </iterate>
-                </if>
+            <if condition="productJson.goodIdentifications">
+                <set field="productJson.identifications" from="productJson.remove('goodIdentifications')"/>
+            </if>
 
             <!-- Set the createdDate as nowDate for the product -->
             <set field="productJson.createdDate" from="ec.user.nowTimestamp"/>
