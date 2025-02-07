@@ -217,7 +217,7 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
-            <log message="productJson BEFORE prepare create: ${productJson}"/>
+            <!--<log message="productJson BEFORE prepare create: ${productJson}"/>-->
             <!-- Set the features list and remove it from productJson -->
             <set field="features" from="productJson.remove('features')"/>
 
@@ -271,7 +271,7 @@ under the License.
             <set field="productJson.createdDate" from="ec.user.nowTimestamp"/>
 
             <!-- Adding log for testing -->
-            <log message="productJson AFTER prepare create: ${productJson}"/>
+            <!--<log message="productJson AFTER prepare create: ${productJson}"/>-->
         </actions>
     </service>
     <service verb="update" noun="ProductAndVariants">
@@ -353,7 +353,7 @@ under the License.
             <parameter name="deleteProductKeywords" type="List"/>
         </out-parameters>
         <actions>
-            <log message="productJson BEFORE prepare update: ${productJson}"/>
+            <!--<log message="productJson BEFORE prepare update: ${productJson}"/>-->
             <!-- Prepare the product features -->
             <set field="features" from="productJson.remove('features')"/>
             <set field="validFeatureAppls" from="[]"/>
@@ -504,7 +504,7 @@ under the License.
                 </iterate>
             </if>
 
-            <log message="productJson AFTER prepare update: ${productJson}"/>
+            <!--<log message="productJson AFTER prepare update: ${productJson}"/>-->
         </actions>
     </service>
 
