@@ -22,7 +22,7 @@ under the License.
             <iterate list="documentList" entry="dataDocument">
                 <log level="info" message="Creating product index for oms productId : ${dataDocument._id}"/>
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:dataDocument._id]"
-                              async="true"/>
+                        transaction="force-new" ignore-error="true"/>
             </iterate>
         </actions>
     </service>
