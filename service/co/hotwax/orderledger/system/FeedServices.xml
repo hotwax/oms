@@ -47,7 +47,7 @@ under the License.
 
                 try {
                     File errorFile = new File(errorJsonFilePath)
-                    if (!errorFile.parentFile.exists()) feedFile.parentFile.mkdirs()
+                    if (!errorFile.parentFile.exists()) errorFile.parentFile.mkdirs()
                     JsonFactory jfactory = new JsonFactory()
 
                     /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
