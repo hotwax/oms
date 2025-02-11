@@ -27,7 +27,7 @@ under the License.
         </actions>
     </service>
     <service verb="call" noun="CreateProductIndex" type="oms-rest" location="service/createProductIndex" method="post" authenticate="false">
-        <description>Call OMS cancelSalesOrderItems service.</description>
+        <description>Call OMS CreateProductIndex service.</description>
         <in-parameters>
             <parameter name="productId"/>
         </in-parameters>
