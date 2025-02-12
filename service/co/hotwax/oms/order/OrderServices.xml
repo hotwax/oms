@@ -23,7 +23,7 @@ under the License.
             This service will take in the order JSON in OMSNewOrdersFeed and set up a complete order by performing any surrounding crud operations as needed.
         </description>
         <in-parameters>
-            <parameter name="payLoad" type="Map" required="true"/>
+            <parameter name="payload" type="Map" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId" required="true"/>
@@ -32,37 +32,37 @@ under the License.
             <!-- Validations -->
             <!-- Check if the order is already created in the system -->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader" limit="1">
-                <econdition field-name="externalId" from="payLoad.externalId"/>
+                <econdition field-name="externalId" from="payload.externalId"/>
             </entity-find>
             <if condition="orderHeader">
                 <return error="true" type="warning" message="OrderHeader [ID: ${orderHeader[0].orderId}] - Already exists"/>
             </if>
             <!-- TODO: Discuss the return error part -->
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
-                <field-map field-name="productStoreId" from="payLoad.productStoreId"/>
+                <field-map field-name="productStoreId" from="payload.productStoreId"/>
             </entity-find-one>
             <if condition="!productStore">
-                <return error="true" type="warning" message="ProductStore [ID: ${payLoad.productStoreId}] - Not found"/>
+                <return error="true" type="warning" message="ProductStore [ID: ${payload.productStoreId}] - Not found"/>
             </if>
 
             <set field="orderContext" from="[:]"/>
-            <set field="orderContext.externalId" from="payLoad.externalId"/>
+            <set field="orderContext.externalId" from="payload.externalId"/>
             <set field="orderContext.orderTypeId" value="SALES_ORDER"/>
-            <set field="orderContext.orderName" from="payLoad.orderName"/>
-            <set field="orderContext.salesChannelEnumId" from="payLoad.salesChannelEnumId"/>
-            <set field="orderContext.orderDate" from="payLoad.createdAt"/>
-            <set field="orderContext.currencyUomId" from="payLoad.currencyUom"/>
-            <set field="orderContext.presentmentCurrencyUomId" from="payLoad.presentmentCurrencyUom"/>
-            <set field="orderContext.grandTotal" from="payLoad.grandTotal"/>
-            <set field="orderContext.remainingSubTotal" from="payLoad.remainingSubTotal"/>
-            <set field="orderContext.statusId" from="payLoad.statusId"/>
-            <set field="orderContext.productStoreId" from="payLoad.productStoreId"/>
-            <set field="orderContext.adjustments" from="payLoad.adjustments"/>
-            <set field="orderContext.attributes" from="payLoad.attributes"/>
+            <set field="orderContext.orderName" from="payload.orderName"/>
+            <set field="orderContext.salesChannelEnumId" from="payload.salesChannelEnumId"/>
+            <set field="orderContext.orderDate" from="payload.createdAt"/>
+            <set field="orderContext.currencyUomId" from="payload.currencyUom"/>
+            <set field="orderContext.presentmentCurrencyUomId" from="payload.presentmentCurrencyUom"/>
+            <set field="orderContext.grandTotal" from="payload.grandTotal"/>
+            <set field="orderContext.remainingSubTotal" from="payload.remainingSubTotal"/>
+            <set field="orderContext.statusId" from="payload.statusId"/>
+            <set field="orderContext.productStoreId" from="payload.productStoreId"/>
+            <set field="orderContext.adjustments" from="payload.adjustments"/>
+            <set field="orderContext.attributes" from="payload.attributes"/>
 
             <set field="orderRoles" from="[]"/>
             <!-- Get the customer party ID either by finding it or creating it -->
-            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Person" in-map="payLoad.customer" out-map="findOrCreateCustomerOutput"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.findOrCreate#Person" in-map="payload.customer" out-map="findOrCreateCustomerOutput"/>
             <set field="orderRoles" from="orderRoles+[partyId:findOrCreateCustomerOutput.partyId, roleTypeId:'SHIP_TO_CUSTOMER']"/>
             <set field="orderRoles" from="orderRoles+[partyId:productStore.payToPartyId, roleTypeId:'SHIP_FROM_VENDOR']"/>
             <set field="orderContext.roles" from="orderRoles"/>
@@ -70,43 +70,43 @@ under the License.
             <set field="orderContactMechs" from="[]"/>
             <!-- Shipping Address -->
             <!-- Check if latitude and longitude is available and then create the GeoPoint record -->
-            <if condition="payLoad.shipToAddress.latitude &amp;&amp; payLoad.shipToAddress.longitude">
-                <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payLoad.shipToAddress.latitude, longitude:payLoad.shipToAddress.longitude]" out-map="createGeoPointOutput"/>
-                <set field="payLoad.shipToAddress.geoPointId" from="createGeoPointOutput.geoPointId"/>
+            <if condition="payload.shipToAddress.latitude &amp;&amp; payload.shipToAddress.longitude">
+                <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payload.shipToAddress.latitude, longitude:payload.shipToAddress.longitude]" out-map="createGeoPointOutput"/>
+                <set field="payload.shipToAddress.geoPointId" from="createGeoPointOutput.geoPointId"/>
             </if>
-            <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="payLoad.shipToAddress" out-map="createShipToAddressOutput"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress" in-map="payload.shipToAddress" out-map="createShipToAddressOutput"/>
             <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createShipToAddressOutput.contactMechId, contactMechPurposeTypeId:'SHIPPING_LOCATION']"/>
 
             <!-- Shipping Phone -->
-            <if condition="payLoad.shipToPhone">
-                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payLoad.shipToPhone]" out-map="createShipToPhoneOutput"/>
+            <if condition="payload.shipToPhone">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payload.shipToPhone]" out-map="createShipToPhoneOutput"/>
                 <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createShipToPhoneOutput.contactMechId, contactMechPurposeTypeId:'PHONE_SHIPPING']"/>
             </if>
 
             <!-- Order Email -->
-            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:payLoad.email]" out-map="createOrderEmailOutput"/>
+            <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:payload.email]" out-map="createOrderEmailOutput"/>
             <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createOrderEmailOutput.contactMechId, contactMechPurposeTypeId:'ORDER_EMAIL']"/>
 
             <!-- Billing Address -->
-            <if condition="payLoad.billToAddress">
+            <if condition="payload.billToAddress">
                 <!-- Check if latitude and longitude is available and then create the GeoPoint record -->
-                <if condition="payLoad.billToAddress.latitude &amp;&amp; payLoad.billToAddress.longitude">
-                    <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payLoad.billToAddress.latitude, longitude:payLoad.billToAddress.longitude]" out-map="createBillToGeoPointOutput"/>
-                    <set field="payLoad.billToAddress.geoPointId" from="createBillToGeoPointOutput.geoPointId"/>
+                <if condition="payload.billToAddress.latitude &amp;&amp; payload.billToAddress.longitude">
+                    <service-call name="create#moqui.basic.GeoPoint" in-map="[dataSourceId:GEOPT_GOOGLE, latitude:payload.billToAddress.latitude, longitude:payload.billToAddress.longitude]" out-map="createBillToGeoPointOutput"/>
+                    <set field="payload.billToAddress.geoPointId" from="createBillToGeoPointOutput.geoPointId"/>
                 </if>
-                <service-call name="co.hotwax.oms.ContactMechServices.create#PostalAddress" in-map="payLoad.billToAddress" out-map="createBillToAddressOutput"/>
+                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress" in-map="payload.billToAddress" out-map="createBillToAddressOutput"/>
                 <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createBillToAddressOutput.contactMechId, contactMechPurposeTypeId:'BILLING_LOCATION']"/>
             </if>
 
             <!-- Billing Phone -->
-            <if condition="payLoad.billToPhone">
-                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payLoad.billToPhone]" out-map="createBillToPhoneOutput"/>
+            <if condition="payload.billToPhone">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" in-map="[contactNumber:payload.billToPhone]" out-map="createBillToPhoneOutput"/>
                 <set field="orderContactMechs" from="orderContactMechs+[contactMechId:createBillToPhoneOutput.contactMechId, contactMechPurposeTypeId:'PHONE_BILLING']"/>
             </if>
             <set field="orderContext.contactMechs" from="orderContactMechs"/>
 
             <set field="orderItemShipGroups" from="[]"/>
-            <iterate list="payLoad.shipGroups" entry="shipGroup">
+            <iterate list="payload.shipGroups" entry="shipGroup">
                 <iterate list="shipGroup.items" entry="item">
                     <set field="productSku" from="item.productSku"/>
                     <if condition="productSku">
@@ -118,7 +118,7 @@ under the License.
                     </if>
                 </iterate>
             </iterate>
-            <set field="orderContext.shipGroups" from="payLoad.shipGroups"/>
+            <set field="orderContext.shipGroups" from="payload.shipGroups"/>
 
             <!-- Save the OrderHeader and related information -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="orderContext" out-map="createOrderHeaderOutput"/>
