@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<entity-facade-xml type="ext-upgrade-v1.0.3">
+<entity-facade-xml type="ext-upgrade">
     <!-- EnumerationType for OMS system message type enum and relationship -->
     <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
     <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
