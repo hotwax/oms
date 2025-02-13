@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<entity-facade-xml type="ext-upgrade-upcoming">
+<entity-facade-xml type="ext-upgrade-v1.0.1">
     <dataDocuments dataDocumentId="OmsProduct" indexName="oms" documentName="Product"
             primaryEntityName="org.apache.ofbiz.product.product.Product" documentTitle="ProductNameTemplate">
         <fields fieldSeqId="01" fieldPath="productId"/>

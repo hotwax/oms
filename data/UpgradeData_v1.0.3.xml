@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="ext-upgrade-v1.0.3">
+    <!-- EnumerationType for OMS system message type enum and relationship -->
+    <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
+    <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
+    <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeed" enumTypeId="OMSMessageTypeEnum"/>
+
+    <moqui.service.job.ServiceJob jobName="consume_AllReceivedSystemMessages_oms" description="Consume All Received SystemMessages for OMS"
+            serviceName="org.moqui.impl.SystemMessageServices.consume#AllReceivedSystemMessages" cronExpression="0 0/15 * * * ?" paused="Y">
+        <parameters parameterName="mode" parameterValue="sync"/>
+        <parameters parameterName="systemMessageTypeIds" parameterValue="NewProductsFeed,ProductUpdatesFeed"/>
+    </moqui.service.job.ServiceJob>
+</entity-facade-xml>

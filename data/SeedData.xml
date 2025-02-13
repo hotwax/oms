@@ -5,6 +5,9 @@
     <!-- SystemMessageType data for Error Feed file -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="FeedErrorFile"/>
 
+    <!-- EnumerationType for OMS system message type enum and relationship -->
+    <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
+
     <!-- TODO: Add receivePath -->
     <!-- SystemMessageType data for consuming New Products Feed -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
@@ -16,6 +19,7 @@
             receiveMovePath="/home/${sftpUsername}/hotwax/ProductsFeed/archive"
             sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
             sendPath="${contentRoot}/oms/NewProductsFeed"/>
+    <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
 
     <!-- TODO: Add receivePath -->
     <!-- SystemMessageType data for consuming Update Products Feed -->
@@ -28,17 +32,12 @@
             receiveMovePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed/archive"
             sendService="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
             sendPath="${contentRoot}/oms/ProductUpdatesFeed"/>
+    <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeed" enumTypeId="OMSMessageTypeEnum"/>
 
-    <!-- ServiceJob data for polling New Products Feed from SFTP -->
-    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_NewProductsFeed" description="Poll New Products Feed"
-            serviceName="co.hotwax.ofbiz.SystemMessageServices.poll#SystemMessageFileSftp" cronExpression="0 0 * * * ?" paused="Y">
-        <parameters parameterName="systemMessageTypeId" parameterValue="NewProductsFeed"/>
-    </moqui.service.job.ServiceJob>
-
-    <!-- ServiceJob data for polling Update Products Feed from SFTP -->
-    <moqui.service.job.ServiceJob jobName="poll_SystemMessageFileSftp_ProductUpdatesFeed" description="Poll Product Updates Feed"
-            serviceName="co.hotwax.ofbiz.SystemMessageServices.poll#SystemMessageFileSftp" cronExpression="0 0 * * * ?" paused="Y">
-        <parameters parameterName="systemMessageTypeId" parameterValue="ProductUpdatesFeed"/>
+    <moqui.service.job.ServiceJob jobName="consume_AllReceivedSystemMessages_oms" description="Consume All Received SystemMessages for OMS"
+            serviceName="org.moqui.impl.SystemMessageServices.consume#AllReceivedSystemMessages" cronExpression="0 0/15 * * * ?" paused="Y">
+        <parameters parameterName="mode" parameterValue="sync"/>
+        <parameters parameterName="systemMessageTypeIds" parameterValue="NewProductsFeed,ProductUpdatesFeed"/>
     </moqui.service.job.ServiceJob>
 
 </entity-facade-xml>
