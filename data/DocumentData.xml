@@ -50,9 +50,11 @@ under the License.
         <fields fieldSeqId="24" fieldPath="keywords:keyword"/>
     </dataDocuments>
 
+    <!-- Commenting this data as data feeds are not performing well with bulk product uploads.
     <moqui.entity.feed.DataFeed dataFeedId="OmsProduct" dataFeedTypeEnumId="DTFDTP_RT_PUSH" indexOnStartEmpty="Y"
             feedName="OMS Product Feed" feedReceiveServiceName="co.hotwax.oms.search.SearchServices.index#ProductSolr"
             feedDeleteServiceName="org.moqui.search.SearchServices.delete#DataDocument">
         <documents dataDocumentId="OmsProduct"/>
     </moqui.entity.feed.DataFeed>
+    -->
 </entity-facade-xml>

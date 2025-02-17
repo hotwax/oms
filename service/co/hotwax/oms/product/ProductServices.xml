@@ -78,6 +78,17 @@ under the License.
                     ec.message.addError(variantErrors.toString())
                 </script>
             </if>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId]"
+                          transaction="force-new" ignore-error="true"/>
+            <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+            <if condition="variantProductIds">
+                <iterate list="variantProductIds" entry="variantProductId">
+                     <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:variantProductId]"
+                                   transaction="force-new" ignore-error="true"/>
+                    <log level="info" message="Created product index for oms productId : ${variantProductId}"/>
+                </iterate>
+             </if>
         </actions>
     </service>
 
@@ -340,6 +351,17 @@ under the License.
                     ec.message.addError(variantErrors.toString())
                 </script>
             </if>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId]"
+                          transaction="force-new" ignore-error="true"/>
+                <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+                <if condition="variantProductIds">
+                    <iterate list="variantProductIds" entry="variantProductId">
+                        <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:variantProductId]"
+                                      transaction="force-new" ignore-error="true"/>
+                        <log level="info" message="Created product index for oms productId : ${variantProductId}"/>
+                    </iterate>
+                </if>
         </actions>
     </service>
 
