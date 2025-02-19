@@ -36,32 +36,59 @@ under the License.
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
             <set field="parentProductId" from="createVirtualProductOut.productId"/>
 
-            <!-- Set the createVariantResultError list to store the errors occurred while creating variant product -->
-            <set field="createVariantResultError" from="[]"/>
+            <!-- Set the variantErrors list to store the errors occurred while creating variant product -->
+            <set field="variantErrors" from="[]"/>
+            <set field="variantProductIds" from="[]"/>
 
             <!-- Iterate the productVariants list -->
             <iterate list="productVariants" entry="productVariant">
-
                 <!-- For each product variant call the create#ProductVariant service -->
-                <script><![CDATA[
-                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.create#ProductVariant")
-                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
-                    .requireNewTransaction(true)
-                    .call()
-
-                        // If any errors then add the error to createVariantResultError list
-                    if (ec.message.hasError()) {
-                        createVariantResultError.add(ec.message.getErrorsString())
-                    }
-                    ec.message.clearAll();
-                    ]]></script>
-            </iterate>
-
-            <if condition="createVariantResultError">
                 <script>
-                    ec.message.addError(createVariantResultError.toString())
+                    <![CDATA[
+                        actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.create#ProductVariant")
+                        .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                        .requireNewTransaction(true)
+                        .call()
+
+                        // If any errors then add the error to variantErrors list
+                        if (ec.message.hasError()) {
+                            variantErrors.add(ec.message.getErrorsString())
+                        }
+                        ec.message.clearAll();
+                    ]]>
+                </script>
+                <if condition="actionResult.productId">
+                    <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
+                </if>
+            </iterate>
+            <if condition="variantProductIds">
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" operator="not-in" from="variantProductIds"/>
+                </entity-find>
+                <if condition="productAssocs">
+                    <iterate list="productAssocs" entry="productAssoc">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new" ignore-error="true"/>
+                    </iterate>
+                </if>
+            </if>
+
+            <if condition="variantErrors">
+                <script>
+                    ec.message.addError(variantErrors.toString())
                 </script>
             </if>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId]"
+                          transaction="force-new" ignore-error="true"/>
+            <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+            <if condition="variantProductIds">
+                <iterate list="variantProductIds" entry="variantProductId">
+                     <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:variantProductId]"
+                                   transaction="force-new" ignore-error="true"/>
+                    <log level="info" message="Created product index for oms productId : ${variantProductId}"/>
+                </iterate>
+             </if>
         </actions>
     </service>
 
@@ -125,6 +152,9 @@ under the License.
                 <description>The parent product id for the variants.</description>
             </parameter>
         </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+        </out-parameters>
         <actions>
 
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
@@ -143,6 +173,7 @@ under the License.
 
             <!-- Check if productId is not null -->
             <if condition="productVariantJson.productId">
+                <set field="productId" from="productVariantJson.productId"/>
                 <!-- Create ShopifyShopProduct record -->
                 <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
                         productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
@@ -172,6 +203,7 @@ under the License.
             <!-- Create Product record for the variant product -->
             <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
                     out-map="createProductOut"/>
+            <set field="productId" from="createProductOut.productId"/>
 
             <!-- Create ProductAssoc record for the variant product -->
             <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
@@ -196,7 +228,7 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
-            <log message="productJson BEFORE prepare create: ${productJson}"/>
+            <!--<log message="productJson BEFORE prepare create: ${productJson}"/>-->
             <!-- Set the features list and remove it from productJson -->
             <set field="features" from="productJson.remove('features')"/>
 
@@ -240,8 +272,22 @@ under the License.
                 </iterate>
                 <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
+
+            <!-- Set the goodIdentifications from the incoming productJson -->
+            <if condition="productJson.goodIdentifications">
+                <set field="productJson.identifications" from="productJson.remove('goodIdentifications')"/>
+            </if>
+
+            <!-- Set the product prices from the incoming productJson -->
+            <if condition="productJson.productPrices">
+                <set field="productJson.prices" from="productJson.remove('productPrices')"/>
+            </if>
+
+            <!-- Set the createdDate as nowDate for the product -->
+            <set field="productJson.createdDate" from="ec.user.nowTimestamp"/>
+
             <!-- Adding log for testing -->
-            <log message="productJson AFTER prepare create: ${productJson}"/>
+            <!--<log message="productJson AFTER prepare create: ${productJson}"/>-->
         </actions>
     </service>
     <service verb="update" noun="ProductAndVariants">
@@ -270,30 +316,57 @@ under the License.
                 </else>
             </if>
 
-            <!-- Set the UpdateVariantResultError list to store the errors occurred while creating variant product -->
-            <set field="UpdateVariantResultError" from="[]"/>
+            <!-- Set the variantErrors list to store the errors occurred while creating variant product -->
+            <set field="variantErrors" from="[]"/>
+            <set field="variantProductIds" from="[]"/>
 
             <iterate list="productVariants" entry="productVariant">
-
-                <script><![CDATA[
-                    actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.update#ProductVariant")
-                    .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
-                    .requireNewTransaction(true)
-                    .call()
-
-                    // If any errors then add the error to UpdateVariantResultError list
-                    if (ec.message.hasError()) {
-                        UpdateVariantResultError.add(ec.message.getErrorsString())
-                    }
-                    ec.message.clearAll();
-                    ]]></script>
-            </iterate>
-
-            <if condition="UpdateVariantResultError">
                 <script>
-                    ec.message.addError(UpdateVariantResultError.toString())
+                    <![CDATA[
+                        actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.update#ProductVariant")
+                        .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                        .requireNewTransaction(true)
+                        .call()
+
+                        // If any errors then add the error to variantErrors list
+                        if (ec.message.hasError()) {
+                            variantErrors.add(ec.message.getErrorsString())
+                        }
+                        ec.message.clearAll();
+                    ]]>
+                </script>
+                <if condition="actionResult.productId">
+                    <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
+                </if>
+            </iterate>
+            <if condition="variantProductIds">
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" operator="not-in" from="variantProductIds"/>
+                </entity-find>
+                <if condition="productAssocs">
+                    <iterate list="productAssocs" entry="productAssoc">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new" ignore-error="true"/>
+                    </iterate>
+                </if>
+            </if>
+
+            <if condition="variantErrors">
+                <script>
+                    ec.message.addError(variantErrors.toString())
                 </script>
             </if>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId]"
+                          transaction="force-new" ignore-error="true"/>
+                <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+                <if condition="variantProductIds">
+                    <iterate list="variantProductIds" entry="variantProductId">
+                        <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:variantProductId]"
+                                      transaction="force-new" ignore-error="true"/>
+                        <log level="info" message="Created product index for oms productId : ${variantProductId}"/>
+                    </iterate>
+                </if>
         </actions>
     </service>
 
@@ -307,7 +380,7 @@ under the License.
             <parameter name="deleteProductKeywords" type="List"/>
         </out-parameters>
         <actions>
-            <log message="productJson BEFORE prepare update: ${productJson}"/>
+            <!--<log message="productJson BEFORE prepare update: ${productJson}"/>-->
             <!-- Prepare the product features -->
             <set field="features" from="productJson.remove('features')"/>
             <set field="validFeatureAppls" from="[]"/>
@@ -424,7 +497,67 @@ under the License.
                     <set field="deleteProductKeywords" from="deleteProductKeywords + currentProductKeyword"/>
                 </if>
             </iterate>
-            <log message="productJson AFTER prepare update: ${productJson}"/>
+
+            <!-- Set the identifications list -->
+            <set field="productJson.identifications" from="[]"/>
+
+            <!-- Set the goodIdentifications from the incoming productJson -->
+            <set field="goodIdentifications" from="productJson.remove('goodIdentifications')"/>
+
+            <!-- If goodIdentifications then iterate the goodIdentifications list and check in GoodIdentification entity
+                 if the goodIdentificationType is already present -->
+            <if condition="goodIdentifications">
+                <iterate list="goodIdentifications" entry="goodIdentification">
+
+                    <!-- Fetch the goodIdentifications for the productId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentificationList">
+                        <econdition field-name="productId" from="productJson?.productId"/>
+                        <econdition field-name="goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
+                        <date-filter/>
+                    </entity-find>
+
+                    <!-- If goodIdentifications list then set the values from the list if not then set the values from the incoming goodIdentifications -->
+                    <if condition="goodIdentificationList"><then>
+                        <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
+                             idValue:goodIdentificationList[0].idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                    </then>
+                        <else>
+                            <set field="identification" from="[goodIdentificationTypeId:goodIdentification.goodIdentificationTypeId,
+                                 idValue:goodIdentification.idValue]"/>
+                        </else>
+                    </if>
+
+                    <set field="productJson.identifications" from="productJson.identifications+identification"/>
+                </iterate>
+            </if>
+
+            <!-- Set the productPrices map from the incoming productJson -->
+            <set field="productPrices" from="productJson.remove('productPrices')"/>
+
+            <!-- If productPrices then check in ProductPrice entity if the product price record is already present -->
+            <if condition="productPrices">
+
+                <!-- Fetch the productPrice for the product -->
+                <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPriceList">
+                    <econdition field-name="productId" from="productJson?.productId"/>
+                    <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
+                    <econdition field-name="productPricePurposeId" value="PURCHASE"/>
+                    <econdition field-name="currencyUomId" from="productPrices.currencyUomId"/>
+                    <econdition field-name="productStoreGroupId" from="productPrices.productStoreGroupId"/>
+                    <date-filter/>
+                </entity-find>
+
+                <!-- If productPriceList then set the values from the list if not then set the values from the incoming productPrices -->
+                <if condition="productPriceList"><then>
+                    <set field="productJson.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
+                        currencyUomId:productPrices.currencyUomId, price:productPrices.price, productStoreGroupId:productPrices.productStoreGroupId,
+                        fromDate:ec.l10n.format(productPriceList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                </then><else>
+                    <set field="productJson.prices" from="productPrices"/>
+                </else>
+                </if>
+            </if>
+            <!--<log message="productJson AFTER prepare update: ${productJson}"/>-->
         </actions>
     </service>
 
@@ -471,6 +604,9 @@ under the License.
             <parameter name="productVariantJson" type="Map" required="true"/>
             <parameter name="parentProductId" required="true"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+        </out-parameters>
         <actions>
 
             <!-- Check if internalName is present, if no return as for variant the internalName is used to
@@ -493,12 +629,14 @@ under the License.
             <if condition="!productVariantJson.productId">
                 <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
+                <set field="productId" from="createProductOutput.productId"/>
                 <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                 <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
+                    <set field="productId" from="productVariantJson.productId"/>
 
                     <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
                     <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">

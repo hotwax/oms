@@ -47,7 +47,7 @@ under the License.
 
                 try {
                     File errorFile = new File(errorJsonFilePath)
-                    if (!errorFile.parentFile.exists()) feedFile.parentFile.mkdirs()
+                    if (!errorFile.parentFile.exists()) errorFile.parentFile.mkdirs()
                     JsonFactory jfactory = new JsonFactory()
 
                     /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
@@ -66,7 +66,6 @@ under the License.
 
             <!-- Iterate through jsonList and for each entry call systemMessage.sendService in a new transaction -->
             <iterate list="jsonList" entry="jsonEntry">
-                <log message="===jsonEntry====${jsonEntry}"/>
                 <script>
                     /* Calling the sendService in this way will allow us to identify
                         if the service execution had exception or returned error so we can prepare the error file */
@@ -92,7 +91,7 @@ under the License.
                         jGenerator.writeEndArray()
                     }
                 } catch (IOException e) {
-                    logger.error("Error preparing OMS Update Products JSON Feed file", e)
+                    logger.error("Error preparing OMS JSON Feed file", e)
                 }
             </script>
 
