@@ -69,7 +69,7 @@ under the License.
 
     <resource name="productStores">
         <method type="get">
-            <entity name="co.hotwax.product.store.ProductStoreShipmentMethCount" operation="list"/>
+            <entity name="org.apache.ofbiz.product.store.ProductStore" operation="list"/>
         </method>
         <method type="post">
             <entity name="org.apache.ofbiz.product.store.ProductStore" operation="create"/>
@@ -121,6 +121,13 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="shipmentMethods">
+            <resource name="counts">
+                <method type="get">
+                    <entity name="co.hotwax.product.store.ProductStoreShipmentMethCount" operation="list"/>
+                </method>
+            </resource>
+        </resource>
     </resource>
 
     <resource name="groupProductStores" description="ProductStores associated with facility group">
