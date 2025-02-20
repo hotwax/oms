@@ -519,7 +519,7 @@ under the License.
                     <!-- If goodIdentifications list then set the values from the list if not then set the values from the incoming goodIdentifications -->
                     <if condition="goodIdentificationList"><then>
                         <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
-                             idValue:goodIdentificationList[0].idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                             idValue:goodIdentification.idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
                     </then>
                         <else>
                             <set field="identification" from="[goodIdentificationTypeId:goodIdentification.goodIdentificationTypeId,
