@@ -90,13 +90,13 @@ under the License.
         </master>
     </extend-entity>
     <extend-entity entity-name="OrderContactMech" package="org.apache.ofbiz.order.order">
-        <relationship type="one" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
             <key-map field-name="contactMechId"/>
         </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.contact.PostalAddress" short-alias="postalAddress">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.contact.PostalAddress" short-alias="postalAddress">
             <key-map field-name="contactMechId"/>
         </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.contact.TelecomNumber" short-alias="telecomNumber">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.contact.TelecomNumber" short-alias="telecomNumber">
             <key-map field-name="contactMechId"/>
         </relationship>
         <master>
