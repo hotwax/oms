@@ -50,10 +50,10 @@ under the License.
         </master>
     </extend-entity>
     <extend-entity entity-name="PicklistRole" package="org.apache.ofbiz.shipment.picklist">
-        <relationship type="one" related="org.apache.ofbiz.party.party.Person" short-alias="person">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.party.Person" short-alias="person">
             <key-map field-name="partyId"/>
         </relationship>
-        <relationship type="one" related="org.apache.ofbiz.party.party.PartyGroup" short-alias="partyGroup">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.party.PartyGroup" short-alias="partyGroup">
             <key-map field-name="partyId"/>
         </relationship>
         <master name="party">
