@@ -663,12 +663,41 @@ under the License.
     <!--I don't like the findOrCreate pattern, but don't have better suggestion -->
     <!--The service noun should be ProductInventoryItem, as we are fetching product inventory item at facility  -->
     <service verb="findOrCreate" noun="FacilityInventoryItem">
+        <description>
+            This service finds or creates an inventory item for a given product and facility.
+            It ensures that the ProductFacility record exist before associating them with an inventory item.
+        </description>
         <in-parameters>
-            <parameter name="facilityId"/>
-            <parameter name="externalFacilityId"/>
-            <parameter name="productId"/>
-            <parameter name="productIdentType"/>
-            <parameter name="productIdentValue"/>
+            <parameter name="facilityId">
+                <description>
+                    The internal identifier of the facility.
+                    If not provided, externalFacilityId is used to find the facility.
+                </description>
+            </parameter>
+            <parameter name="externalFacilityId">
+                <description>
+                    The external identifier of the facility.
+                    Used to find the facility when facilityId is not provided.
+                </description>
+            </parameter>
+            <parameter name="productId">
+                <description>
+                    The internal identifier of the product.
+                    If not provided, productIdentType and productIdentValue are used to find the product.
+                </description>
+            </parameter>
+            <parameter name="productIdentType">
+                <description>
+                    The identification type (e.g., SKU, UPCA) for the product.
+                    Required if productId is not provided.
+                </description>
+            </parameter>
+            <parameter name="productIdentValue">
+                <description>
+                    The identification value corresponding to productIdentType.
+                    Required if productId is not provided.
+                </description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="productId"/>
