@@ -57,6 +57,16 @@ under the License.
                 </id>
             </resource>
         </id>
+        <resource name="shipGroups">
+            <method type="get">
+                <entity name="org.apache.ofbiz.order.order.OrderItemShipGroup" operation="list"/>
+            </method>
+            <id name="shipGroupSeqId">
+                <method type="put">
+                    <entity name="org.apache.ofbiz.order.order.OrderItemShipGroup" operation="update"/>
+                </method>
+            </id>
+        </resource>
     </resource>
     <resource name="returns">
         <method type="get">
