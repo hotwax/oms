@@ -725,6 +725,10 @@ under the License.
                 </if>
                 <set field="facilityId" from="facilities?facilities[0].facilityId:null"/>
             </if>
+            <service-call name="co.hotwax.oms.FacilityServices.check#FacilityType" in-map="[facilityId: facilityId, parentTypeId: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <if condition="outResult.hasFacilityType">
+                <return error="true" message="Facility [ID: ${facilityId} is virtual facility."/>
+            </if>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
                 <field-map field-name="productId" from="productId"/>
                 <field-map field-name="facilityId" from="facilityId"/>
