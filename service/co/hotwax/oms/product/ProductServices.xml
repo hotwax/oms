@@ -660,6 +660,8 @@ under the License.
             </if>
         </actions>
     </service>
+    <!--I don't like the findOrCreate pattern, but don't have better suggestion -->
+    <!--The service noun should be ProductInventoryItem, as we are fetching product inventory item at facility  -->
     <service verb="findOrCreate" noun="FacilityInventoryItem">
         <in-parameters>
             <parameter name="facilityId"/>
@@ -674,68 +676,52 @@ under the License.
             <parameter name="inventoryItemId"/>
         </out-parameters>
         <actions>
-            <if condition="productId &amp;&amp; facilityId">
-
-                <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
-                    <field-map field-name="productId" from="productId"/>
-                    <field-map field-name="facilityId" from="facilityId"/>
-                </entity-find-one>
-
-                <else>
-                    <entity-find-one entity-name="org.apache.ofbiz.product.product.GoodIdentification" value-field="goodIdentification">
-                        <field-map field-name="goodIdentificationTypeId" from="productIdentType"/>
-                        <field-map field-name="idValue" from="productIdentValue"/>
-                    </entity-find-one>
-
-                    <if condition="!goodIdentification">
-                        <return error="true" message="Could not find product with ident type ${productIdentType} and value ${productIdentValue}"/>
-                    </if>
-
-                    <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility">
-                        <field-map field-name="externalId" from="externalFacilityId"/>
-                    </entity-find-one>
-
-                    <if condition="!facility">
-                        <return error="true" message="Could not find facility with external ID ${externalFacilityId}"/>
-                    </if>
-
-                    <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
-                        <field-map field-name="productId" from="goodIdentification.productId"/>
-                        <field-map field-name="facilityId" from="facility.facilityId"/>
-                    </entity-find-one>
-
-                </else>
-
+            <if condition="!productId">
+                <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentifications" cache="true">
+                    <econdition field-name="goodIdentificationTypeId" from="productIdentType"/>
+                    <econdition field-name="idValue" from="productIdentValue"/>
+                    <date-filter/>
+                </entity-find>
+                <if condition="!goodIdentifications">
+                    <return error="true" message="Could not find product with ident type ${productIdentType} and value ${productIdentValue}"/>
+                </if>
+                <set field="productId" from="goodIdentifications?goodIdentifications[0].productId:null"/>
             </if>
+            <if condition="!facilityId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilities" cache="true">
+                    <econdition field-name="externalId" from="externalFacilityId"/>
+                </entity-find>
+                <if condition="!facilities">
+                    <return error="true" message="Could not find facility with external ID ${externalFacilityId}"/>
+                </if>
+                <set field="facilityId" from="facilities?facilities[0].facilityId:null"/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
+                <field-map field-name="productId" from="productId"/>
+                <field-map field-name="facilityId" from="facilityId"/>
+            </entity-find-one>
 
             <if condition="productFacility &amp;&amp; productFacility.inventoryItemId">
-
                 <set field="inventoryItemId" from="productFacility.inventoryItemId"/>
-
                 <else>
-                    <if condition="!productFacility">
-                        <set field="productFacilityMap" type="NewMap" from="[productId: productId, facilityId: facilityId]"/>
-                        <service-call name="create#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacilityMap" out-map="productFacilityOut"/>
-                        <set field="productFacility" from="productFacilityOut"/>
-                    </if>
-
-                    <set field="inventoryItemMap" type="NewMap" from="[
-                        productId: productId,
-                        facilityId: facilityId,
-                        inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
-                    ]"/>
-                    <!--                    But we should not directly create InventoryItem it should be created using seca of inventory item detail-->
+                    <set field="inventoryItemMap" from="[
+                            productId: productId,
+                            facilityId: facilityId,
+                            inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
+                        ]"/>
                     <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItemMap" out-map="inventoryItemOut"/>
                     <set field="inventoryItemId" from="inventoryItemOut.inventoryItemId"/>
+                    <if condition="!productFacility">
+                        <set field="productFacilityMap" from="[productId: productId, facilityId: facilityId, inventoryItemId: inventoryItemId]"/>
+                        <service-call name="create#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacilityMap" out-map="productFacilityOut"/>
+                        <set field="productFacility" from="productFacilityOut"/>
+                        <else>
+                            <set field="productFacility.inventoryItemId" from="inventoryItemId"/>
+                            <service-call name="update#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacility"/>
+                        </else>
+                    </if>
                 </else>
-
-                <set field="productFacility.inventoryItemId" from="inventoryItemId"/>
-                <service-call name="update#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacility"/>
-
             </if>
-
-            <return message="[productId: ${productId}, facilityId: ${facilityId}, inventoryItemId: ${inventoryItemId}"/>
-
         </actions>
     </service>
 </services>
