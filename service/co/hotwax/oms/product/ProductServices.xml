@@ -725,8 +725,14 @@ under the License.
                 </if>
                 <set field="facilityId" from="facilities?facilities[0].facilityId:null"/>
             </if>
-            <service-call name="co.hotwax.oms.FacilityServices.check#FacilityType" in-map="[facilityId: facilityId, parentTypeId: 'VIRTUAL_FACILITY']" out-map="outResult"/>
-            <if condition="outResult.hasFacilityType">
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility"/>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                                primaryKey: 'facilityTypeId',
+                                childType: facility.facilityTypeId,
+                                parentTypeField: 'parentTypeId',
+                                parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <if condition="outResult.hasParentType">
                 <return error="true" message="Facility [ID: ${facilityId} is virtual facility."/>
             </if>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
