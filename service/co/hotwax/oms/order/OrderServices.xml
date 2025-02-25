@@ -35,7 +35,7 @@ under the License.
             </entity-find-one>
             <if condition="!orderItem">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Validate the change reason Enumeration -->
@@ -44,13 +44,13 @@ under the License.
             </entity-find-one>
             <if condition="!reasonEnum">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="Cancel Reason Enumeration [EnumId:${reason}] - Not found"/>
+                <return type="warning" message="Cancel Reason Enumeration [EnumId:${reason}] - Not found"/>
             </if>
 
             <!-- Validate if the order item is completed or already cancelled -->
             <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
                 <!-- Log the error message and return from the service -->
-                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Already cancelled or completed"/>
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Already cancelled or completed"/>
             </if>
 
             <!-- Update the order item cancel quantity -->
@@ -123,7 +123,7 @@ under the License.
                 <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
             </entity-find-one>
             <if condition="!orderItem">
-                <return type="warning" error="true" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <set field="itemTaxTotal" from="0.0"/>
@@ -137,7 +137,7 @@ under the License.
             </entity-find>
             <if condition="!orderAdjustments">
                 <!-- If no sales tax adjustments are found then return -->
-                <return type="warning" message="Sales Tax OrderAdjustment [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+                <return type="info" message="Sales Tax OrderAdjustment [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Get the sales tax total amount by adding each adjustment's amount -->
@@ -163,7 +163,7 @@ under the License.
             </entity-find>
 
             <if condition="!oisgirs">
-                <return type="info" error="false" message="Order Reservations [OrderItem ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+                <return type="info" message="Order Reservations [OrderItem ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Iterate each OISGIR record and delete it; ideally it will have 1 record-->
@@ -173,7 +173,7 @@ under the License.
                 <entity-delete value-field="oisgir"/>
 
                 <!-- Call create#InventoryItemDetail inline to register the inventoryItem change and mark it available for reservation -->
-                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp, quantityOnHandDiff:0, availableToPromiseDiff:1, accountingQuantityDiff:0, description: 'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId]"/>
+                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp, quantityOnHandDiff:0, availableToPromiseDiff:1, accountingQuantityDiff:0, orderId:orderId, description: 'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId]"/>
             </iterate>
 
         </actions>
@@ -196,7 +196,7 @@ under the License.
             </entity-find-one>
             <!-- Log and return with error if order item doesn't exist -->
             <if condition="!orderItem">
-                <return error="true" type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
             <!-- Update the status of the order item -->
@@ -227,26 +227,26 @@ under the License.
             <parameter name="statusChanged" type="Boolean"/>
         </out-parameters>
         <actions>
-            <set field="statusChanged" from="false"/>
+            <set field="statusChanged" type="Boolean" value="false"/>
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
                 <econdition field-name="orderId"/>
             </entity-find>
             <if condition="!orderItemList">
-                <return type="warning" error="true" message="OrderItem [ID: ${orderId}] - Not found"/>
+                <return type="warning" message="OrderItem [ID: ${orderId}] - Not found"/>
             </if>
 
-            <set field="allCancelled" from="true"/>
-            <set field="anyCompleted" from="false"/>
-            <set field="allCancelledOrCompleted" from="true"/>
+            <set field="allCancelled" type="Boolean" value="true"/>
+            <set field="anyCompleted" type="Boolean" value="false"/>
+            <set field="allCancelledOrCompleted" type="Boolean" value="true"/>
             <iterate list="orderItemList" entry="curOrderItem">
                 <if condition="curOrderItem.statusId in ['ITEM_REJECTED', 'ITEM_CANCELLED']"><continue/></if>
                 <if condition="curOrderItem.statusId == 'ITEM_COMPLETED'">
-                    <set field="allCancelled" from="false"/>
-                    <set field="anyCompleted" from="true"/>
+                    <set field="allCancelled" type="Boolean" value="false"/>
+                    <set field="anyCompleted" type="Boolean" value="true"/>
                     <continue/>
                 </if>
-                <set field="allCancelled" from="false"/>
-                <set field="allCancelledOrCompleted" from="false"/>
+                <set field="allCancelled" type="Boolean" value="false"/>
+                <set field="allCancelledOrCompleted" type="Boolean" value="false"/>
             </iterate>
             <if condition="allCancelled">
                 <then>
@@ -265,7 +265,7 @@ under the License.
             <parameter name="orderId" required="true"/>
             <parameter name="statusId" required="true"/>
             <parameter name="changeReason"/>
-            <parameter name="setItemStatus" type="Boolean" default="false"/>
+            <parameter name="setItemStatus" type="Boolean" default-value="false"/>
         </in-parameters>
         <actions>
             <!-- Validate the orderHeader record -->
@@ -273,7 +273,7 @@ under the License.
                 <field-map field-name="orderId" from="orderId"/>
             </entity-find-one>
             <if condition="!orderHeader">
-                <return error="true" type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
+                <return type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
             </if>
 
             <!-- Check if statusId is a valid status -->
@@ -281,7 +281,7 @@ under the License.
                 <field-map field-name="statusId" from="statusId"/>
             </entity-find-one>
             <if condition="!statusItem">
-                <return error="true" type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
+                <return type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
             </if>
 
             <!-- Update the status of the OrderHeader -->
