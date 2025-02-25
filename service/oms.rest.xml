@@ -427,4 +427,16 @@ under the License.
     <resource name="statuses" description="Get the status items">
         <method type="get"><entity name="co.hotwax.common.status.StatusItemAndType" operation="list"/></method>
     </resource>
+    <resource name="products">
+        <id name="productId">
+            <method type="get">
+                <entity name="org.apache.ofbiz.product.product.Product" operation="one"/>
+            </method>
+            <resource name="variants">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.product.product.ProductAssoc" operation="list"/>
+                </method>
+            </resource>
+        </id>
+    </resource>
 </resource>
