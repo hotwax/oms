@@ -416,4 +416,35 @@
             </if>
         </actions>
     </service>
+    <service verb="increase" noun="FacilityOrderCount">
+        <description>
+            This service increases the order count for a specific facility on a given date.
+            It either updates an existing record for the facility's order count or creates a new record if none exists for the current date.
+        </description>
+        <in-parameters>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="count" default-value="1" type="Long"/>
+        </in-parameters>
+        <actions>
+            <script>
+                import java.time.format.DateTimeFormatter
+                String entryDate = ec.user.nowTimestamp.toLocalDateTime().toLocalDate()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-d"))
+            </script>
+            <entity-find-one entity-name="co.hotwax.facility.FacilityOrderCount" value-field="facilityOrderCount">
+                <field-map field-name="facilityId" from="facilityId"/>
+                <field-map field-name="entryDate" from="entryDate"/>
+            </entity-find-one>
+            <if condition="facilityOrderCount">
+                <set field="lastOrderCount" from="facilityOrderCount.lastOrderCount" default-value="0" type="Long"/>
+                <set field="count" from="count + lastOrderCount" type="Long"/>
+                <service-call name="update#co.hotwax.facility.FacilityOrderCount"
+                              in-map="[facilityId: facilityId, entryDate: entryDate, lastOrderCount: count]"/>
+                <else>
+                    <service-call name="create#co.hotwax.facility.FacilityOrderCount"
+                                  in-map="[facilityId: facilityId, entryDate: entryDate, lastOrderCount: count]"/>
+                </else>
+            </if>
+        </actions>
+    </service>
 </services>
