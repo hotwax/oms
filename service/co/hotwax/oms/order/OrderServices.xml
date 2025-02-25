@@ -39,7 +39,7 @@ under the License.
             </if>
 
             <!-- Validate the change reason Enumeration -->
-            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="reasonEnum" cache="true">
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="reasonEnum" cache="true">
                 <field-map field-name="enumId" from="reason"/>
             </entity-find-one>
             <if condition="!reasonEnum">
@@ -199,6 +199,14 @@ under the License.
                 <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
+            <!-- Check if the status change is valid -->
+            <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderItem.statusId, toStatusId:statusId]" out-map="statusValidChangeResponse"/>
+            <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
+            <if condition="!isValidChange">
+                <!-- Log error message and return from the service -->
+                <return error="true" type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Invalid status transition to ${statusId}"/>
+            </if>
+
             <!-- Update the status of the order item -->
             <set field="orderItem.statusId" from="statusId"/>
             <entity-update value-field="orderItem"/>
@@ -284,6 +292,13 @@ under the License.
                 <return type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
             </if>
 
+            <!-- Check if the status change of the order is a valid change -->
+            <service-call name="co.hotwax.oms.order.OrderServices.check#ValidStatusChange" in-map="[statusId:orderHeader.statusId, toStatusId:statusId]" out-map="statusValidChangeResponse"/>
+            <set field="isValidChange" from="statusValidChangeResponse.isValidChange"/>
+            <if condition="!isValidChange">
+                <return error="true" type="warning" message="OrderHeader [ID: ${orderId}] - Invalid status transition to ${statusId}"/>
+            </if>
+
             <!-- Update the status of the OrderHeader -->
             <set field="orderHeader.statusId" from="statusId"/>
             <entity-update value-field="orderHeader"/>
@@ -300,6 +315,26 @@ under the License.
                 <iterate list="orderItemList" entry="orderItem">
                     <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
                 </iterate>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="check" noun="ValidStatusChange">
+        <description>This service checks the validity of a status change</description>
+        <in-parameters>
+            <parameter name="statusId" required="true"/>
+            <parameter name="toStatusId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="isValidChange" required="true"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="moqui.basic.StatusFlowTransition" list="checkStatus" cache="true" limit="1">
+                <econdition field-name="statusId" from="statusId"/>
+                <econdition field-name="toStatusId" from="toStatusId"/>
+            </entity-find>
+            <if condition="checkStatus">
+                <set field="isValidChange" from="checkStatus != null"/>
             </if>
         </actions>
     </service>
