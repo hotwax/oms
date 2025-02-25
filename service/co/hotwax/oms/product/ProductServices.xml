@@ -725,7 +725,7 @@ under the License.
                 </if>
                 <set field="facilityId" from="facilities?facilities[0].facilityId:null"/>
             </if>
-            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility"/>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
             <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
                           in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
                                 primaryKey: 'facilityTypeId',

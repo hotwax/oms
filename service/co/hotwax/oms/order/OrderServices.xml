@@ -7,45 +7,46 @@
             <parameter name="productId" required="true"/>
             <parameter name="quantity" type="BigDecimal" required="true"/>
             <parameter name="facilityId" required="true"/>
-            <parameter name="locationSeqId"/>
         </in-parameters>
         <actions>
-            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem" in-map="[productId: productId,
-                          facilityId: facilityId]"
+            <!-- TODO: Handle marketing package reservation: MARKETING_PKG_PICK
+                Reserve marketing package component against the marketing packet order item
+             -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItem">
+                <return error="true" message="Order item [${orderId}:${orderItemSeqId}] not found."/>
+            </if>
+            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                          in-map="[productId: productId, facilityId: facilityId]"
                           out-map="findOrCreateResult"/>
 
             <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
-
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="orderItemShipGroup">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find-one>
-
-            <if condition="!orderItemShipGroup">
-                <return error="true" message="Order item ship group not found for orderId [${orderId}] and shipGroupSeqId [${shipGroupSeqId}]"/>
-            </if>
-            <set field="userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
-            <set field="orderItemShipGrpInvRes" type="NewMap" from="[
+            <set field="orderItemShipGrpInvRes" from="[
                 orderId: orderId,
                 orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: orderItemShipGroup.shipGroupSeqId,
+                shipGroupSeqId: orderItem.shipGroupSeqId,
                 inventoryItemId: inventoryItemId,
                 quantity: quantity,
-                userLogin: userLogin
+                reservedDatetime: ec.user.nowTimestamp
             ]"/>
 
-            <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="orderItemShipGrpInvRes"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                          in-map="orderItemShipGrpInvRes"/>
 
-            <set field="inventoryItemDetail" type="NewMap" from="[
+            <set field="inventoryItemDetail" from="[
                 inventoryItemId: inventoryItemId,
                 orderId: orderId,
                 orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: orderItemShipGroup.shipGroupSeqId,
-                availableToPromiseDiff: -quantity,
-                userLogin: ec.user.getUsername()?:ec.user.getUserId()
+                shipGroupSeqId: orderItem.shipGroupSeqId,
+                availableToPromiseDiff: quantity,negate(),
+                effectiveDate: ec.user.nowTimestamp
             ]"/>
 
-            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="InventoryItemDetailMap"/>
+            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail"
+                          in-map="InventoryItemDetailMap"/>
         </actions>
     </service>
 
@@ -58,28 +59,27 @@
             <parameter name="cancelQuantity" type="BigDecimal" required="true"/>
         </in-parameters>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem">
-                <field-map field-name="inventoryItemId" from="inventoryItemId"/>
-            </entity-find-one>
+            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                          in-map="[productId: productId, facilityId: facilityId]"
+                          out-map="findOrCreateResult"/>
 
-            <set field="userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
+            <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
 
-            <if condition="inventoryItem">
-                <set field="createDetailMap" type="NewMap" from="[:]"/>
-                <set field="createDetailMap.inventoryItemId" from="inventoryItem.inventoryItemId"/>
-                <set field="createDetailMap.orderId" from="orderId"/>
-                <set field="createDetailMap.orderItemSeqId" from="orderItemSeqId"/>
-                <set field="createDetailMap.shipGroupSeqId" from="shipGroupSeqId"/>
-                <set field="createDetailMap.availableToPromiseDiff" from="cancelQuantity"/>
-                <set field="createDetailMap.userLogin" from="userLogin"/>
+            <set field="createDetailMap" from="[:]"/>
+            <set field="createDetailMap.inventoryItemId" from="inventoryItem.inventoryItemId"/>
+            <set field="createDetailMap.orderId" from="orderId"/>
+            <set field="createDetailMap.orderItemSeqId" from="orderItemSeqId"/>
+            <set field="createDetailMap.shipGroupSeqId" from="shipGroupSeqId"/>
+            <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
+            <set field="createDetailMap.availableToPromiseDiff" from="cancelQuantity"/>
 
-                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="createDetailMap"/>
-            </if>
+            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail"
+                        in-map="createDetailMap"/>
 
-            <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="[orderId: orderId,
-                orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: shipGroupSeqId,
-                userLogin: userLogin]"/>
+            <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                        in-map="[orderId: orderId,
+                        orderItemSeqId: orderItemSeqId,
+                        shipGroupSeqId: shipGroupSeqId]"/>
         </actions>
     </service>
 
@@ -383,7 +383,7 @@
         </actions>
     </service>
 
-    <service verb="findOrCreate" noun="OrderItemShipGroup">
+    <service verb="find" noun="OrderItemShipGroup">
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="facilityId" required="true"/>
@@ -392,25 +392,27 @@
             <parameter name="orderItemShipGroup" type="Map"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups" cache="true">
-                <econdition field-name="orderId" from="orderId"/>
-                <econdition field-name="facilityId" from="facilityId"/>
-                <order-by field-name="shipGroupSeqId DESC"/>
-            </entity-find>
-
-            <if condition="orderItemShipGroups">
-                <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
-                <else>
-                    <!--                    No need to generate nextseqId
-                                        <set field="shipGroupSeqId" from="ec.nextSeqId('OrderItemShipGroup')"/>-->
-                    <set field="orderItemShipGroupMap" type="NewMap" from="[
-              orderId: orderId,
-              shipGroupSeqId: shipGroupSeqId,
-              facilityId: facilityId,
-              userLogin: ec.user.getUsername()?:ec.user.getUserId()
-          ]"/>
-                    <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="orderItemShipGroup"/>
-                </else>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                                primaryKey: 'facilityTypeId',
+                                childType: facility.facilityTypeId,
+                                parentTypeField: 'parentTypeId',
+                                parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+                <!-- Since a new ShipGroup is created for each routing attempt,
+                     reuse the existing ShipGroup only if the facility type is "virtual".
+                    Additionally, filtering based on the shipment method type may be required in future.
+                -->
+            <if condition="outResult.hasParentType">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="facilityId" from="facilityId"/>
+                    <order-by field-name="shipGroupSeqId DESC"/>
+                </entity-find>
+                <if condition="orderItemShipGroups">
+                    <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
+                    <return/>
+                </if>
             </if>
         </actions>
     </service>
