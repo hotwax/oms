@@ -561,7 +561,7 @@
                 </iterate>
             </iterate>
             <iterate list="allocatedFacilityIds" entry="allocatedFacilityId">
-                <service-call name="co.hotwax.oms.order.OrderService.increase#FacilityOrderCount"
+                <service-call name="co.hotwax.oms.order.OrderServices.increase#FacilityOrderCount"
                               in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]"/>
             </iterate>
         </actions>
