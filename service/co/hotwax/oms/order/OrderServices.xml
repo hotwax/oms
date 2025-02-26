@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
     <service verb="create" noun="OrderItemInventoryReservation">
+        <description>
+            This service creates an InventoryItemDetail record only for the specified order and item with the given quantity at the specified facility.
+            It also creates OrderItemShipGroupInventoryReservation records but does not perform any additional inventory adjustments or processing.
+        </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
@@ -53,22 +57,25 @@
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="shipGroupSeqId" required="true"/>
-            <parameter name="cancelQuantity" type="BigDecimal" required="true"/>
+            <parameter name="cancelQuantity" type="BigDecimal" required="true" default-value="1"/>
         </in-parameters>
         <actions>
+            <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
             <!--TODO: Handle marketing package scenario -->
             <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
-                          in-map="[productId: productId, facilityId: facilityId]"
+                          in-map="[productId: orderItem.productId, facilityId: orderItem.facilityId]"
                           out-map="findOrCreateResult"/>
 
             <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
 
             <set field="createDetailMap" from="[:]"/>
-            <set field="createDetailMap.inventoryItemId" from="inventoryItem.inventoryItemId"/>
+            <set field="createDetailMap.inventoryItemId" from="inventoryItemId"/>
             <set field="createDetailMap.orderId" from="orderId"/>
             <set field="createDetailMap.orderItemSeqId" from="orderItemSeqId"/>
-            <set field="createDetailMap.shipGroupSeqId" from="shipGroupSeqId"/>
+            <set field="createDetailMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
             <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
             <set field="createDetailMap.availableToPromiseDiff" from="cancelQuantity"/>
 
@@ -77,7 +84,8 @@
             <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
                         in-map="[orderId: orderId,
                         orderItemSeqId: orderItemSeqId,
-                        shipGroupSeqId: shipGroupSeqId]"/>
+                        inventoryItemId: inventoryItemId,
+                        shipGroupSeqId: orderItem.shipGroupSeqId]"/>
         </actions>
     </service>
 
@@ -506,7 +514,7 @@
     * If an item is already allocated to the given facility, it should return a success response,
     * and if an item is on a virtual facility or any other error condition occurs, it should throw an error.
     -->
-    <service  verb="process" noun="OrderFacilityAllocation" transaction-timeout="120">
+    <service verb="process" noun="OrderFacilityAllocation" transaction-timeout="120">
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="facilityAllocation" type="List" required="true">
