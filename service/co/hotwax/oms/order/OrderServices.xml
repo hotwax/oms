@@ -337,7 +337,7 @@
                 <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
             </if>
 
-            <entity-find entity-name="org.apache.ofbiz.product.inventory.ProductFacilityInventoryItemView" list="productFacilityInventoryItemViews">
+            <entity-find entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" list="productFacilityInventoryItemViews">
                 <econdition field-name="productId" from="orderItem.productId"/>
                 <econdition field-name="facilityId" from="facilityId"/>
                 <econdition field-name="availableToPromise" operator="greater" value="0"/>

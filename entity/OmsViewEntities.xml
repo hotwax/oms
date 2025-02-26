@@ -6,4 +6,20 @@
         <alias entity-alias="IID" name="availableToPromiseTotal" field="availableToPromiseDiff" function="sum"/>
         <alias entity-alias="IID" name="quantityOnHandTotal" field="quantityOnHandDiff" function="sum"/>
     </view-entity>
+
+    <view-entity entity-name="ProductFacilityInventoryItemView" package="co.hotwax.oms.product.inventory">
+        <member-entity entity-alias="PF" entity-name="org.apache.ofbiz.product.facility.ProductFacility"/>
+        <member-entity entity-alias="II" entity-name="org.apache.ofbiz.product.inventory.InventoryItem" join-from-alias="PF" join-optional="true">
+            <key-map field-name="inventoryItemId" />
+        </member-entity>
+        <alias-all entity-alias="PF"/>
+        <alias entity-alias="II" name="availableToPromise" field="availableToPromiseTotal" />
+        <alias name="computedInventoryCount" type="number-decimal">
+            <complex-alias operator="-">
+                <complex-alias-field entity-alias="II" field="availableToPromiseTotal" default-value="0"/>
+                <complex-alias-field entity-alias="PF" field="minimumStock" default-value="0"/>
+            </complex-alias>
+        </alias>
+    </view-entity>
+
 </entities>
