@@ -1,0 +1,9 @@
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
+
+    <view-entity entity-name="InventoryItemDetailSummary" package="co.hotwax.oms.product.inventory">
+        <member-entity entity-alias="IID" entity-name="org.apache.ofbiz.product.inventory.InventoryItemDetail"/>
+        <alias entity-alias="IID" name="inventoryItemId"/>
+        <alias entity-alias="IID" name="availableToPromiseTotal" field="availableToPromiseDiff" function="sum"/>
+        <alias entity-alias="IID" name="quantityOnHandTotal" field="quantityOnHandDiff" function="sum"/>
+    </view-entity>
+</entities>

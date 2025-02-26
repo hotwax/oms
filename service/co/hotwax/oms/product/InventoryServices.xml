@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="create" noun="InventoryItemDetail">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.product.inventory.InventoryItemDetail"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="inventoryItemDetailSeqId"/>
+        </out-parameters>
+        <actions>
+            <entity-make-value entity-name="org.apache.ofbiz.product.inventory.InventoryItemDetail" value-field="newEntity" map="context"/>
+            <!--
+                InventoryItemDetail has multiple primary keys, and EntityAuto services use the
+                entityValue.setSequencedIdSecondary method to get the maximum secondary sequence ID from existing InventoryItemDetail records.
+                If the system has a large number of InventoryItemDetail records, this approach may slow down the record creation process and cause performance issues.
+                Hence, the sequencedIdPrimaryEd method is used instead to generate the next sequence ID, similar to the implementation in OFBiz.
+            -->
+
+            <set field="itemDetailED" from="ec.entity.getEntityDefinition('org.apache.ofbiz.product.inventory.InventoryItemDetail')"/>
+            <set field="newEntity.inventoryItemDetailSeqId" from="ec.entityFacade.sequencedIdPrimaryEd(itemDetailED)"/>
+            <if condition="!newEntity.availableToPromiseDiff">
+                <set field="newEntity.availableToPromiseDiff" value="0" type="BigDecimal"/>
+            </if>
+            <if condition="!newEntity.quantityOnHandDiff">
+                <set field="newEntity.quantityOnHandDiff" value="0" type="BigDecimal"/>
+            </if>
+            <entity-create value-field="newEntity"/>
+        </actions>
+    </service>
+    <service verb="update" noun="InventoryItemFromDetail" no-tx-cache="true">
+        <description>Called by EECA rule to update InventoryItem quantities when an InventoryItemDetail record is created.</description>
+        <in-parameters>
+            <parameter name="inventoryItemId" required="true"/>
+            <parameter name="availableToPromiseDiff" type="BigDecimal"/>
+            <parameter name="quantityOnHandDiff" type="BigDecimal"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem" for-update="true">
+                <field-map field-name="inventoryItemId" from="inventoryItemId"/>
+            </entity-find-one>
+
+            <!--
+            <log message="========== start update#InventoryItemFromDetail ${inventoryItemId}: ${availableToPromiseDiff}/${quantityOnHandDiff} :: ${inventoryItem.availableToPromiseTotal}/${inventoryItem.quantityOnHandTotal}"/>
+            -->
+            <!-- View queries won't work with transaction cache (for data updated within the tx), so if active use different approach -->
+            <if condition="ec.transaction.isTransactionCacheActive()"><then>
+                <!-- incremental update -->
+                <set field="inventoryItem.availableToPromiseTotal" from="(inventoryItem.availableToPromiseTotal ?: 0.0) + (availableToPromiseDiff ?: 0.0)"/>
+                <set field="inventoryItem.quantityOnHandTotal" from="(inventoryItem.quantityOnHandTotal ?: 0.0) + (quantityOnHandDiff ?: 0.0)"/>
+            </then><else>
+                <!-- sum all records, update with new totals -->
+                <entity-find-one entity-name="co.hotwax.oms.product.inventory.InventoryItemDetailSummary" value-field="inventoryItemDetail">
+                    <field-map field-name="inventoryItemId" from="inventoryItemId"/>
+                    <select-field field-name="availableToPromiseTotal,quantityOnHandTotal"/>
+                </entity-find-one>
+                <set field="inventoryItem.availableToPromiseTotal" from="inventoryItemDetail.availableToPromiseTotal ?: 0.0"/>
+                <set field="inventoryItem.quantityOnHandTotal" from="inventoryItemDetail.quantityOnHandTotal ?: 0.0"/>
+            </else></if>
+
+            <entity-update value-field="inventoryItem"/>
+            <!--
+            <set field="message" from="'========== end update#InventoryItemFromDetail ' + inventoryItemID + ': ' + availableToPromiseDiff + '/' + quantityOnHandDiff + ' :: ' + inventoryItem.availableToPromiseTotal + '/' + inventoryItem.quantityOnHandTotal"/>
+            <log message="${message}"/>
+            -->
+        </actions>
+    </service>
+</services>

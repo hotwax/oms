@@ -745,6 +745,8 @@ under the License.
                 <else>
                     <set field="inventoryItemMap" from="[
                             productId: productId,
+                            availableToPromiseTotal: 0,
+                            quantityOnHandTotal: 0,
                             facilityId: facilityId,
                             inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
                         ]"/>

@@ -40,12 +40,11 @@
                 orderId: orderId,
                 orderItemSeqId: orderItemSeqId,
                 shipGroupSeqId: orderItem.shipGroupSeqId,
-                availableToPromiseDiff: quantity,negate(),
+                availableToPromiseDiff: quantity.negate(),
                 effectiveDate: ec.user.nowTimestamp
             ]"/>
-
-            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail"
-                          in-map="InventoryItemDetailMap"/>
+            <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
+                          in-map="inventoryItemDetail"/>
         </actions>
     </service>
 
@@ -73,8 +72,7 @@
             <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
             <set field="createDetailMap.availableToPromiseDiff" from="cancelQuantity"/>
 
-            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail"
-                        in-map="createDetailMap"/>
+            <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail" in-map="createDetailMap"/>
 
             <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
                         in-map="[orderId: orderId,
@@ -592,6 +590,7 @@
             </entity-find-one>
             <!-- If the OrderItem is already allocated at facilityId, do not reallocate.
             Instead, verify if the auto-cancel date scenario applies and update the OrderItem accordingly. -->
+            <set field="fromShipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
             <if condition="fromShipGroup &amp;&amp; facilityId == fromShipGroup.facilityId">
                 <log level="warn" message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
                 <if condition="autoCancelDate || clearAutoCancelDate">
@@ -651,10 +650,9 @@
                     <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
                 </if>
             </if>
-
             <!-- FIXME: Backward compatibility code start-->
             <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGroupAssoc"
-                          in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: fromShipGroup.shipGroupSeqId]"/>
+                          in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: fromShipGroupSeqId]"/>
 
             <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGroupAssoc"
                           in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: toShipGroupSeqId, quantity: quantity]"/>
@@ -662,7 +660,7 @@
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderItemAdjustments" for-update="true">
                 <econdition field-name="orderId" from="orderId"/>
                 <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <econdition field-name="shipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
+                <econdition field-name="shipGroupSeqId" from="fromShipGroupSeqId"/>
             </entity-find>
             <iterate list="orderItemAdjustments" entry="orderItemAdjustment">
                 <set field="orderItemAdjustment.shipGroupSeqId" from="toShipGroupSeqId"/>
@@ -684,10 +682,10 @@
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
             <service-call name="co.hotwax.oms.order.OrderServices.create#OrderItemInventoryReservation"
-                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:  ]"/>
+                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: facilityId, quantity:quantity ]"/>
 
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
-                          in-map="context + [fromFacilityId: fromFacility.facilityId, routerUserLogin:ec.user.userName, changeDatetime: ec.user.nowTimestamp]"/>
+                          in-map="context + [fromFacilityId: fromFacility.facilityId, routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
         </actions>
     </service>
 </services>
