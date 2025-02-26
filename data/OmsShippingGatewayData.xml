@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="ext">
+    <org.apache.ofbiz.party.party.Party partyId="SHIP_AGGREGATOR" partyTypeId="PARTY_GROUP"/>
+    <org.apache.ofbiz.party.party.PartyGroup partyId="SHIP_AGGREGATOR" groupName="Shipping Agreegator"/>
+    <org.apache.ofbiz.party.party.PartyRole partyId="SHIP_AGGREGATOR" roleTypeId="CARRIER"/>
+
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="STANDARD" roleTypeId="CARRIER" deliveryDays="7"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="SECOND_DAY" roleTypeId="CARRIER" deliveryDays="2"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="THIRD_DAY" roleTypeId="CARRIER" deliveryDays="3"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="NEXT_DAY" roleTypeId="CARRIER" deliveryDays="1"/>
+
+    <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="SHIP_AGGREGATOR" packagingTypeCode="YOURPACKAGING"/>
+
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="STORE.SHIP_AGGREGATOR" description="Shipping service configuration for productStore STORE" sendUrl="" privateKey=""/>
+
+    <!-- Additionally required to prepare data of ShopifyShopCarrierShipment entity for carrier SHIP_AGGREGATOR as per shop configuration -->
+
+
+    <!-- Below is sample data  which is required only if we want to predefined Carrier Party from Shopify
+    NOTE: Additionally required to map methods in ShopifyShopCarrierShipment entity as per Shop data
+    -->
+    <!--
+    <org.apache.ofbiz.party.party.Party partyId="FEDEX" partyTypeId="PARTY_GROUP"/>
+    <org.apache.ofbiz.party.party.PartyGroup partyId="FEDEX" groupName="FedEx"/>
+    <org.apache.ofbiz.party.party.PartyRole partyId="FEDEX" roleTypeId="CARRIER"/>
+
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="FI_OVERNIGHT" roleTypeId="CARRIER" sequenceNumber="3" carrierServiceCode="FIRST_OVERNIGHT" deliveryDays="1"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="PR_OVERNIGHT" roleTypeId="CARRIER" sequenceNumber="5" carrierServiceCode="PRIORITY_OVERNIGHT" deliveryDays="1"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="ST_OVERNIGHT" roleTypeId="CARRIER" sequenceNumber="7" carrierServiceCode="STANDARD_OVERNIGHT" deliveryDays="1"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="SECOND_DAY_AM" roleTypeId="CARRIER" sequenceNumber="13" carrierServiceCode="FEDEX_2_DAY_AM" deliveryDays="2"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="SECOND_DAY" roleTypeId="CARRIER" sequenceNumber="8" carrierServiceCode="FEDEX_2_DAY" deliveryDays="2"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="EXPRESS_SAVER" roleTypeId="CARRIER" sequenceNumber="14" carrierServiceCode="FEDEX_EXPRESS_SAVER" deliveryDays="3"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="GROUND" roleTypeId="CARRIER" sequenceNumber="10" carrierServiceCode="FEDEX_GROUND" deliveryDays="7"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="GROUND_HOME" roleTypeId="CARRIER" sequenceNumber="12" carrierServiceCode="GROUND_HOME_DELIVERY" deliveryDays="7"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="SMART_POST" roleTypeId="CARRIER" sequenceNumber="16" carrierServiceCode="SMART_POST" deliveryDays="7"/>
+
+    <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="FEDEX" packagingTypeCode="YOUR_PACKAGING"/>
+    -->
+</entity-facade-xml>

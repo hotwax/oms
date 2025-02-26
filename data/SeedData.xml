@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="seed">
+
+    <!-- SystemMessageType data for Error Feed file -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="FeedErrorFile"/>
+
+    <!-- EnumerationType for OMS system message type enum and relationship -->
+    <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
+
+    <!-- TODO: Add receivePath -->
+    <!-- SystemMessageType data for consuming New Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
+            description="New Products Feed"
+            parentTypeId="LocalFeedFile"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            receivePath="/home/${sftpUsername}/hotwax/ProductsFeed"
+            receiveResponseEnumId="MsgRrMove"
+            receiveMovePath="/home/${sftpUsername}/hotwax/ProductsFeed/archive"
+            sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
+            sendPath="${contentRoot}/oms/NewProductsFeed"/>
+    <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
+
+    <!-- TODO: Add receivePath -->
+    <!-- SystemMessageType data for consuming Update Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
+            description="Product Updates Feed"
+            parentTypeId="LocalFeedFile"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            receivePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed"
+            receiveResponseEnumId="MsgRrMove"
+            receiveMovePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed/archive"
+            sendService="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
+            sendPath="${contentRoot}/oms/ProductUpdatesFeed"/>
+    <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeed" enumTypeId="OMSMessageTypeEnum"/>
+
+    <moqui.service.job.ServiceJob jobName="consume_AllReceivedSystemMessages_oms" description="Consume All Received SystemMessages for OMS"
+            serviceName="org.moqui.impl.SystemMessageServices.consume#AllReceivedSystemMessages" cronExpression="0 0/15 * * * ?" paused="Y">
+        <parameters parameterName="mode" parameterValue="sync"/>
+        <parameters parameterName="systemMessageTypeIds" parameterValue="NewProductsFeed,ProductUpdatesFeed"/>
+    </moqui.service.job.ServiceJob>
+
+</entity-facade-xml>

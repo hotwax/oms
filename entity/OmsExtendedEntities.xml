@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
+
+    <extend-entity entity-name="FacilityContactMech" package="org.apache.ofbiz.product.facility">
+        <relationship type="many" related="org.apache.ofbiz.product.facility.FacilityContactMechPurpose" short-alias="contactMechPurpose">
+            <key-map field-name="facilityId"/>
+            <key-map field-name="contactMechId"/>
+        </relationship>
+    </extend-entity>
+
+    <extend-entity entity-name="ShopifyShop" package="co.hotwax.shopify">
+        <relationship type="many" fk-name="SHOP_CONF" related="co.hotwax.shopify.ShopifyConfig" short-alias="shopifyConfig">
+            <key-map field-name="shopId"/>
+        </relationship>
+        <master>
+            <detail relationship="shopifyConfig"/>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="ShipmentRouteSegment" package="org.apache.ofbiz.shipment.shipment">
+        <field name="trackingUrl" type="text-medium"></field>
+    </extend-entity>
+
+    <extend-entity entity-name="Picklist" package="org.apache.ofbiz.shipment.picklist">
+        <relationship type="many" related="org.apache.ofbiz.shipment.picklist.PicklistRole" short-alias="roles">
+            <key-map field-name="picklistId"/>
+        </relationship>
+        <master>
+            <detail relationship="roles"/>
+        </master>
+        <master name="picker">
+            <detail relationship="roles" use-master="party"/>
+        </master>
+    </extend-entity>
+    <extend-entity entity-name="PicklistRole" package="org.apache.ofbiz.shipment.picklist">
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.party.Person" short-alias="person">
+            <key-map field-name="partyId"/>
+        </relationship>
+        <relationship type="one-nofk" related="org.apache.ofbiz.party.party.PartyGroup" short-alias="partyGroup">
+            <key-map field-name="partyId"/>
+        </relationship>
+        <master name="party">
+            <detail relationship="person"/>
+            <detail relationship="partyGroup"/>
+        </master>
+    </extend-entity>
+
+    <extend-entity entity-name="CarrierShipmentMethod" package="org.apache.ofbiz.shipment.shipment">
+        <field name="isTrackingRequired" type="text-indicator"/>
+    </extend-entity>
+</entities>

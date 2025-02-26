@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="consume" noun="OMSFeed" transaction-timeout="1800">
+        <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
+        <in-parameters>
+            <parameter name="systemMessageId" type="String" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="sendSmrId" type="String"/>
+        </out-parameters>
+        <actions>
+            <!-- Fetch the SystemMessage record and the JSON file path-->
+            <entity-find-one entity-name="SystemMessageAndType" value-field="systemMessage"/>
+            <set field="filePathRef" from="systemMessage.messageText"/>
+
+            <set field="nowDatetime" from="ec.user.nowTimestamp"/>
+
+            <!-- Prepare error file -->
+            <set field="fileName" from="filePathRef.substring(filePathRef.lastIndexOf('/')+1)"/>
+            <set field="fileNameArray" from="fileName.split('\\.')"/>
+            <set field="errorFileName" from="fileNameArray[0] + '-Error.' + fileNameArray[1]"/>
+            <set field="errorFilePathRef" from="ec.resource.expand(systemMessage.sendPath, null, [contentRoot: ec.user.getPreference('mantle.content.root') ?: 'dbresource://datamanager', date:ec.l10n.format(nowDatetime, 'yyyy-MM-dd'), dateTime:ec.l10n.format(nowDatetime, 'yyyy-MM-dd-HH-mm-ss-SSS')], false) + '/error/' + errorFileName"/>
+            <set field="errorJsonFilePath" from="ec.resource.getLocationReference(errorFilePathRef).getUri().getPath()"/>
+            <!-- Create the error file on disk -->
+            <script>
+                import com.fasterxml.jackson.core.JsonGenerator
+                import com.fasterxml.jackson.core.JsonFactory
+                import com.fasterxml.jackson.databind.ObjectMapper
+                import java.nio.charset.StandardCharsets
+
+                try {
+                    File errorFile = new File(errorJsonFilePath)
+                    if (!errorFile.parentFile.exists()) errorFile.parentFile.mkdirs()
+                    JsonFactory jfactory = new JsonFactory()
+
+                    /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
+                    so that they are automatically closed regardless of whether the try statement completes normally or abruptly. */
+                    try (PrintWriter pw = new PrintWriter(StandardCharsets.UTF_8, errorFile);
+                            JsonGenerator jGenerator = jfactory.createGenerator(pw)) {
+                        jGenerator.writeStartArray()
+            </script>
+
+            <!-- Get the JSON file text content using the file path -->
+            <set field="jsonText" from="ec.resource.getLocationReference(filePathRef).getText()"/>
+            <set field="jsonList" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(jsonText, List.class)"/>
+            <if condition="!jsonList">
+                <return type="warning" error="true" message="System message [${systemMessageId}] for Type [${systemMessage?.systemMessageTypeId}] has messageText [${systemMessage.messageText}], with feed file having incorrect data and may contain null, not consuming the feed file."/>
+            </if>
+
+            <!-- Iterate through jsonList and for each entry call systemMessage.sendService in a new transaction -->
+            <iterate list="jsonList" entry="jsonEntry">
+                <script>
+                    /* Calling the sendService in this way will allow us to identify
+                        if the service execution had exception or returned error so we can prepare the error file */
+                    actionResult = ec.service.sync().name(systemMessage.sendServiceName)
+                    .parameters([payload:jsonEntry])
+                    .requireNewTransaction(true)
+                    .call()
+                    if (ec.message.hasError()) {
+                        jsonEntry.put("error", ec.message.getErrorsString())
+                        ec.logger.warn(ec.message.getErrorsString())
+                        ec.message.clearAll()
+
+                        // write the jsonEntry to the Errorfile
+                        new ObjectMapper()
+                        .setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
+                        .writerWithDefaultPrettyPrinter().writeValue(jGenerator,["json":jsonEntry])
+                    }
+                </script>
+            </iterate>
+
+            <!-- Close the error file -->
+            <script>
+                        jGenerator.writeEndArray()
+                    }
+                } catch (IOException e) {
+                    logger.error("Error preparing OMS JSON Feed file", e)
+                }
+            </script>
+
+            <!-- Create SystemMessage record for the error file path reference -->
+            <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
+                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
+        </actions>
+    </service>
+
+</services>
