@@ -389,41 +389,6 @@
         </actions>
     </service>
 
-    <service verb="find" noun="OrderItemShipGroup">
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="facilityId" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="shipGroupSeqId"/>
-        </out-parameters>
-        <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
-                                primaryKey: 'facilityTypeId',
-                                childType: facility.facilityTypeId,
-                                parentTypeField: 'parentTypeId',
-                                parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
-                <!-- Since a new ShipGroup is created for each routing attempt,
-                     reuse the existing ShipGroup only if the facility type is "virtual".
-                    Additionally, filtering based on the shipment method type may be required in future.
-                -->
-            <if condition="outResult.hasParentType">
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
-                    <econdition field-name="orderId" from="orderId"/>
-                    <econdition field-name="facilityId" from="facilityId"/>
-                    <order-by field-name="shipGroupSeqId DESC"/>
-                </entity-find>
-                <if condition="orderItemShipGroups">
-                    <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
-                    <set field="shipGroupSeqId" from="orderItemShipGroup.shipGroupSeqId"/>
-                    <return/>
-                </if>
-            </if>
-        </actions>
-    </service>
-
     <service verb="increase" noun="FacilityOrderCount">
         <description>
             This service increases the order count for a specific facility on a given date.
@@ -643,7 +608,7 @@
                     Find the OrderItemShipGroup.
                     If the item is allocated to a virtual facility, the find#OrderItemShipGroup service returns the existing ship group sequence ID.
                 -->
-                <service-call name="co.hotwax.oms.order.OrderReservationServices.find#OrderItemShipGroup"
+                <service-call name="co.hotwax.oms.order.OrderServices.find#OrderItemShipGroup"
                           in-map="[orderId: orderId, facilityId: facilityId]" out-map="outMap"/>
                 <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
                 <!-- Create a new ship group and copy the fields from the original ship group sequence ID.-->
