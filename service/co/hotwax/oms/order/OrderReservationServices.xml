@@ -527,7 +527,7 @@
             </iterate>
             <iterate list="allocatedFacilityIds" entry="allocatedFacilityId">
                 <service-call name="co.hotwax.oms.order.OrderReservationServices.increase#FacilityOrderCount"
-                              in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]"/>
+                              in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]" ignore-error="true"/>
             </iterate>
         </actions>
     </service>
