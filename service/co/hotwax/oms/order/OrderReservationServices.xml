@@ -171,7 +171,7 @@
                 List&lt;EntityValue&gt; orderItemsToReject = entityFind.list();
 
                 orderItemsToReject.each { itemToReject ->
-                ec.service.sync().name("co.hotwax.oms.order.OrderServices.reject#OrderItem")
+                ec.service.sync().name("co.hotwax.oms.order.OrderReservationServices.reject#OrderItem")
                 .parameter("orderId", itemToReject.orderId)
                 .parameter("orderItemSeqId", itemToReject.orderItemSeqId)
                 .parameter("rejectionReasonId", rejectionReasonId)
@@ -263,7 +263,7 @@
             <set field="shipGroupSeqId" from="currentShipGroup[0].shipGroupSeqId"/>
 
             <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
-            <service-call name="co.hotwax.oms.order.OrderServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
+            <service-call name="co.hotwax.oms.order.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
             orderItemSeqId:orderItemSeqId,shipGroupSeqId:shipGroupSeqId,cancelQuantity:1]"/>
 
             <!--2. Move to rejected facility-->
@@ -550,7 +550,7 @@
                     <set field="allocatedItem.toShipGroupSeqId" from="toShipGroupSeqId"/>
                     <set field="allocatedItem.facilityId" from="facilityId"/>
                     <set field="allocatedItem.orderId" from="orderId"/>
-                    <service-call name="co.hotwax.oms.order.OrderServices.process#OrderItemAllocation"
+                    <service-call name="co.hotwax.oms.order.OrderReservationServices.process#OrderItemAllocation"
                                   in-map="allocatedItem" out-map="outMap"/>
                     <if condition="outMap.allocatedShipGroupSeqId">
                         <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
@@ -561,7 +561,7 @@
                 </iterate>
             </iterate>
             <iterate list="allocatedFacilityIds" entry="allocatedFacilityId">
-                <service-call name="co.hotwax.oms.order.OrderServices.increase#FacilityOrderCount"
+                <service-call name="co.hotwax.oms.order.OrderReservationServices.increase#FacilityOrderCount"
                               in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]"/>
             </iterate>
         </actions>
@@ -643,7 +643,7 @@
                     Find the OrderItemShipGroup.
                     If the item is allocated to a virtual facility, the find#OrderItemShipGroup service returns the existing ship group sequence ID.
                 -->
-                <service-call name="co.hotwax.oms.order.OrderServices.find#OrderItemShipGroup"
+                <service-call name="co.hotwax.oms.order.OrderReservationServices.find#OrderItemShipGroup"
                           in-map="[orderId: orderId, facilityId: facilityId]" out-map="outMap"/>
                 <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
                 <!-- Create a new ship group and copy the fields from the original ship group sequence ID.-->
@@ -689,7 +689,7 @@
                           in-map="serviceInCtx"/>
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
-            <service-call name="co.hotwax.oms.order.OrderServices.create#OrderItemInventoryReservation"
+            <service-call name="co.hotwax.oms.order.OrderReservationServices.create#OrderItemInventoryReservation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: facilityId, quantity:quantity ]"/>
 
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
