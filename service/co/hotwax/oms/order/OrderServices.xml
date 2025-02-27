@@ -215,7 +215,7 @@ under the License.
             </if>
             <!-- Call create#OrderStatus to register the order item cancellation status change event-->
             <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                    statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime, statusUserLogin:ec.user.userid]"/>
+                    statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime, statusUserLogin:ec.user.getUsername()]"/>
 
             <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED -->
             <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
@@ -304,7 +304,7 @@ under the License.
             <entity-update value-field="orderHeader"/>
 
             <!-- Create OrderStatus record to register the status change -->
-            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.userid]"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.getUsername()]"/>
 
             <if condition="setItemStatus">
                 <!-- If setItemStatus is true then get all the order items -->
