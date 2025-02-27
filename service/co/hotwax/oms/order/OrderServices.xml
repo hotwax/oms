@@ -220,7 +220,7 @@
             <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="currentShipGroup"/>
 
             <!--3. Call create order facility change-->
-            <set field="orderFacilityChangeMap"  type="NewMap" from="[:]"/>
+            <set field="orderFacilityChangeMap" from="[:]"/>
             <set field="orderFacilityChangeMap.orderId" from="orderId"/>
             <set field="orderFacilityChangeMap.facilityId" from="rejectToFacilityId"/>
             <set field="orderFacilityChangeMap.fromFacilityId" from="facilityId"/>
@@ -231,25 +231,22 @@
             <set field="orderFacilityChangeMap.changeUserLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <set field="orderFacilityChangeMap.changeDatetime" from="ec.user.nowTimestamp"/>
             <set field="orderFacilityChangeMap.comments" from="rejectComments"/>
-            <set field="orderFacilityChangeMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.facility.OrderFacilityChange" in-map="orderFacilityChangeMap"/>
 
             <!--4. createUpdateExternalFulfillmentOrderItem-->
-            <set field="createUpdateExternalFulfillmentOrderItemMap"  type="NewMap" from="[:]"/>
+            <set field="createUpdateExternalFulfillmentOrderItemMap" from="[:]"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.orderId" from="orderId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.orderItemSeqId" from="orderItemSeqId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.shipGroupSeqId" from="currentShipGroup.shipGroupSeqId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.fulfillmentStatus" value="REJECT"/>
-            <set field="createUpdateExternalFulfillmentOrderItemMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.integration.order.ExternalFulfillmentOrderItem" in-map="createUpdateExternalFulfillmentOrderItemMap"/>
 
             <!--5. createOrderHistory-->
-            <set field="orderHistoryMap"  type="NewMap" from="[:]"/>
+            <set field="orderHistoryMap" from="[:]"/>
             <set field="orderHistoryMap.orderId" from="orderId"/>
             <set field="orderHistoryMap.orderItemSeqId" from="orderItemSeqId"/>
             <set field="orderHistoryMap.shipGroupSeqId" from="currentShipGroup.shipGroupSeqId"/>
             <set field="orderHistoryMap.eventTypeEnumId" from="ITEM_BKD_REJECTED"/>
-            <set field="orderHistoryMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.customerservice.order.OrderHistory" in-map="orderHistoryMap"/>
 
             <!--6. Record inventory variance-->
@@ -306,12 +303,11 @@
             <!--Run the code to record variance -->
 
             <!--                These details go in a map placed inside 'inventoryItemVariances' list -->
-            <set field="inventoryItemVariances"  type="NewList" from="[]"/>
-            <set field="inventoryItemVarianceMap"  type="NewMap" from="[:]"/>
+            <set field="inventoryItemVariances" from="[]"/>
+            <set field="inventoryItemVarianceMap" from="[:]"/>
             <set field="inventoryItemVarianceMap.inventoryItemId" from="productFacilityInventoryItemView.inventoryItemId"/>
             <set field="inventoryItemVarianceMap.varianceReasonId" from="rejectionReasonId"/>
             <set field="inventoryItemVarianceMap.comments" from="rejectComments"/>
-            <set field="inventoryItemVarianceMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <set field="inventoryItemVarianceMap.availableToPromiseVar" from="availableToPromiseVar.negate()"/>
 
             <if condition="updateQOH">
@@ -323,7 +319,7 @@
             </script>
 
             <!--                These go in top level Map - createPhysicalInventoryMap -->
-            <set field="createPhysicalInventoryMap"  type="NewMap" from="[:]"/>
+            <set field="createPhysicalInventoryMap" from="[:]"/>
             <set field="createPhysicalInventoryMap.physicalInventoryDate" from="ec.user.nowTimestamp" />
             <set field="createPhysicalInventoryMap.partyId" from="ec.user.getUsername()?:ec.user.getUserId().partyId" />
             <set field="createPhysicalInventoryMap.inventoryItemVariances" from="inventoryItemVariances" />
