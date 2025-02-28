@@ -144,17 +144,16 @@
             "facilityAllocation": [
                 {
                     "facilityId": "1",
+                    "routingGroupId": '',
+                    "orderRoutingId": '',
+                    "routingRuleId": '',
+                    "routingRunId": ''
+                    "changeReasonEnumId": '',
+                    "suggestedShipMethodTypeId": '',
                     "items": [
                         {
                             "orderItemSeqId": "00101",
                             "quantity": 1,
-                            "changeReasonEnumId": '',
-                            "routingRule": '',
-                            "routingGroupId": '',
-                            "orderRoutingId": '',
-                            "routingRuleId": '',
-                            "routingRunId": '',
-                            "suggestedShipMethodTypeId": '',
                             "comments": ''
                         },
                         {
@@ -165,10 +164,16 @@
                 },
                 {
                     "facilityId": "10",
+                    "routingGroupId": '',
+                    "orderRoutingId": '',
+                    "routingRuleId": '',
+                    "routingRunId": ''
+                    "changeReasonEnumId": '',
+                    "suggestedShipMethodTypeId": '',
                     "items": [
                         {
                             "orderItemSeqId": "00103",
-                            "quantity": 1
+                            "quantity": 1,
                         }
                     ]
                 }
@@ -192,6 +197,12 @@
                             <parameter name="comments"/>
                         </parameter>
                     </parameter>
+                    <parameter name="routingGroupId"/>
+                    <parameter name="orderRoutingId"/>
+                    <parameter name="routingRuleId"/>
+                    <parameter name="routingRunId"/>
+                    <parameter name="suggestedShipMethodTypeId"/>
+                    <parameter name="changeReasonEnumId"/>
                 </parameter>
             </parameter>
         </in-parameters>
@@ -216,7 +227,7 @@
                     <set field="allocatedItem.facilityId" from="facilityId"/>
                     <set field="allocatedItem.orderId" from="orderId"/>
                     <service-call name="co.hotwax.oms.order.OrderReservationServices.process#OrderItemAllocation"
-                                  in-map="allocatedItem" out-map="outMap"/>
+                                  in-map="allocation + allocatedItem" out-map="outMap"/>
                     <if condition="outMap.allocatedShipGroupSeqId">
                         <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
                         <script>
@@ -358,7 +369,9 @@
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: facilityId, quantity:quantity ]"/>
 
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
-                          in-map="context + [fromFacilityId: fromFacility.facilityId, routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
+                          in-map="context + [shipGroupSeqId: toShipGroupSeqId, fromFacilityId: fromFacility.facilityId,
+                                shipmentMethodTypeId: suggestedShipMethodTypeId,
+                                routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
         </actions>
     </service>
 </services>
