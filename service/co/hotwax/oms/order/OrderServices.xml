@@ -100,8 +100,8 @@ under the License.
                     communicationEventTypeEnumId:'API_CANCEL_ORDER_ITEM', content:'Shopify Order Item Cancel: OrderId:' + orderId + ', itemSeqId: ' + orderItem.orderItemSeqId + ', Qty [' + BigDecimal.ONE.intValue() + ']', datetimeStarted:ec.user.nowTimestamp]"/>
             <!-- TODO: Discuss messaging in the communicationEvent logging -->
 
-            <!-- Call change#SalesOrderItemStatus service to change the order item status -->
-            <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+            <!-- Call change#OrderItemStatus service to change the order item status -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
                     statusId:'ITEM_CANCELLED', changeReason:reasonEnum.enumId, statusDateTime:ec.user.nowTimestamp]"/>
 
         </actions>
@@ -179,7 +179,7 @@ under the License.
         </actions>
     </service>
 
-    <service verb="change" noun="SalesOrderItemStatus">
+    <service verb="change" noun="OrderItemStatus">
         <description>Change the status of a sales order item</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
@@ -187,6 +187,7 @@ under the License.
             <parameter name="statusId" required="true"/>
             <parameter name="changeReason"/>
             <parameter name="statusDateTime"/>
+            <parameter name="checkCancelCompleteOrder" type="Boolean" default-value="true"/>
         </in-parameters>
         <actions>
             <!-- Get the order item -->
@@ -217,10 +218,12 @@ under the License.
             <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
                     statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime, statusUserLogin:ec.user.getUsername()]"/>
 
-            <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED -->
-            <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
-                <!-- Call checkCancelComplete#SalesOrder service to confirm if we need to completely cancel or complete the sales order -->
-                <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#SalesOrder" in-map="[orderId:orderId, changeReason:changeReason]"/>
+            <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED when checkCancelCompleteOrder is true-->
+            <if condition="checkCancelCompleteOrder">
+                <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
+                    <!-- Call checkCancelComplete#SalesOrder service to confirm if we need to completely cancel or complete the sales order -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#SalesOrder" in-map="[orderId:orderId, changeReason:changeReason]"/>
+                </if>
             </if>
         </actions>
     </service>
@@ -259,16 +262,16 @@ under the License.
             </iterate>
             <if condition="allCancelled">
                 <then>
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
                 </then>
                 <else-if condition="anyCompleted &amp;&amp; allCancelledOrCompleted">
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
                 </else-if>
             </if>
         </actions>
     </service>
 
-    <service verb="change" noun="SalesOrderStatus">
+    <service verb="change" noun="OrderStatus">
         <description>This service validates and then changes the status of a sales order</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
@@ -311,9 +314,9 @@ under the License.
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
                     <econdition field-name="orderId" from="orderId"/>
                 </entity-find>
-                <!-- Iterate through the order items and call change#SalesOrderItemStatus service to update their status as well -->
+                <!-- Iterate through the order items and call change#OrderItemStatus service to update their status as well -->
                 <iterate list="orderItemList" entry="orderItem">
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#SalesOrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
                 </iterate>
             </if>
         </actions>
