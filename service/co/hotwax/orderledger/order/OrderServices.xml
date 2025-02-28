@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <!-- Service to cancel sales order item record -->
+    <service verb="cancel" noun="SalesOrderItem">
+        <description>Cancels a sales order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="shipGroupSeqId" required="true"/>
+            <parameter name="reason"/>
+            <parameter name="comment"/>
+        </in-parameters>
+        <actions>
+            <!-- Validate the order item is already cancelled or completed -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItem">
+                <!-- Log the error message and return from the service -->
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+            </if>
+
+            <!-- Validate the change reason Enumeration -->
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="reasonEnum" cache="true">
+                <field-map field-name="enumId" from="reason"/>
+            </entity-find-one>
+            <if condition="!reasonEnum">
+                <!-- Log the error message and return from the service -->
+                <return type="warning" message="Cancel Reason Enumeration [EnumId:${reason}] - Not found"/>
+            </if>
+
+            <!-- Validate if the order item is completed or already cancelled -->
+            <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
+                <!-- Log the error message and return from the service -->
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Already cancelled or completed"/>
+            </if>
+
+            <!-- Update the order item cancel quantity -->
+            <set field="orderItem.cancelQuantity" value="1"/>
+            <entity-update value-field="orderItem"/>
+
+            <!-- Update the orderItemShipGroupAssoc cancel quantity -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="oisga">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+            <set field="oisga.cancelQuantity" value="1"/>
+            <entity-update value-field="oisga"/>
+
+            <!-- Call create#OrderItemChange service to register the cancellation -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderItemChange" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    changeTypeEnumId:'ODR_ITM_CANCEL', reasonEnumId:reasonEnum.enumId, changeComments:comment, cancelQuantity:1,
+                    changeDatetime:ec.user.nowTimestamp]"/>
+            <!-- TODO: changeUserLogin; changeUserLogin:context.userLogin -->
+
+            <!-- Call create#NoteData service to add information as a note -->
+            <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId,
+                    noteDateTime:ec.user.nowTimestamp]" out-map="noteDataResponse"/>
+            <!-- Call create#OrderHeaderNote service to associate the created note to the order -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:noteDataResponse.noteId]"/>
+            <!-- TODO: internalNote:Y or N ; Also we can save the comment/reason as a part of the note-->
+
+            <!-- Call cancel#OrderItemInvResQty to cancel the inventory reservation -->
+            <service-call name="co.hotwax.oms.order.OrderServices.cancel#OrderItemInvResQty" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    shipGroupSeqId:shipGroupSeqId]"/>
+
+            <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
+            <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
+            <set field="itemTaxTotal" from="orderItemSalesTaxTotalResponse.itemTaxTotal" type="BigDecimal" />
+
+            <!-- If taxTotal is greater than zero, then call create#OrderAdjustment inline to create negative sales tax amount for the order item-->
+            <if condition="itemTaxTotal.compareTo(BigDecimal.ZERO) &gt; 0">
+                <service-call name="create#org.apache.ofbiz.order.order.OrderAdjustment" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                        shipGroupSeqId:'_NA_', orderAdjustmentTypeId:'SALES_TAX', description:'Tax adjustment on item cancellation',
+                        amount:-itemTaxTotal]"/>
+                <!-- TODO: Discuss the setting of shipGroupSeqId=_NA_ -->
+            </if>
+
+            <!-- Call create#CommunicationEvent to register the event -->
+            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:orderId, communicationEventTypeId:'API_COMMUNICATION',
+                    communicationEventTypeEnumId:'API_CANCEL_ORDER_ITEM', content:'Shopify Order Item Cancel: OrderId:' + orderId + ', itemSeqId: ' + orderItem.orderItemSeqId + ', Qty [' + BigDecimal.ONE.intValue() + ']', datetimeStarted:ec.user.nowTimestamp]"/>
+            <!-- TODO: Discuss messaging in the communicationEvent logging -->
+
+            <!-- Call change#OrderItemStatus service to change the order item status -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    statusId:'ITEM_CANCELLED', changeReason:reasonEnum.enumId, statusDateTime:ec.user.nowTimestamp]"/>
+
+        </actions>
+    </service>
+
+</services>
