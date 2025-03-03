@@ -3,19 +3,19 @@
     <service verb="create" noun="OrderItemInventoryReservation">
         <description>
             This service creates an InventoryItemDetail record only for the specified order and item with the given quantity at the specified facility.
-            It also creates OrderItemShipGroupInventoryReservation records but does not perform any additional inventory adjustments or processing.
+            It also creates OrderItemShipGroup InventoryReservation records but does not perform any additional inventory adjustments or processing.
+            This service reserves inventory items from the OrderItemShipGroup facility ID.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="quantity" type="BigDecimal" required="true"/>
-            <parameter name="facilityId" required="true"/>
         </in-parameters>
         <actions>
             <!-- TODO: Handle marketing package reservation: MARKETING_PKG_PICK
                 Reserve marketing package component against the marketing packet order item
              -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+            <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
                 <field-map field-name="orderId" from="orderId"/>
                 <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
             </entity-find-one>
@@ -23,7 +23,7 @@
                 <return error="true" message="Order item [${orderId}:${orderItemSeqId}] not found."/>
             </if>
             <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
-                          in-map="[productId: orderItem.productId, facilityId: facilityId]"
+                          in-map="[productId: orderItem.productId, facilityId: orderItem.facilityId]"
                           out-map="findOrCreateResult"/>
 
             <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
@@ -366,7 +366,7 @@
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
-                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: facilityId, quantity:quantity ]"/>
+                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:quantity ]"/>
 
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
                           in-map="context + [shipGroupSeqId: toShipGroupSeqId, fromFacilityId: fromFacility.facilityId,
