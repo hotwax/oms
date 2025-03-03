@@ -132,14 +132,14 @@ under the License.
             <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED when checkCancelCompleteOrder is true-->
             <if condition="checkCancelCompleteOrder">
                 <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
-                    <!-- Call checkCancelComplete#SalesOrder service to confirm if we need to completely cancel or complete the sales order -->
-                    <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#SalesOrder" in-map="[orderId:orderId, changeReason:changeReason]"/>
+                    <!-- Call checkCancelComplete#Order service to confirm if we need to completely cancel or complete the sales order -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId, changeReason:changeReason]"/>
                 </if>
             </if>
         </actions>
     </service>
 
-    <service verb="checkCancelComplete" noun="SalesOrder">
+    <service verb="checkCancelComplete" noun="Order">
         <description>This service checks if we need to completely cancel or complete a sales order.</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
