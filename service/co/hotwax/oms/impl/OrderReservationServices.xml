@@ -226,7 +226,7 @@
                     <set field="allocatedItem.toShipGroupSeqId" from="toShipGroupSeqId"/>
                     <set field="allocatedItem.facilityId" from="facilityId"/>
                     <set field="allocatedItem.orderId" from="orderId"/>
-                    <service-call name="co.hotwax.oms.order.OrderReservationServices.process#OrderItemAllocation"
+                    <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                                   in-map="allocation + allocatedItem" out-map="outMap"/>
                     <if condition="outMap.allocatedShipGroupSeqId">
                         <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
@@ -237,7 +237,7 @@
                 </iterate>
             </iterate>
             <iterate list="allocatedFacilityIds" entry="allocatedFacilityId">
-                <service-call name="co.hotwax.oms.order.OrderReservationServices.increase#FacilityOrderCount"
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.increase#FacilityOrderCount"
                               in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]" ignore-error="true"/>
             </iterate>
         </actions>
@@ -365,7 +365,7 @@
                           in-map="serviceInCtx"/>
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
-            <service-call name="co.hotwax.oms.order.OrderReservationServices.create#OrderItemInventoryReservation"
+            <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: facilityId, quantity:quantity ]"/>
 
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"

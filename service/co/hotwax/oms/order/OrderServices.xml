@@ -116,7 +116,7 @@
                 List&lt;EntityValue&gt; orderItemsToReject = entityFind.list();
 
                 orderItemsToReject.each { itemToReject ->
-                ec.service.sync().name("co.hotwax.oms.order.OrderReservationServices.reject#OrderItem")
+                ec.service.sync().name("co.hotwax.oms.impl.OrderReservationServices.reject#OrderItem")
                 .parameter("orderId", itemToReject.orderId)
                 .parameter("orderItemSeqId", itemToReject.orderItemSeqId)
                 .parameter("rejectionReasonId", rejectionReasonId)
@@ -208,7 +208,7 @@
             <set field="shipGroupSeqId" from="currentShipGroup[0].shipGroupSeqId"/>
 
             <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
-            <service-call name="co.hotwax.oms.order.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
+            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
             orderItemSeqId:orderItemSeqId,shipGroupSeqId:shipGroupSeqId,cancelQuantity:1]"/>
 
             <!--2. Move to rejected facility-->

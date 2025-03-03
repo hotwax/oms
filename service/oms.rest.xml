@@ -54,6 +54,14 @@ under the License.
                     <method type="put">
                         <entity name="org.apache.ofbiz.order.order.OrderItem" operation="update"/>
                     </method>
+                    <resource name="allocation">
+                        <method type="delete">
+                            <service name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"/>
+                        </method>
+                        <method type="post">
+                            <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
+                        </method>
+                    </resource>
                 </id>
             </resource>
             <resource name="shipGroups">
@@ -65,6 +73,11 @@ under the License.
                         <entity name="org.apache.ofbiz.order.order.OrderItemShipGroup" operation="update"/>
                     </method>
                 </id>
+            </resource>
+            <resource name="allocation">
+                <method type="post">
+                    <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
+                </method>
             </resource>
         </id>
     </resource>
