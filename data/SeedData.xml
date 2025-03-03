@@ -40,23 +40,23 @@
         <parameters parameterName="systemMessageTypeIds" parameterValue="NewProductsFeed,ProductUpdatesFeed"/>
     </moqui.service.job.ServiceJob>
 
-    <!-- New Status Item, status flow and transitions added, for now used to manage Transfer Order lifecycle and can be used for other order types if required -->
-    <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILLMENT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
+    <!-- New Status Item, for now used to manage Transfer Order items lifecycle and can be used for other order types if required -->
+    <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILL" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
     <moqui.basic.StatusItem statusId="ITEM_PENDING_RECEIPT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_RECEIPT" description="Pending Receipt"/>
 
-    <!-- Status Flow for Transfer Orders Store to Warehouse -->
-    <moqui.basic.StatusFlow statusFlowId="TO_PendingFulfill" description="Status transitions for Transfer Orders where Fulfillment is managed by OMS and Receiving is managed by 3rd party e.g. Store to Warehouse"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingFulfill" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILLMENT" transitionSequence="1" transitionName="Pending Fulfillment Item"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingFulfill" statusId="ITEM_PENDING_FULFILLMENT" toStatusId="ITEM_COMPLETED" transitionSequence="2" transitionName="Complete Item"/>
+    <!-- Status Flow for Order Items Pending Fulfillment e.g. Transfer Orders Store to Warehouse -->
+    <moqui.basic.StatusFlow statusFlowId="OrderPendingFulfill" statusTypeId="ORDER_ITEM_STATUS" description="Status Flow for Orders Pending Fulfillment in OMS and Receiving by third party e.g. Transfer Orders Store to Warehouse"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingFulfill" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Pending Fulfillment Item"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingFulfill" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_COMPLETED" transitionSequence="2" transitionName="Complete Item"/>
 
-    <!-- Status Flow for Transfer Orders Warehouse to Store -->
-    <moqui.basic.StatusFlow statusFlowId="TO_PendingReceive" description="Status transitions for Transfer Orders where Fulfillment is managed by 3rd party and Receiving is managed by OMS e.g. Warehouse to Store"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingReceive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Pending Receipt Item"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingReceive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="2" transitionName="Complete Item"/>
+    <!-- Status Flow for Order Items Pending Receipt e.g. Transfer Orders Warehouse to Store -->
+    <moqui.basic.StatusFlow statusFlowId="OrderPendingReceipt" statusTypeId="ORDER_ITEM_STATUS"  description="Status Flow for Orders Fulfillment by third party and Receiving Pending in OMS e.g. Transfer Orders Warehouse to Store"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingReceipt" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Pending Receipt Item"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingReceipt" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="2" transitionName="Complete Item"/>
 
-    <!-- Status Flow for Transfer Orders Store to Store -->
-    <moqui.basic.StatusFlow statusFlowId="TO_PendingFulfillAndReceive" description="Status transitions for Transfer Orders where both Fulfillment and Receiving is managed by OMS e.g. Store to Store"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingFulfillAndReceive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILLMENT" transitionSequence="1" transitionName="Pending Fulfillment Item"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingFulfillAndReceive" statusId="ITEM_PENDING_FULFILLMENT" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="Pending Receipt Item"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_PendingFulfillAndReceive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="3" transitionName="Complete Item"/>
+    <!-- Status Flow for Order Items Pending Fulfillment And Receipt e.g. Transfer Orders Store to Store -->
+    <moqui.basic.StatusFlow statusFlowId="OrderPendingFulfillReceipt" statusTypeId="ORDER_ITEM_STATUS"  description="Status Flow for Orders Pending Fulfillment and Pending Receipt in OMS eg. Transfer Orders Store to Store"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingFulfillReceipt" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Pending Fulfillment Item"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingFulfillReceipt" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="Pending Receipt Item"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="OrderPendingFulfillReceipt" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="3" transitionName="Complete Item"/>
 </entity-facade-xml>
