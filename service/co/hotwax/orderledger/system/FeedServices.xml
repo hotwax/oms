@@ -27,7 +27,7 @@ under the License.
         </out-parameters>
         <actions>
             <!-- Fetch the SystemMessage record and the JSON file path-->
-            <entity-find-one entity-name="SystemMessageAndType" value-field="systemMessage"/>
+            <entity-find-one entity-name="moqui.service.message.SystemMessageAndType" value-field="systemMessage"/>
             <set field="filePathRef" from="systemMessage.messageText"/>
 
             <set field="nowDatetime" from="ec.user.nowTimestamp"/>
