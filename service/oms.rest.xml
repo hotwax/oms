@@ -59,7 +59,7 @@ under the License.
                             <service name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"/>
                         </method>
                         <method type="post">
-                            <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
+                            <service name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"/>
                         </method>
                     </resource>
                 </id>

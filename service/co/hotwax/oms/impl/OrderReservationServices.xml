@@ -54,7 +54,7 @@
                         out-map="findOrCreateResult"/>
 
                 <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
-                <set field="orderItemShipGrpInvResMap" from="[orderId: orderId,
+                <set field="orderItemShipGrpInvRes" from="[orderId: orderId,
                         orderItemSeqId: orderItemSeqId,
                         shipGroupSeqId: orderItem.shipGroupSeqId,
                         inventoryItemId: inventoryItemId,
