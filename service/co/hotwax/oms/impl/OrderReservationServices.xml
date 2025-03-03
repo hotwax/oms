@@ -3,8 +3,12 @@
     <service verb="create" noun="OrderItemInventoryReservation">
         <description>
             This service creates an InventoryItemDetail record only for the specified order and item with the given quantity at the specified facility.
-            It also creates OrderItemShipGroup InventoryReservation records but does not perform any additional inventory adjustments or processing.
-            This service reserves inventory items from the OrderItemShipGroup facility ID.
+            It also creates OrderItemShipGrpInvRes records but does not perform any additional inventory adjustments or processing.
+
+            Additionally, this service handles marketing package item reservations. In the case of a marketing package,
+            the system creates reservation records for both the package and its components.
+            The component quantity is determined by multiplying the reservation quantity with the component’s required quantity,
+            and the corresponding OrderItemShipGrpInvRes records are created accordingly.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
@@ -75,7 +79,13 @@
     </service>
 
     <service verb="cancel" noun="OrderItemInventoryReservation">
-        <description>Cancel inventory reservations for an order item.</description>
+        <description>
+            This service cancels inventory reservations for an order item.
+            It handles both finished goods and marketing package items.
+
+            For finished goods: Deletes the OrderItemShipGrpInvRes records. Increases the available-to-promise (ATP) inventory accordingly.
+            For marketing packages: Deletes the OrderItemShipGrpInvRes records for both the package and its components. Increases the ATP inventory for the respective inventory items.
+        </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
