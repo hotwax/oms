@@ -287,6 +287,8 @@
                     </if>
                     <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
                                   in-map="serviceInCtx"/>
+                    <service-call name="co.hotwax.oms.search.SearchServices.create#OrderIndex" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+                                  ignore-error="true"/>
                 </if>
                 <return message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
             </if>
@@ -372,6 +374,9 @@
                           in-map="context + [shipGroupSeqId: toShipGroupSeqId, fromFacilityId: fromFacility.facilityId,
                                 shipmentMethodTypeId: suggestedShipMethodTypeId,
                                 routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+                          ignore-error="true"/>
         </actions>
     </service>
 </services>

@@ -35,4 +35,23 @@ under the License.
             <parameter name="response" type="Map"/>
         </out-parameters>
     </service>
+    <service verb="index" noun="OrderItem" type="oms-rest" location="service/createOrderIndex" method="post">
+        <description>Create order index</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="response" type="Map"/>
+        </out-parameters>
+    </service>
+    <service verb="index" noun="OrderHeader" type="oms-rest" location="service/createOrderIndex" method="post">
+        <description>Create order index</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="response" type="Map"/>
+        </out-parameters>
+    </service>
 </services>
