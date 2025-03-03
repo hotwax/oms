@@ -111,16 +111,10 @@ under the License.
                 <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
-            <!-- Check if the status change is valid -->
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ValidStatusChange" in-map="[statusId:orderItem.statusId, toStatusId:statusId]" out-map="statusValidChangeResponse"/>
-            <if condition="!statusValidChangeResponse.isValidChange">
-                <!-- Log error message and return from the service -->
-                <return error="true" type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Invalid status transition to ${statusId}"/>
-            </if>
-
             <!-- Update the status of the order item -->
-            <set field="orderItem.statusId" from="statusId"/>
-            <entity-update value-field="orderItem"/>
+            <set field="orderItemMap" from="orderItem"/>
+            <set field="orderItemMap.statusId" from="statusId"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="orderItemMap"/>
 
             <if condition="!statusDateTime">
                 <set field="statusDateTime" from="ec.user.nowTimestamp"/>
@@ -207,15 +201,10 @@ under the License.
                 <return type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
             </if>
 
-            <!-- Check if the status change of the order is a valid change -->
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ValidStatusChange" in-map="[statusId:orderHeader.statusId, toStatusId:statusId]" out-map="statusValidChangeResponse"/>
-            <if condition="!statusValidChangeResponse.isValidChange">
-                <return error="true" type="warning" message="OrderHeader [ID: ${orderId}] - Invalid status transition to ${statusId}"/>
-            </if>
-
             <!-- Update the status of the OrderHeader -->
-            <set field="orderHeader.statusId" from="statusId"/>
-            <entity-update value-field="orderHeader"/>
+            <set field="orderHeaderMap" from="orderHeader"/>
+            <set field="orderHeaderMap.statusId" from="statusId"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="orderHeaderMap" />
 
             <!-- Create OrderStatus record to register the status change -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.getUsername()]"/>

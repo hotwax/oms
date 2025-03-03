@@ -74,25 +74,4 @@ under the License.
             </script>
         </actions>
     </service>
-
-    <service verb="check" noun="ValidStatusChange">
-        <description>This service checks the validity of a status change</description>
-        <in-parameters>
-            <parameter name="statusId" required="true"/>
-            <parameter name="toStatusId" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="isValidChange" type="Boolean" required="true"/>
-        </out-parameters>
-        <actions>
-            <set field="isValidChange" type="Boolean" value="false"/>
-            <entity-find entity-name="moqui.basic.StatusFlowTransition" list="checkStatus" cache="true" limit="1">
-                <econdition field-name="statusId" from="statusId"/>
-                <econdition field-name="toStatusId" from="toStatusId"/>
-            </entity-find>
-            <if condition="checkStatus">
-                <set field="isValidChange" type="Boolean" value="true"/>
-            </if>
-        </actions>
-    </service>
 </services>
