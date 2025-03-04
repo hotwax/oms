@@ -79,6 +79,11 @@ under the License.
                     <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
                 </method>
             </resource>
+            <resource name="facilityChange">
+                <method type="get">
+                    <entity name="co.hotwax.facility.OrderFacilityChange" operation="list"/>
+                </method>
+            </resource>
         </id>
     </resource>
     <resource name="returns">
