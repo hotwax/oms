@@ -79,6 +79,11 @@ under the License.
                     <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
                 </method>
             </resource>
+            <resource name="facilityChange">
+                <method type="get">
+                    <entity name="co.hotwax.facility.OrderFacilityChange" operation="list"/>
+                </method>
+            </resource>
         </id>
     </resource>
     <resource name="returns">
@@ -351,16 +356,16 @@ under the License.
         </method>
     </resource>
 
-    <resource name="party" require-authentication="anonymous-all">
+    <resource name="parties">
         <method type="get">
-            <entity name="org.apache.ofbiz.party.party.Party" operation="list"/>
+            <entity name="co.hotwax.party.party.PartyNameDetail" operation="list"/>
         </method>
         <method type="post">
             <entity name="org.apache.ofbiz.party.party.Party" operation="create"/>
         </method>
         <id name="partyId">
             <method type="get">
-                <entity name="org.apache.ofbiz.party.party.Party" operation="one"/>
+                <entity name="co.hotwax.party.party.PartyNameDetail" operation="one"/>
             </method>
             <method type="delete">
                 <entity name="org.apache.ofbiz.party.party.Party" operation="delete"/>
