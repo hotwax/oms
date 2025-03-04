@@ -118,30 +118,30 @@ under the License.
                 </method>
             </resource>
             <resource name="facilities">
-                <resource name="counts">
-                    <method type="get">
-                        <entity name="co.hotwax.product.store.ProductStoreFacilityCount" operation="list"/>
-                    </method>
-                </resource>
                 <method type="get">
                     <entity name="co.hotwax.product.store.ProductStoreFacilityDetail" operation="list"/>
                 </method>
                 <method type="post">
                     <entity name="org.apache.ofbiz.product.store.ProductStoreFacility" operation="store"/>
                 </method>
-            </resource>
-            <resource name="facilityGroups">
                 <resource name="counts">
                     <method type="get">
-                        <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
+                        <entity name="co.hotwax.product.store.ProductStoreFacilityCount" operation="list"/>
                     </method>
                 </resource>
+            </resource>
+            <resource name="facilityGroups">
                 <method type="get">
                     <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
                 </method>
                 <method type="post">
                     <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="store"/>
                 </method>
+                <resource name="counts">
+                    <method type="get">
+                        <entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="list"/>
+                    </method>
+                </resource>
             </resource>
         </id>
         <resource name="shipmentMethods">
@@ -166,11 +166,6 @@ under the License.
         <method type="post">
             <entity name="org.apache.ofbiz.product.facility.Facility" operation="create"/>
         </method>
-        <resource name="identifications">
-            <method type="get">
-                <entity name="co.hotwax.facility.FacilityIdentification" operation="list"/>
-            </method>
-        </resource>
         <id name="facilityId">
             <method type="get">
                 <entity name="org.apache.ofbiz.product.facility.Facility" operation="one"/>
@@ -230,6 +225,11 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="identifications">
+            <method type="get">
+                <entity name="co.hotwax.facility.FacilityIdentification" operation="list"/>
+            </method>
+        </resource>
         <resource name="facilityOrderCounts" description="Facility order count">
             <method type="get">
                 <entity name="co.hotwax.facility.FacilityOrderCount" operation="list"/>
