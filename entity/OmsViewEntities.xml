@@ -21,5 +21,49 @@
             </complex-alias>
         </alias>
     </view-entity>
-
+    <view-entity package="co.hotwax.oms.order" entity-name="OrderItemReservation">
+        <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem"/>
+        <member-entity entity-alias="OISGIR" entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="II" entity-name="org.apache.ofbiz.product.inventory.InventoryItem" join-from-alias="OISGIR">
+            <key-map field-name="inventoryItemId"/>
+        </member-entity>
+        <alias name="orderId" entity-alias="OI"/>
+        <alias name="orderItemSeqId" entity-alias="OI"/>
+        <alias name="shipGroupSeqId" entity-alias="OI"/>
+        <alias name="productId" entity-alias="OI"/>
+        <alias name="quantity" entity-alias="OI"/>
+        <alias name="orderItemTypeId" entity-alias="OI"/>
+        <alias name="statusId" entity-alias="OI"/>
+        <alias name="estimatedShipDate" entity-alias="OI"/>
+        <alias name="inventoryItemId" entity-alias="OISGIR"/>
+        <alias name="reservedQty" field="quantity" entity-alias="OISGIR"/>
+        <alias name="reservedProductId" field="productId" entity-alias="II"/>
+    </view-entity>
+    <view-entity entity-name="PartyNameDetail" package="co.hotwax.party.party">
+        <member-entity entity-alias="PTY" entity-name="org.apache.ofbiz.party.party.Party"/>
+        <member-entity entity-alias="PER" entity-name="org.apache.ofbiz.party.party.Person" join-from-alias="PTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PTYGRP" entity-name="org.apache.ofbiz.party.party.PartyGroup" join-from-alias="PTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <alias entity-alias="PTY" name="partyId"/>
+        <alias entity-alias="PTY" name="partyTypeId"/>
+        <alias entity-alias="PTY" name="externalId"/>
+        <alias entity-alias="PTY" name="description"/>
+        <alias entity-alias="PTY" name="statusId"/>
+        <alias entity-alias="PER" name="firstName"/>
+        <alias entity-alias="PER" name="middleName"/>
+        <alias entity-alias="PER" name="lastName"/>
+        <alias entity-alias="PER" name="firstNameLocal"/>
+        <alias entity-alias="PER" name="lastNameLocal"/>
+        <alias entity-alias="PER" name="personalTitle"/>
+        <alias entity-alias="PER" name="suffix"/>
+        <alias entity-alias="PTYGRP" name="groupName"/>
+        <alias entity-alias="PTYGRP" name="groupNameLocal"/>
+    </view-entity>
 </entities>
