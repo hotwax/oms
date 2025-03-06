@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="create" noun="TransferOrder">
+        <description>
+            Service to create Transfer Order.
+            The Order and Items are created in ORDER_CREATED and ITEM_CREATED status respectively.
+        </description>
+        <in-parameters>
+            <parameter name="payload" type="Map" required="true">
+                <description>The payload containing transfer order and item details.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Transfer Order created in OMS.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <!-- Validate Product Store, required for some default values like sales channel and currency if not in the payload -->
+            <if condition="!payload.productStoreId">
+                <return error="true" message="Cannot create Transfer order, productStoreId is required."/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                <field-map field-name="productStoreId" from="payload.productStoreId"/>
+            </entity-find-one>
+            <if condition="!productStore">
+                <return error="true" message="Product Store with ${payload.productStoreId} does not exist."/>
+            </if>
+
+            <!-- Set some default values for OrderHeader -->
+            <set field="payload.salesChannelEnumId" from="payload.salesChannelEnumId ?: productStore.defaultSalesChannelEnumId"/>
+            <set field="payload.currencyUom" from="payload.currencyUom ?: productStore.defaultCurrencyUomId"/>
+
+            <set field="payload.orderTypeId" value="TRANSFER_ORDER" />
+            <set field="payload.entryDate" from="ec.user.nowTimestamp"/>
+
+            <!-- Instead of adding validations on statusId, the service always sets ORDER_CREATED status for TO creation -->
+            <set field="payload.statusId" value="ORDER_CREATED"/>
+
+            <iterate list="payload.shipGroups" entry="shipGroup">
+                <!-- TODO if invalid external facilityIds or empty, the TO creation is successful with empty values in OH and OISG,
+                        should this be restricted or set as _NA_ if not found?  -->
+                <set field="externalFacilityIdList" from="[]"/>
+                <set field="originExternalFacilityId" from="payload.remove('originExternalFacilityId')"/>
+                <set field="destinationExternalFacilityId" from="payload.remove('destinationExternalFacilityId')"/>
+                <script>
+                    externalFacilityIdList.add(originExternalFacilityId)
+                    externalFacilityIdList.add(destinationExternalFacilityId)
+                </script>
+
+                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" cache="true">
+                    <econdition field-name="externalId" operator="in" from="externalFacilityIdList"/>
+                </entity-find>
+                <set field="shipGroup.facilityId" from="facilityList.find({ it.externalId == originExternalFacilityId })?.facilityId"/>
+                <set field="payload.originFacilityId" from="shipGroup.facilityId"/>
+                <set field="shipGroup.orderFacilityId" from="facilityList.find({ it.externalId == destinationExternalFacilityId })?.facilityId"/>
+
+                <set field="shipGroup.carrierRoleTypeId" from="shipGroup.carrierRoleTypeId ?: 'CARRIER'"/>
+
+                <!-- Validate Carrier and Shipment Method -->
+                <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" value-field="carrierShipmentMethod" cache="true">
+                    <field-map field-name="shipmentMethodTypeId" from="shipGroup.shipmentMethodTypeId"/>
+                    <field-map field-name="partyId" from="shipGroup.carrierPartyId"/>
+                    <field-map field-name="roleTypeId" from="shipGroup.carrierRoleTypeId"/>
+                </entity-find-one>
+                <if condition="!carrierShipmentMethod">
+                    <return error="true" message="Shipment Method Type [${shipGroup.shipmentMethodTypeId}] is not associated with the Carrier Party Id [${shipGroup.carrierPartyId}]"/>
+                </if>
+
+                <iterate list="shipGroup.items" entry="item">
+                    <set field="item.orderItemTypeId" value="PRODUCT_ORDER_ITEM"/>
+
+                    <!-- Instead of adding validations on statusId, the service always sets ITEM_CREATED status for TO item creation -->
+                    <set field="item.statusId" value="ITEM_CREATED"/>
+
+                    <!-- Check if productId in the item map -->
+                    <if condition="!item.productId">
+                        <!-- Check for goodIdentifications -->
+                        <if condition="!item.goodIdentifications">
+                            <return error="true" message="Either productId or goodIdentifications is required for the Transfer Order Items."/>
+                        </if>
+
+                        <!-- Set the goodIdentifications from the incoming payload -->
+                        <set field="goodIdentifications" from="item.remove('goodIdentifications')"/>
+
+                        <iterate list="goodIdentifications" entry="goodIdentification">
+                            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentificationList">
+                                <econdition field-name="goodIdentificationTypeId" from="goodIdentification.idType"/>
+                                <econdition field-name="idValue" from="goodIdentification.idValue"/>
+                                <date-filter/>
+                            </entity-find>
+                            <set field="productId" from="goodIdentificationList?.first?.productId"/>
+
+                            <!-- Break the loop if productId, no need to iterate for all goodIdentifications -->
+                            <if condition="productId">
+                                <set field="item.productId" from="productId"/>
+                                <break/>
+                            </if>
+                        </iterate>
+                    </if>
+
+                    <!-- Prepare the OI.itemDescription -->
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssocAndFrom" list="parentProductList">
+                        <econdition field-name="productIdTo" from="item.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <set field="item.itemDescription" from="parentProductList?.first?.productName"/>
+                </iterate>
+            </iterate>
+
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut" transaction="force-new"/>
+            <set field="orderId" from="orderOut.orderId"/>
+            <if condition="orderId">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
+                        transaction="force-new" ignore-error="true" out-map="solrResponse"/>
+                <!-- TODO check if issue in indexing in Solr, this will still print the log message -->
+                <log level="info" message="Created order index for oms orderId : ${orderId}"/>
+            </if>
+        </actions>
+    </service>
+</services>
