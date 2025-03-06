@@ -473,7 +473,7 @@ under the License.
             <service-call name="create#co.hotwax.customerservice.order.OrderHistory" in-map="orderHistoryMap"/>
 
             <!--6. Record inventory variance-->
-            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="enumMap" cache="true">
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumMap" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
 
@@ -518,7 +518,7 @@ under the License.
                         <set field="varianceQuantity" type="BigDecimal" value="0"/>
                     </then>
                     <else>
-                        <!--                        Variance is greater than atp, what to do ?  Second pass ? -->
+                        <!-- Variance is greater than atp, what to do ?  Second pass ? -->
                         <set field="varianceQuantity" type="BigDecimal" from="varianceQuantity.subtract(availableToPromiseVar)"/>
                     </else>
                 </if>

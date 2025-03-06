@@ -49,11 +49,13 @@ under the License.
             <set field="payload.salesChannelEnumId" from="payload.salesChannelEnumId ?: productStore.defaultSalesChannelEnumId"/>
             <set field="payload.currencyUom" from="payload.currencyUom ?: productStore.defaultCurrencyUomId"/>
 
-            <set field="payload.orderTypeId" value="TRANSFER_ORDER" />
+            <set field="payload.orderTypeId" value="TRANSFER_ORDER"/>
             <set field="payload.entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- Instead of adding validations on statusId, the service always sets ORDER_CREATED status for TO creation -->
             <set field="payload.statusId" value="ORDER_CREATED"/>
+
+            <set field="payload.createdBy" from="ec.user.getUsername()?:ec.user.getUserId()"/>
 
             <iterate list="payload.shipGroups" entry="shipGroup">
                 <!-- TODO if invalid external facilityIds or empty, the TO creation is successful with empty values in OH and OISG,
@@ -131,7 +133,7 @@ under the License.
             <set field="orderId" from="orderOut.orderId"/>
             <if condition="orderId">
                 <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                        transaction="force-new" ignore-error="true" out-map="solrResponse"/>
+                        transaction="force-new" ignore-error="true"/>
                 <!-- TODO check if issue in indexing in Solr, this will still print the log message -->
                 <log level="info" message="Created order index for oms orderId : ${orderId}"/>
             </if>
