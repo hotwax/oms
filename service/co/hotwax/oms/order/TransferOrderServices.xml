@@ -129,11 +129,11 @@ under the License.
                 </iterate>
             </iterate>
 
-            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut" transaction="force-new"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
             <if condition="orderId">
                 <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                        transaction="force-new" ignore-error="true"/>
+                        async="true" ignore-error="true"/>
                 <!-- TODO check if issue in indexing in Solr, this will still print the log message -->
                 <log level="info" message="Created order index for oms orderId : ${orderId}"/>
             </if>
