@@ -145,6 +145,8 @@ under the License.
     <service verb="approve" noun="TransferOrder">
         <description>
             Service to approve Transfer Order.
+            The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
+            Status for "Approve Item" transition based on the statusFlowId associated with the Transfer Order.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true">
@@ -159,9 +161,12 @@ under the License.
             <!-- Update the order status to ORDER_APPROVED -->
             <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId, statusId:'ORDER_APPROVED']"/>
 
+            <!-- Get the item status for based on statusFlowId for approving order item -->
             <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
                 <econdition field-name="statusFlowId"/>
                 <econdition field-name="transitionSequence" value="1"/>
+                <!-- TODO below check could be avoided since transitionSequence=1 is used?
+                        or we could check on transitionName="Approve Item" -->
                 <econdition field-name="statusId" value="ITEM_CREATED"/>
             </entity-find>
             <set field="itemToStatusId" from="statusFlowTransitionList?.first?.toStatusId"/>
@@ -169,43 +174,34 @@ under the License.
             <if condition="!itemToStatusId">
                 <return error="true" message="Cannot Approve Order ID [${orderId}] - Missing Status Flow transition for Approve Item"/>
             </if>
-            <log message="=== itemToStatusId: ${itemToStatusId} ======"/>
 
             <!-- Get Ship Groups -->
             <entity-find-related value-field="orderHeader" relationship-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList"/>
-            <log message="========== shipGroupList: ${shipGroupList} ============ "/>
-
-            <set field="facilityAllocation" from="[]"/>
 
             <iterate list="shipGroupList" entry="shipGroup">
-                <script>facilityAllocation.add([facilityId:shipGroup.facilityId])</script>
-
-
+                <!-- Get Order Items -->
                 <entity-find-related value-field="shipGroup" relationship-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList"/>
-                <iterate list="orderItemList" entry="orderItem">
-                    <log message="========== orderItem: ${orderItem} ============ "/>
 
+                <!-- Update Item Status and Reserve the item if item's next status is ITEM_PENDING_FULFILL -->
+                <iterate list="orderItemList" entry="orderItem">
                     <!-- Update the order item status -->
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
                             in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemToStatusId]"/>
 
-                    <!-- If to itemToStatusId = 'ITEM_PENDING_FULFILLMENT' then reserve order -->
-                    <if condition="'ITEM_PENDING_FULFILLMENT'.equals(itemToStatusId)">
-                        <!-- TODO check and prepare in-map for this new reservation service -->
-                        <!--<service-call name="co.hotwax.oms.order.OrderReservationServices.process#OrderFacilityAllocation"
-                                in-map=""/>-->
-
-                        <!-- TODO Update the order and item status in Solr -->
-
-
+                    <if condition="'ITEM_PENDING_FULFILL'.equals(itemToStatusId)">
+                        <!-- Check if multiple times reservation done if order approved again,
+                                - this returns error for duplicate entry of OISGR, so this should be good. -->
+                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
+                                in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, quantity:orderItem.quantity ]"/>
                     </if>
                 </iterate>
             </iterate>
-            <!-- Update the order item status -->
-            <log message="=== facilityAllocation: ${facilityAllocation} ======"/>
 
+            <!-- Update Order Index for change in order and item status -->
             <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                    transaction="force-new" ignore-error="true"/>
+                    async="true" ignore-error="true"/>
+            <!-- TODO check if issue in indexing in Solr, this will still print the log message -->
+            <log level="info" message="Updated order index for oms orderId : ${orderId}"/>
         </actions>
     </service>
 </services>
