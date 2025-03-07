@@ -139,4 +139,73 @@ under the License.
             </if>
         </actions>
     </service>
+
+    <!-- TODO check for backward compatibility of TOs in created status and needs to be approved?,
+            if no statusFlowId then toStatusId = ITEM_APPROVED ? -->
+    <service verb="approve" noun="TransferOrder">
+        <description>
+            Service to approve Transfer Order.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true">
+                <description>The internal ID of the Transfer Order in OMS.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Get Order Header -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+            <set field="statusFlowId" from="orderHeader?.statusFlowId"/>
+
+            <!-- Update the order status to ORDER_APPROVED -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId, statusId:'ORDER_APPROVED']"/>
+
+            <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
+                <econdition field-name="statusFlowId"/>
+                <econdition field-name="transitionSequence" value="1"/>
+                <econdition field-name="statusId" value="ITEM_CREATED"/>
+            </entity-find>
+            <set field="itemToStatusId" from="statusFlowTransitionList?.first?.toStatusId"/>
+
+            <if condition="!itemToStatusId">
+                <return error="true" message="Cannot Approve Order ID [${orderId}] - Missing Status Flow transition for Approve Item"/>
+            </if>
+            <log message="=== itemToStatusId: ${itemToStatusId} ======"/>
+
+            <!-- Get Ship Groups -->
+            <entity-find-related value-field="orderHeader" relationship-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList"/>
+            <log message="========== shipGroupList: ${shipGroupList} ============ "/>
+
+            <set field="facilityAllocation" from="[]"/>
+
+            <iterate list="shipGroupList" entry="shipGroup">
+                <script>facilityAllocation.add([facilityId:shipGroup.facilityId])</script>
+
+
+                <entity-find-related value-field="shipGroup" relationship-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList"/>
+                <iterate list="orderItemList" entry="orderItem">
+                    <log message="========== orderItem: ${orderItem} ============ "/>
+
+                    <!-- Update the order item status -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemToStatusId]"/>
+
+                    <!-- If to itemToStatusId = 'ITEM_PENDING_FULFILLMENT' then reserve order -->
+                    <if condition="'ITEM_PENDING_FULFILLMENT'.equals(itemToStatusId)">
+                        <!-- TODO check and prepare in-map for this new reservation service -->
+                        <!--<service-call name="co.hotwax.oms.order.OrderReservationServices.process#OrderFacilityAllocation"
+                                in-map=""/>-->
+
+                        <!-- TODO Update the order and item status in Solr -->
+
+
+                    </if>
+                </iterate>
+            </iterate>
+            <!-- Update the order item status -->
+            <log message="=== facilityAllocation: ${facilityAllocation} ======"/>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
+                    transaction="force-new" ignore-error="true"/>
+        </actions>
+    </service>
 </services>
