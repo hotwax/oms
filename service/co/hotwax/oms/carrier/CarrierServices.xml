@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="create" noun="Carrier">
+        <in-parameters>
+            <parameter name="partyId"/>
+            <parameter name="groupName"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId" required="true"/>
+        </out-parameters>
+        <actions>
+            <service-call name="create#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId,partyTypeId:'PARTY_GROUP']" out-map="createPartyOutput"/>
+            <set field="partyId" from="createPartyOutput.partyId"/>
+            <service-call name="create#org.apache.ofbiz.party.party.PartyGroup" in-map="[partyId:partyId,groupName:groupName]"/>
+            <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId,roleTypeId:'CARRIER']"/>
+        </actions>
+    </service>
+</services>

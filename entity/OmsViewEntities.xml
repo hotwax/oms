@@ -43,6 +43,7 @@
         <alias name="reservedQty" field="quantity" entity-alias="OISGIR"/>
         <alias name="reservedProductId" field="productId" entity-alias="II"/>
     </view-entity>
+
     <view-entity entity-name="PartyNameDetail" package="co.hotwax.party.party">
         <member-entity entity-alias="PTY" entity-name="org.apache.ofbiz.party.party.Party"/>
         <member-entity entity-alias="PER" entity-name="org.apache.ofbiz.party.party.Person" join-from-alias="PTY" join-optional="true">
@@ -51,6 +52,36 @@
         <member-entity entity-alias="PTYGRP" entity-name="org.apache.ofbiz.party.party.PartyGroup" join-from-alias="PTY" join-optional="true">
             <key-map field-name="partyId"/>
         </member-entity>
+        <alias entity-alias="PTY" name="partyId"/>
+        <alias entity-alias="PTY" name="partyTypeId"/>
+        <alias entity-alias="PTY" name="externalId"/>
+        <alias entity-alias="PTY" name="description"/>
+        <alias entity-alias="PTY" name="statusId"/>
+        <alias entity-alias="PER" name="firstName"/>
+        <alias entity-alias="PER" name="middleName"/>
+        <alias entity-alias="PER" name="lastName"/>
+        <alias entity-alias="PER" name="firstNameLocal"/>
+        <alias entity-alias="PER" name="lastNameLocal"/>
+        <alias entity-alias="PER" name="personalTitle"/>
+        <alias entity-alias="PER" name="suffix"/>
+        <alias entity-alias="PTYGRP" name="groupName"/>
+        <alias entity-alias="PTYGRP" name="groupNameLocal"/>
+    </view-entity>
+
+    <view-entity entity-name="PartyNameAndRoleDetail" package="co.hotwax.party.party">
+        <member-entity entity-alias="PTY" entity-name="org.apache.ofbiz.party.party.Party"/>
+        <member-entity entity-alias="PR" entity-name="org.apache.ofbiz.party.party.PartyRole" join-from-alias="PTY">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PER" entity-name="org.apache.ofbiz.party.party.Person" join-from-alias="PTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PTYGRP" entity-name="org.apache.ofbiz.party.party.PartyGroup" join-from-alias="PTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <alias-all entity-alias="PR">
+            <exclude field="partyId"/>
+        </alias-all>
         <alias entity-alias="PTY" name="partyId"/>
         <alias entity-alias="PTY" name="partyTypeId"/>
         <alias entity-alias="PTY" name="externalId"/>

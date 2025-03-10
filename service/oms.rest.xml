@@ -386,11 +386,6 @@ under the License.
         </id>
     </resource>
 
-    <!--
-    <resource name="partyRoleAndPartyDetails" description="Get PartyRole And PartyDetails">
-        <method type="get"><entity name="org.apache.ofbiz.party.party.PartyRoleAndPartyDetails" operation="list"/></method>
-    </resource> -->
-
     <resource name="partyContactMechs">
         <method type="get">
             <entity name="org.apache.ofbiz.party.party.PartyContactMechDetails" operation="list"/>
@@ -398,21 +393,23 @@ under the License.
     </resource>
 
     <resource name="shippingGateways" require-authentication="anonymous-all">
+        <resource name="carrierParties">
+            <method type="get"><entity name="co.hotwax.party.party.PartyNameAndRoleDetail" operation="list"/></method>
+            <method type="post"><service name="co.hotwax.oms.carrier.CarrierServices.create#Carrier"/></method>
+        </resource>
         <resource name="shipmentMethodTypes">
-            <method type="get">
-                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/>
-            </method>
-            <method type="post">
-                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/>
-            </method>
+            <method type="get"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/></method>
+            <method type="post"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/></method>
+            <id name="shipmentMethodTypeId">
+                <method type="put"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="update"/></method>
+                <method type="delete"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="delete"/></method>
+            </id>
         </resource>
         <resource name="carrierShipmentMethods">
-            <method type="get">
-                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/>
-            </method>
-            <method type="post">
-                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/>
-            </method>
+            <method type="get"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/></method>
+            <method type="post"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/></method>
+            <method type="delete"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="delete"/></method>
+            <method type="put"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="store"/></method>
         </resource>
         <resource name="shipmentBoxTypes">
             <method type="get">
