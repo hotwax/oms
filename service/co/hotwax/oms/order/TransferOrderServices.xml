@@ -18,6 +18,11 @@ under the License.
 
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
+    <!-- TODO Corresponding commerce TO screens need to be fixed.
+            NOTE: OISGA records are not created for the transfer order here, but the earlier impl creates
+            OISGA records and the commerce screens still use references of OISGA.
+            The shipGroupSeqId reference is saved in OrderItem and should be fetched from there, this impl
+            will not support backward compatibility, so the screens need to be fixed. -->
     <service verb="create" noun="TransferOrder">
         <description>
             Service to create Transfer Order.
@@ -26,6 +31,7 @@ under the License.
         <in-parameters>
             <parameter name="payload" type="Map" required="true">
                 <description>The payload containing transfer order and item details.</description>
+                <!-- TODO add payload map parameters also -->
             </parameter>
         </in-parameters>
         <out-parameters>
