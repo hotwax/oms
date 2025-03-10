@@ -30,8 +30,50 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="payload" type="Map" required="true">
-                <description>The payload containing transfer order and item details.</description>
-                <!-- TODO add payload map parameters also -->
+                <parameter name="externalId">
+                    <description>The ID of the Transfer Order in the external system.</description>
+                </parameter>
+                <parameter name="orderName">
+                    <description>The Transfer Order name.</description>
+                </parameter>
+                <parameter name="statusFlowId">
+                    <description>The Status Flow ID in OMS for the Transfer Order Item status transitions.</description>
+                </parameter>
+                <parameter name="productStoreId">
+                    <description>The ID of the Product Store in OMS.</description>
+                </parameter>
+                <parameter name="originFacilityId">
+                    <description>The ID of the Facility in OMS for the origin location of the Transfer Order.</description>
+                </parameter>
+                <parameter name="orderDate">
+                    <description>The date when the Transfer Order was placed.</description>
+                </parameter>
+                <parameter name="shipGroups" type="List">
+                    <parameter name="shipGroupMap" type="Map">
+                        <parameter name="destinationFacilityId">
+                            <description>The ID of the Facility in OMS for the destination location of the Transfer Order.</description>
+                        </parameter>
+                        <parameter name="shipmentMethodTypeId">
+                            <description>The ID of the Shipment Method in OMS for the Transfer Order.</description>
+                        </parameter>
+                        <parameter name="carrierPartyId">
+                            <description>The ID of the Carrier Party in OMS for the Transfer Order.</description>
+                        </parameter>
+                        <parameter name="items" type="List">
+                            <parameter name="itemMap" type="Map">
+                                <parameter name="productId">
+                                    <description>The ID of the product in OMS for the Transfer Order Item.</description>
+                                </parameter>
+                                <parameter name="externalId">
+                                    <description>The ID of the product in external system for the Transfer Order Item.</description>
+                                </parameter>
+                                <parameter name="quantity" type="Integer">
+                                    <description>The quantity of the item ordered in the Transfer Order.</description>
+                                </parameter>
+                            </parameter>
+                        </parameter>
+                    </parameter>
+                </parameter>
             </parameter>
         </in-parameters>
         <out-parameters>
@@ -40,20 +82,13 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
-            <!-- Validate Product Store, required for some default values like sales channel and currency if not in the payload -->
-            <if condition="!payload.productStoreId">
-                <return error="true" message="Cannot create Transfer order, productStoreId is required."/>
-            </if>
+            <!-- Get Product Store to set default values like sales channel and currency if not in the payload -->
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
                 <field-map field-name="productStoreId" from="payload.productStoreId"/>
             </entity-find-one>
-            <if condition="!productStore">
-                <return error="true" message="Product Store with ${payload.productStoreId} does not exist."/>
-            </if>
 
-            <!-- Set some default values for OrderHeader -->
-            <set field="payload.salesChannelEnumId" from="payload.salesChannelEnumId ?: productStore.defaultSalesChannelEnumId"/>
-            <set field="payload.currencyUom" from="payload.currencyUom ?: productStore.defaultCurrencyUomId"/>
+            <set field="payload.salesChannelEnumId" from="payload.salesChannelEnumId ?: productStore?.defaultSalesChannelEnumId"/>
+            <set field="payload.currencyUom" from="payload.currencyUom ?: productStore?.defaultCurrencyUomId"/>
 
             <set field="payload.orderTypeId" value="TRANSFER_ORDER"/>
             <set field="payload.entryDate" from="ec.user.nowTimestamp"/>
@@ -63,85 +98,25 @@ under the License.
 
             <set field="payload.createdBy" from="ec.user.getUsername()?:ec.user.getUserId()"/>
 
+            <!-- Set originFacilityId as facilityId for OrderItemShipGroup -->
+            <set field="payload.shipGroups*.facilityId" from="payload.originFacilityId"/>
+
             <iterate list="payload.shipGroups" entry="shipGroup">
-                <!-- TODO if invalid external facilityIds or empty, the TO creation is successful with empty values in OH and OISG,
-                        should this be restricted or set as _NA_ if not found?  -->
-                <set field="externalFacilityIdList" from="[]"/>
-                <set field="originExternalFacilityId" from="payload.remove('originExternalFacilityId')"/>
-                <set field="destinationExternalFacilityId" from="payload.remove('destinationExternalFacilityId')"/>
-                <script>
-                    externalFacilityIdList.add(originExternalFacilityId)
-                    externalFacilityIdList.add(destinationExternalFacilityId)
-                </script>
+                <!-- Set destinationFacilityId as orderFacilityId for OrderItemShipGroup -->
+                <set field="shipGroup.orderFacilityId" from="shipGroup.remove('destinationFacilityId')"/>
 
-                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" cache="true">
-                    <econdition field-name="externalId" operator="in" from="externalFacilityIdList"/>
-                </entity-find>
-                <set field="shipGroup.facilityId" from="facilityList.find({ it.externalId == originExternalFacilityId })?.facilityId"/>
-                <set field="payload.originFacilityId" from="shipGroup.facilityId"/>
-                <set field="shipGroup.orderFacilityId" from="facilityList.find({ it.externalId == destinationExternalFacilityId })?.facilityId"/>
-
-                <set field="shipGroup.carrierRoleTypeId" from="shipGroup.carrierRoleTypeId ?: 'CARRIER'"/>
-
-                <!-- Validate Carrier and Shipment Method -->
-                <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" value-field="carrierShipmentMethod" cache="true">
-                    <field-map field-name="shipmentMethodTypeId" from="shipGroup.shipmentMethodTypeId"/>
-                    <field-map field-name="partyId" from="shipGroup.carrierPartyId"/>
-                    <field-map field-name="roleTypeId" from="shipGroup.carrierRoleTypeId"/>
-                </entity-find-one>
-                <if condition="!carrierShipmentMethod">
-                    <return error="true" message="Shipment Method Type [${shipGroup.shipmentMethodTypeId}] is not associated with the Carrier Party Id [${shipGroup.carrierPartyId}]"/>
-                </if>
-
-                <iterate list="shipGroup.items" entry="item">
-                    <set field="item.orderItemTypeId" value="PRODUCT_ORDER_ITEM"/>
-
-                    <!-- Instead of adding validations on statusId, the service always sets ITEM_CREATED status for TO item creation -->
-                    <set field="item.statusId" value="ITEM_CREATED"/>
-
-                    <!-- Check if productId in the item map -->
-                    <if condition="!item.productId">
-                        <!-- Check for goodIdentifications -->
-                        <if condition="!item.goodIdentifications">
-                            <return error="true" message="Either productId or goodIdentifications is required for the Transfer Order Items."/>
-                        </if>
-
-                        <!-- Set the goodIdentifications from the incoming payload -->
-                        <set field="goodIdentifications" from="item.remove('goodIdentifications')"/>
-
-                        <iterate list="goodIdentifications" entry="goodIdentification">
-                            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentificationList">
-                                <econdition field-name="goodIdentificationTypeId" from="goodIdentification.idType"/>
-                                <econdition field-name="idValue" from="goodIdentification.idValue"/>
-                                <date-filter/>
-                            </entity-find>
-                            <set field="productId" from="goodIdentificationList?.first?.productId"/>
-
-                            <!-- Break the loop if productId, no need to iterate for all goodIdentifications -->
-                            <if condition="productId">
-                                <set field="item.productId" from="productId"/>
-                                <break/>
-                            </if>
-                        </iterate>
-                    </if>
-
-                    <!-- Prepare the OI.itemDescription from parent product name -->
-                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssocAndFrom" list="parentProductList">
-                        <econdition field-name="productIdTo" from="item.productId"/>
-                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
-                        <date-filter/>
-                    </entity-find>
-                    <set field="item.itemDescription" from="parentProductList?.first?.productName"/>
-                </iterate>
+                <!-- Set default values for Order Item -->
+                <set field="shipGroup.items*.orderItemTypeId" value="PRODUCT_ORDER_ITEM"/>
+                <!-- Instead of adding validations on statusId, the service always sets ITEM_CREATED status for TO item creation -->
+                <set field="shipGroup.items*.statusId" value="ITEM_CREATED"/>
             </iterate>
 
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
             <if condition="orderId">
+                <log level="info" message="Creating order index for oms orderId : ${orderId}"/>
                 <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
                         async="true" ignore-error="true"/>
-                <!-- TODO check if issue in indexing in Solr, this will still print the log message -->
-                <log level="info" message="Created order index for oms orderId : ${orderId}"/>
             </if>
         </actions>
     </service>
