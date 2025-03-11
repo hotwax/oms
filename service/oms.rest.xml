@@ -121,6 +121,15 @@ under the License.
                 <method type="get">
                     <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="list"/>
                 </method>
+                <method type="post">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="create"/>
+                </method>
+                <method type="put">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="update"/>
+                </method>
+                <method type="delete">
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="delete"/>
+                </method>
             </resource>
             <resource name="facilities">
                 <method type="get">
@@ -218,7 +227,13 @@ under the License.
                     <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="list"/>
                 </method>
                 <method type="post">
-                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="store"/>
+                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="create"/>
+                </method>
+                <method type="put">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="update"/>
+                </method>
+                <method type="delete">
+                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="delete"/>
                 </method>
             </resource>
             <resource name="calendars">
@@ -329,7 +344,7 @@ under the License.
                 <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="list"/>
             </method>
             <method type="post">
-                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="store"/>
+                <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="create"/>
             </method>
         </resource>
         <resource name="mappingTypes">
@@ -386,11 +401,6 @@ under the License.
         </id>
     </resource>
 
-    <!--
-    <resource name="partyRoleAndPartyDetails" description="Get PartyRole And PartyDetails">
-        <method type="get"><entity name="org.apache.ofbiz.party.party.PartyRoleAndPartyDetails" operation="list"/></method>
-    </resource> -->
-
     <resource name="partyContactMechs">
         <method type="get">
             <entity name="org.apache.ofbiz.party.party.PartyContactMechDetails" operation="list"/>
@@ -398,21 +408,23 @@ under the License.
     </resource>
 
     <resource name="shippingGateways" require-authentication="anonymous-all">
+        <resource name="carrierParties">
+            <method type="get"><entity name="co.hotwax.party.party.PartyNameAndRoleDetail" operation="list"/></method>
+            <method type="post"><service name="co.hotwax.oms.carrier.CarrierServices.create#Carrier"/></method>
+        </resource>
         <resource name="shipmentMethodTypes">
-            <method type="get">
-                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/>
-            </method>
-            <method type="post">
-                <entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/>
-            </method>
+            <method type="get"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="list"/></method>
+            <method type="post"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="create"/></method>
+            <id name="shipmentMethodTypeId">
+                <method type="put"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="update"/></method>
+                <method type="delete"><entity name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" operation="delete"/></method>
+            </id>
         </resource>
         <resource name="carrierShipmentMethods">
-            <method type="get">
-                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/>
-            </method>
-            <method type="post">
-                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/>
-            </method>
+            <method type="get"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/></method>
+            <method type="post"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/></method>
+            <method type="delete"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="delete"/></method>
+            <method type="put"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="store"/></method>
         </resource>
         <resource name="shipmentBoxTypes">
             <method type="get">
@@ -438,6 +450,7 @@ under the License.
                 <entity name="co.hotwax.shopify.ShopifyShopCarrierShipment" operation="create"/>
             </method>
         </resource>
+
     </resource>
     <resource name="paymentMethodTypes">
         <method type="get"><entity name="org.apache.ofbiz.accounting.payment.PaymentMethodType" operation="list"/></method>
@@ -455,6 +468,14 @@ under the License.
                     <entity name="org.apache.ofbiz.product.product.ProductAssoc" operation="list"/>
                 </method>
             </resource>
+        </id>
+    </resource>
+    <resource name="systemMessageRemotes">
+        <method type="get"><entity name="moqui.service.message.SystemMessageRemote" operation="list"/></method>
+        <method type="post"><entity name="moqui.service.message.SystemMessageRemote" operation="create"/></method>
+        <id name="systemMessageRemote">
+            <method type="put"><entity name="moqui.service.message.SystemMessageRemote" operation="update"/></method>
+            <method type="delete"><entity name="moqui.service.message.SystemMessageRemote" operation="delete"/></method>
         </id>
     </resource>
 </resource>
