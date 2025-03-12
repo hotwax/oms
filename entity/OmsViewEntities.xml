@@ -97,4 +97,30 @@
         <alias entity-alias="PTYGRP" name="groupName"/>
         <alias entity-alias="PTYGRP" name="groupNameLocal"/>
     </view-entity>
+
+    <view-entity entity-name="CarrierShipmentMethodCount" package="co.hotwax.shipment">
+        <member-entity entity-alias="P" entity-name="Party"/>
+        <member-entity entity-alias="PG" entity-name="PartyGroup" join-from-alias="P">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PR" entity-name="PartyRole" join-from-alias="P">
+            <key-map field-name="partyId"/>
+            <entity-condition>
+                <econdition entity-alias="PR" field-name="roleTypeId" value="CARRIER"/>
+            </entity-condition>
+        </member-entity>
+        <member-entity entity-alias="CSM" entity-name="CarrierShipmentMethod" join-from-alias="PR" join-optional="true">
+            <key-map field-name="partyId"/>
+            <key-map field-name="roleTypeId"/>
+        </member-entity>
+        <alias-all entity-alias="PG">
+            <exclude field="partyId"/>
+        </alias-all>
+        <alias entity-alias="P" name="partyId" is-aggregate="true"/>
+        <alias entity-alias="P" name="partyTypeId"/>
+        <alias entity-alias="P" name="statusId"/>
+        <alias entity-alias="PR" name="roleTypeId"/>
+        <alias entity-alias="PG" name="groupName"/>
+        <alias entity-alias="CSM" name="shipmentMethodCount" field="shipmentMethodTypeId" function="count"/>
+    </view-entity>
 </entities>
