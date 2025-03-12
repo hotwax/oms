@@ -425,6 +425,11 @@ under the License.
             <method type="post"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="create"/></method>
             <method type="delete"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="delete"/></method>
             <method type="put"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="store"/></method>
+            <resource name="counts">
+                <method type="get">
+                    <entity name="co.hotwax.shipment.CarrierShipmentMethodCount" operation="list"/>
+                </method>
+            </resource>
         </resource>
         <resource name="shipmentBoxTypes">
             <method type="get">
