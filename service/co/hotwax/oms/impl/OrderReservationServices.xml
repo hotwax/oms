@@ -468,8 +468,6 @@
                                 shipmentMethodTypeId: suggestedShipMethodTypeId,
                                 routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
 
-            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
-                          ignore-error="true"/>
         </actions>
     </service>
 </services>
