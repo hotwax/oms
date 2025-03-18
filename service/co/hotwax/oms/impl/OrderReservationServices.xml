@@ -290,7 +290,12 @@
             </parameter>
         </in-parameters>
         <out-parameters>
-
+            <parameter name="allocatedFacilityList" type="List">
+                <parameter name="allocatedFacility" type="Map">
+                    <parameter name="facilityId"/>
+                    <parameter name="shipGroupSeqId"/>
+                </parameter>
+            </parameter>
         </out-parameters>
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
@@ -300,6 +305,7 @@
             <if condition="'ORDER_APPROVED' != orderHeader.statusId">
                 <return error="true" message="Order [ID: ${orderId}] not in approved status."/>
             </if>
+            <set field="allocatedFacilityList" from="[]"/>
             <set field="allocatedFacilityIds" from="[] as Set"/>
             <iterate list="facilityAllocation" entry="allocation">
                 <set field="facilityId" from="allocation.facilityId"/>
@@ -314,6 +320,7 @@
                     <if condition="outMap.allocatedShipGroupSeqId">
                         <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
                         <script>
+                            allocatedFacilityList.add([facilityId: facilityId, shipGroupSeqId:toShipGroupSeqId])
                             allocatedFacilityIds.add(facilityId);
                         </script>
                     </if>
