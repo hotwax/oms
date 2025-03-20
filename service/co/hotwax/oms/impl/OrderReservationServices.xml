@@ -378,10 +378,7 @@
                             <set field="serviceInCtx.autoCancelDate" from="autoCancelDate"/>
                         </else-if>
                     </if>
-                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
-                                  in-map="serviceInCtx"/>
-                    <service-call name="co.hotwax.oms.search.SearchServices.create#OrderIndex" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
-                                  ignore-error="true"/>
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="serviceInCtx"/>
                 </if>
                 <return message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
             </if>
@@ -460,9 +457,17 @@
                           in-map="serviceInCtx"/>
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
-            <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                            primaryKey: 'facilityTypeId',
+                            childType: toFacility?.facilityTypeId,
+                            parentTypeField: 'parentTypeId',
+                            parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <!-- Do not perform inventory reservation if destination facility is virtual facility -->
+            <if condition="!outResult.hasParentType">
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:quantity ]"/>
-
+            </if>
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
                           in-map="context + [shipGroupSeqId: toShipGroupSeqId, fromFacilityId: fromFacility.facilityId,
                                 shipmentMethodTypeId: suggestedShipMethodTypeId,
