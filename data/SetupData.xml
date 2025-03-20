@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <entity-facade-xml type="ext-seed">
+    <enums enumId="UgtServiceJob" description="ServiceJob Actions Group" enumTypeId="UserGroupType"/>
+    <userPermissions description="ServiceJob: Run Now" userPermissionId="SJ_RUN_NOW"/>
+    <userPermissions description="ServiceJob: Status Update" userPermissionId="SJ_STATUS_UPDATE"/>
+    <userPermissions description="ServiceJob: Parameters Update" userPermissionId="SJ_PARAMETERS_UPDATE"/>
+    <userPermissions description="ServiceJob: Schedule Update" userPermissionId="SJ_CRON_UPDATE"/>
+
     <artifactGroups artifactGroupId="OMS_API" description="Commerce OMS API (via root resource)">
         <artifacts artifactTypeEnumId="AT_REST_PATH" inheritAuthz="Y" artifactName="/oms"/>
         <!-- Full permissions for the ADMIN user group -->
         <authz artifactAuthzId="OMS_API_ADMIN" userGroupId="ADMIN" authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>
     </artifactGroups>
+    
 </entity-facade-xml>
