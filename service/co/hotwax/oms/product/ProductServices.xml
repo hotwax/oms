@@ -743,6 +743,10 @@ under the License.
             <if condition="productFacility &amp;&amp; productFacility.inventoryItemId">
                 <set field="inventoryItemId" from="productFacility.inventoryItemId"/>
                 <else>
+                    <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityLocation" list="facilityLocations" cache="true">
+                        <econdition field-name="facilityId" from="facilityId"/>
+                        <econdition field-name="locationTypeEnumId" value="FLT_PICKLOC"/>
+                    </entity-find>
                     <set field="inventoryItemMap" from="[
                             productId: productId,
                             availableToPromiseTotal: 0,
@@ -750,6 +754,12 @@ under the License.
                             facilityId: facilityId,
                             inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
                         ]"/>
+                    <if condition="facilityLocations">
+                        <set field="inventoryItemMap.locationSeqId" from="facilityLocations[0].locationSeqId"/>
+                        <else>
+                            <set field="inventoryItemMap.locationSeqId" value="TLTLTLLL01"/>
+                        </else>
+                    </if>
                     <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItemMap" out-map="inventoryItemOut"/>
                     <set field="inventoryItemId" from="inventoryItemOut.inventoryItemId"/>
                     <if condition="!productFacility">

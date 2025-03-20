@@ -97,4 +97,60 @@
         <alias entity-alias="PTYGRP" name="groupName"/>
         <alias entity-alias="PTYGRP" name="groupNameLocal"/>
     </view-entity>
+
+    <view-entity entity-name="CarrierShipmentMethodCount" package="co.hotwax.shipment">
+        <member-entity entity-alias="P" entity-name="Party"/>
+        <member-entity entity-alias="PG" entity-name="PartyGroup" join-from-alias="P">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PR" entity-name="PartyRole" join-from-alias="P">
+            <key-map field-name="partyId"/>
+            <entity-condition>
+                <econdition entity-alias="PR" field-name="roleTypeId" value="CARRIER"/>
+            </entity-condition>
+        </member-entity>
+        <member-entity entity-alias="CSM" entity-name="CarrierShipmentMethod" join-from-alias="PR" join-optional="true">
+            <key-map field-name="partyId"/>
+            <key-map field-name="roleTypeId"/>
+        </member-entity>
+        <alias-all entity-alias="PG">
+            <exclude field="partyId"/>
+        </alias-all>
+        <alias entity-alias="P" name="partyId" is-aggregate="true"/>
+        <alias entity-alias="P" name="partyTypeId"/>
+        <alias entity-alias="P" name="statusId"/>
+        <alias entity-alias="PR" name="roleTypeId"/>
+        <alias entity-alias="PG" name="groupName"/>
+        <alias entity-alias="CSM" name="shipmentMethodCount" field="shipmentMethodTypeId" function="count"/>
+    </view-entity>
+
+    <view-entity entity-name="FacilityPartyNameDetail" package="org.apache.ofbiz.product.facility">
+        <member-entity entity-alias="FPTY" entity-name="org.apache.ofbiz.product.facility.FacilityParty"/>
+        <member-entity entity-alias="PER" entity-name="org.apache.ofbiz.party.party.Person" join-from-alias="FPTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <member-entity entity-alias="PTYGRP" entity-name="org.apache.ofbiz.party.party.PartyGroup" join-from-alias="FPTY" join-optional="true">
+            <key-map field-name="partyId"/>
+        </member-entity>
+        <alias-all entity-alias="FPTY"/>
+        <alias entity-alias="PER" name="firstName"/>
+        <alias entity-alias="PER" name="middleName"/>
+        <alias entity-alias="PER" name="lastName"/>
+        <alias entity-alias="PER" name="firstNameLocal"/>
+        <alias entity-alias="PER" name="lastNameLocal"/>
+        <alias entity-alias="PER" name="personalTitle"/>
+        <alias entity-alias="PER" name="suffix"/>
+        <alias entity-alias="PTYGRP" name="groupName"/>
+        <alias entity-alias="PTYGRP" name="groupNameLocal"/>
+    </view-entity>
+
+    <view-entity entity-name="ProductStoreShipmentMethDetail" package="org.apache.ofbiz.product.store">
+        <member-entity entity-alias="PSSM" entity-name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth"/>
+        <member-entity entity-alias="SMT" entity-name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" join-from-alias="PSSM">
+            <key-map field-name="shipmentMethodTypeId"/>
+        </member-entity>
+        <alias-all entity-alias="PSSM"/>
+        <alias entity-alias="SMT" name="description"/>
+    </view-entity>
+
 </entities>
