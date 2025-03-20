@@ -165,7 +165,8 @@ under the License.
                 <iterate list="orderItemList" entry="orderItem">
                     <!-- Update the order item status -->
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
-                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemToStatusId]"/>
+                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemToStatusId,
+                            checkCancelCompleteOrder:false]"/>
 
                     <if condition="'ITEM_PENDING_FULFILL'.equals(itemToStatusId)">
                         <!-- Check if multiple times reservation done if order approved again,
