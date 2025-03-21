@@ -9,4 +9,11 @@
                           ignore-error="true" />
         </actions>
     </seca>
+    <seca id="CancelReservation" service="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" when="tx-commit">
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.update#OISGIRIFulfillmentStatus"
+                          in-map="context"
+                          ignore-error="true" />
+        </actions>
+    </seca>
 </secas>
