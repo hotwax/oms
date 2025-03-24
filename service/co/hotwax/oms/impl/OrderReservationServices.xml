@@ -311,12 +311,22 @@
                 <set field="facilityId" from="allocation.facilityId"/>
                 <set field="toShipGroupSeqId" from="null"/>
                 <set field="allocatedItems" from="allocation.items" type="List"/>
+                <set field="orderFacilityChangeMap" from="[
+                        changeReasonEnumId: allocation.changeReasonEnumId,
+                        routingRule: allocation.routingRule,
+                        routingGroupId: allocation.routingGroupId,
+                        orderRoutingId: allocation.orderRoutingId,
+                        routingRuleId: allocation.routingRuleId,
+                        routingRunId: allocation.routingRunId,
+                        suggestedShipMethodTypeId: allocation.suggestedShipMethodTypeId,
+                        comments: allocation.comments
+                        ]"/>
                 <iterate list="allocatedItems" entry="allocatedItem">
                     <set field="allocatedItem.toShipGroupSeqId" from="toShipGroupSeqId"/>
                     <set field="allocatedItem.facilityId" from="facilityId"/>
                     <set field="allocatedItem.orderId" from="orderId"/>
                     <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
-                                  in-map="allocation + allocatedItem" out-map="outMap"/>
+                                  in-map="allocation + allocatedItem + [orderFacilityChange: orderFacilityChangeMap]" out-map="outMap"/>
                     <if condition="outMap.allocatedShipGroupSeqId">
                         <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
                         <script>
@@ -341,14 +351,16 @@
             <parameter name="autoCancelDate" type="Timestamp"/>
             <parameter name="clearAutoCancelDate" type="Boolean" default-value="false"/>
             <parameter name="toShipGroupSeqId"/>
-            <parameter name="changeReasonEnumId"/>
-            <parameter name="routingRule"/>
-            <parameter name="routingGroupId"/>
-            <parameter name="orderRoutingId"/>
-            <parameter name="routingRuleId"/>
-            <parameter name="routingRunId"/>
-            <parameter name="suggestedShipMethodTypeId"/>
-            <parameter name="comments"/>
+            <parameter name="orderFacilityChange" type="Map">
+                <parameter name="changeReasonEnumId"/>
+                <parameter name="routingRule"/>
+                <parameter name="routingGroupId"/>
+                <parameter name="orderRoutingId"/>
+                <parameter name="routingRuleId"/>
+                <parameter name="routingRunId"/>
+                <parameter name="suggestedShipMethodTypeId"/>
+                <parameter name="comments"/>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="allocatedShipGroupSeqId"/>
@@ -468,10 +480,19 @@
                 <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:quantity ]"/>
             </if>
+            <set field="orderFacilityChangeMap" from="context.orderFacilityChange" type="NewMap"/>
+            <set field="orderFacilityChangeMap.orderId" from="orderId"/>
+            <set field="orderFacilityChangeMap.orderItemSeqId" from="orderItemSeqId"/>
+            <set field="orderFacilityChangeMap.facilityId" from="facilityId"/>
+            <set field="orderFacilityChangeMap.shipGroupSeqId" from="toShipGroupSeqId"/>
+            <set field="orderFacilityChangeMap.fromFacilityId" from="fromFacility.facilityId"/>
+            <set field="orderFacilityChangeMap.shipmentMethodTypeId" from="orderFacilityChangeMap.suggestedShipMethodTypeId"/>
+            <set field="orderFacilityChangeMap.routerUserLogin" from="ec.user.username"/>
+            <set field="orderFacilityChangeMap.changeUserLogin" from="ec.user.username"/>
+            <set field="orderFacilityChangeMap.changeDatetime" from="ec.user.nowTimestamp"/>
+
             <service-call name="create#co.hotwax.facility.OrderFacilityChange"
-                          in-map="context + [shipGroupSeqId: toShipGroupSeqId, fromFacilityId: fromFacility.facilityId,
-                                shipmentMethodTypeId: suggestedShipMethodTypeId,
-                                routerUserLogin:ec.user.username, changeDatetime: ec.user.nowTimestamp]"/>
+                          in-map="orderFacilityChangeMap"/>
 
         </actions>
     </service>
