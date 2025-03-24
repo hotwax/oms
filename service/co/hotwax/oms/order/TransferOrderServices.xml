@@ -175,6 +175,8 @@ under the License.
                     </if>
                 </iterate>
             </iterate>
+            <!-- NOTE: separate indexing for order not required for change in status, the process#OrderItemAllocation has seca
+                    to run index#OrderItem and index#Reservation which is taking care of indexing the order and item updates in Solr -->
         </actions>
     </service>
 </services>
