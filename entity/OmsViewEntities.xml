@@ -152,5 +152,29 @@
         <alias-all entity-alias="PSSM"/>
         <alias entity-alias="SMT" name="description"/>
     </view-entity>
+    <view-entity entity-name="OrderItemAndReservation" package="co.hotwax.oms.order">
+        <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
+        <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
+            <key-map field-name="orderId"/>
+        </member-entity>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="OISGIR" entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" join-from-alias="OI" join-optional="true">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <alias name="orderId" entity-alias="OH"/>
+        <alias name="orderTypeId" entity-alias="OH"/>
+        <alias name="statusId"  entity-alias="OH"/>
+        <alias name="orderItemSeqId" entity-alias="OI"/>
+        <alias name="quantity" entity-alias="OI"/>
+        <alias name="itemStatusId" field="statusId" entity-alias="OI"/>
+        <alias name="shipGroupSeqId" entity-alias="OISG"/>
+        <alias name="facilityId" entity-alias="OISG"/>
+        <alias name="inventoryItemId" entity-alias="OISGIR"/>
+    </view-entity>
 
 </entities>
