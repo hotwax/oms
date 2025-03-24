@@ -111,13 +111,9 @@ under the License.
                 <set field="shipGroup.items*.statusId" value="ITEM_CREATED"/>
             </iterate>
 
+            <!-- Call Create Order service -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
-            <if condition="orderId">
-                <log level="info" message="Creating order index for oms orderId : ${orderId}"/>
-                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                        async="true" ignore-error="true"/>
-            </if>
         </actions>
     </service>
 </services>
