@@ -370,9 +370,6 @@
             <if condition="!orderItem">
                 <return error="true" message="Order Item [${orderId}:${orderItemSeqId}] not found"/>
             </if>
-            <if condition="'ITEM_APPROVED' != orderItem.statusId">
-                <return error="true" message="Order Item [${orderId}:${orderItemSeqId}] not in approved status"/>
-            </if>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="fromShipGroup">
                 <field-map field-name="orderId" from="orderId"/>
                 <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
