@@ -134,7 +134,8 @@ under the License.
             <set field="statusFlowId" from="orderHeader?.statusFlowId"/>
 
             <!-- Update the order status to ORDER_APPROVED -->
-            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId, statusId:'ORDER_APPROVED']"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId,
+                    statusId:'ORDER_APPROVED']"/>
 
             <!-- Get the item status for based on statusFlowId for approving order item -->
             <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
@@ -153,11 +154,11 @@ under the License.
             <!-- Get Ship Groups -->
             <entity-find-related value-field="orderHeader" relationship-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList"/>
 
+            <!-- Update Item Status and Reserve the item if item's next status is ITEM_PENDING_FULFILL -->
             <iterate list="shipGroupList" entry="shipGroup">
                 <!-- Get Order Items -->
                 <entity-find-related value-field="shipGroup" relationship-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList"/>
 
-                <!-- Update Item Status and Reserve the item if item's next status is ITEM_PENDING_FULFILL -->
                 <iterate list="orderItemList" entry="orderItem">
                     <!-- Update the order item status -->
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
@@ -167,16 +168,13 @@ under the License.
                     <if condition="'ITEM_PENDING_FULFILL'.equals(itemToStatusId)">
                         <!-- Check if multiple times reservation done if order approved again,
                                 - done, this returns error for duplicate entry of OISGR, so this should be good. -->
-                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
-                                in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, quantity:orderItem.quantity]"/>
+                        <!-- Used process#OrderItemAllocation since this will also take care of updating indexing added as part of seca on this service -->
+                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                                facilityId:shipGroup.facilityId, quantity:orderItem.quantity]"/>
                     </if>
                 </iterate>
             </iterate>
-
-            <!-- Update Order Index for change in order and item status -->
-            <log level="info" message="Creating order index for oms orderId : ${orderId} in Approve Transfer Order"/>
-            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                    async="true" ignore-error="true"/>
         </actions>
     </service>
 </services>
