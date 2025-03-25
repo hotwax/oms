@@ -373,7 +373,7 @@ under the License.
         </out-parameters>
         <actions>
 
-            <!--            Check for shipment rejection -->
+            <!-- Check for shipment rejection -->
             <if condition="shipmentId &amp;&amp; shipmentItemSeqId">
 
                 <!--Fetch the Shipment record using shipmentId.-->
@@ -415,20 +415,18 @@ under the License.
 
                 <set field="orderShipment" from="orderShipmentList[0]"/>
 
-                <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
-                              in-map="[orderId:orderShipment.orderId,orderItemSeqId:orderShipment.orderItemSeqId,fulfillmentStatus:'']"/>
-
-                <!--            delete orderShipment -->
+                <!-- delete orderShipment -->
                 <service-call name="delete#org.apache.ofbiz.order.order.OrderShipment"
                               in-map="orderShipment"/>
             </if>
 
-            <!--Fetch shipGroupSeqId before processing anything -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="currentShipGroup" >
-                <econdition field-name="orderId" from="orderId"/>
-            </entity-find>
+            <!--Fetch shipGroupSeqId of item before processing anything -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
 
-            <set field="shipGroupSeqId" from="currentShipGroup[0].shipGroupSeqId"/>
+            <set field="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
 
             <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
@@ -472,6 +470,10 @@ under the License.
             <set field="orderHistoryMap.eventTypeEnumId" from="ITEM_BKD_REJECTED"/>
             <service-call name="create#co.hotwax.customerservice.order.OrderHistory" in-map="orderHistoryMap"/>
 
+            <!-- Set the facility and fulfillment status in solr doc -->
+            <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
+                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,facilityId:rejectToFacilityId,fulfillmentStatus:'Rejected']"/>
+
             <!--6. Record inventory variance-->
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumMap" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
@@ -480,19 +482,13 @@ under the License.
             <set field="enumType" from="enumMap.enumTypeId"/>
             <set field="varianceQuantity" value="0" type="BigDecimal"/>
 
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="itemSeqId"/>
-            </entity-find-one>
-
             <if condition="enumType.equals('REPORT_NO_VAR')">
-                <return message="Rejection reason is not eligible for setting variance"/>
+                <return message="Item rejected succesfully to facility: $rejectToFacilityId}" type="success"/>
             </if>
 
             <if condition="enumType.equals('REPORT_VAR')">
                 <set field="varianceQuantity" value="1" type="BigDecimal"/>
             </if>
-
             <if condition="enumType.equals('REPORT_ALL_VAR')">
                 <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
                     <field-map field-name="productId" from="orderItem.productId"/>
@@ -509,8 +505,8 @@ under the License.
             </entity-find>
 
             <set field="productFacilityInventoryItemView" from="productFacilityInventoryItemViews[0]"/>
-
             <set field="availableToPromiseVar" type="BigDecimal" from="productFacilityInventoryItemView.availableToPromise"/>
+
             <if condition="varianceQuantity!=null">
                 <if condition="availableToPromiseVar >= varianceQuantity ">
                     <then>
@@ -525,7 +521,7 @@ under the License.
             </if>
             <!--Run the code to record variance -->
 
-            <!--                These details go in a map placed inside 'inventoryItemVariances' list -->
+            <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
             <set field="inventoryItemVariances" from="[]"/>
             <set field="inventoryItemVarianceMap" from="[:]"/>
             <set field="inventoryItemVarianceMap.inventoryItemId" from="productFacilityInventoryItemView.inventoryItemId"/>
@@ -541,13 +537,13 @@ under the License.
                 inventoryItemVariances.add(inventoryItemVarianceMap)
             </script>
 
-            <!--                These go in top level Map - createPhysicalInventoryMap -->
+            <!--  These go in top level Map - createPhysicalInventoryMap -->
             <set field="createPhysicalInventoryMap" from="[:]"/>
             <set field="createPhysicalInventoryMap.physicalInventoryDate" from="ec.user.nowTimestamp" />
             <set field="createPhysicalInventoryMap.partyId" from="ec.user.getUsername()?:ec.user.getUserId().partyId" />
             <set field="createPhysicalInventoryMap.inventoryItemVariances" from="inventoryItemVariances" />
 
-            <!--                Call create Physical Inventory -->
+            <!--  Call create Physical Inventory -->
             <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="createPhysicalInventoryMap" out-map="result"/>
 
         </actions>
