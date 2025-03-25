@@ -171,7 +171,8 @@ under the License.
                         <!-- Used process#OrderItemAllocation since this will also take care of updating indexing added as part of seca on this service -->
                         <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                                 in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
-                                facilityId:shipGroup.facilityId, quantity:orderItem.quantity]"/>
+                                facilityId:shipGroup.facilityId, quantity:orderItem.quantity,
+                                toShipGroupSeqId:shipGroup.shipGroupSeqId]"/>
                     </if>
                 </iterate>
             </iterate>
