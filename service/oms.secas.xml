@@ -16,4 +16,15 @@
                           ignore-error="true" />
         </actions>
     </seca>
+    <!-- Index Transfer Order on creation -->
+    <seca id="TOCreatedIndexOrder" service="co.hotwax.oms.order.TransferOrderServices.create#TransferOrder" when="tx-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <log level="info" message="Creating order index for oms orderId: ${orderId}"/>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
+                    ignore-error="true"/>
+        </actions>
+    </seca>
 </secas>
