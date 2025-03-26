@@ -786,6 +786,7 @@ under the License.
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="lookedUpValue" for-update="true"/>
             <if condition="lookedUpValue">
+                <entity-set value-field="lookedUpValue"/>
                 <set field="computedLastInventoryCount" value="0" type="BigDecimal"/>
                 <set field="lastInventoryCount" from="lookedUpValue.lastInventoryCount" type="BigDecimal" default-value="0"/>
                 <set field="minimumStock" from="lookedUpValue.minimumStock" type="BigDecimal" default-value="0"/>
