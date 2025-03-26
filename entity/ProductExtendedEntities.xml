@@ -39,6 +39,9 @@ under the License.
         <relationship type="one" related="org.apache.ofbiz.product.category.ProductCategory" short-alias="primaryCategory">
             <key-map field-name="primaryProductCategoryId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.product.product.ProductAttribute" short-alias="attributes">
+            <key-map field-name="productId"/>
+        </relationship>
 
         <master>
             <detail relationship="prices"/>
@@ -48,6 +51,7 @@ under the License.
             <detail relationship="keywords"/>
             <detail relationship="categories"/>
             <detail relationship="primaryCategory"/>
+            <detail relationship="attributes"/>
         </master>
     </extend-entity>
 </entities>
