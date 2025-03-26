@@ -75,6 +75,8 @@ under the License.
             </else></if>
 
             <entity-update value-field="inventoryItem"/>
+            <service-call name="co.hotwax.oms.product.ProductServices.update#ProductFacility"
+                          in-map="[productId: inventoryItem.productId, facilityId: inventoryItem.facilityId, lastInventoryCount: inventoryItem.availableToPromiseTotal]" ignore-error="true"/>
             <!--
             <set field="message" from="'========== end update#InventoryItemFromDetail ' + inventoryItemID + ': ' + availableToPromiseDiff + '/' + quantityOnHandDiff + ' :: ' + inventoryItem.availableToPromiseTotal + '/' + inventoryItem.quantityOnHandTotal"/>
             <log message="${message}"/>
