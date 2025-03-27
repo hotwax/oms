@@ -433,13 +433,6 @@
                 </if>
             </if>
             <if condition="fromShipGroupSeqId != toShipGroupSeqId">
-                <!-- FIXME: Backward compatibility code start-->
-            <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGroupAssoc"
-                          in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: fromShipGroupSeqId]"/>
-
-            <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGroupAssoc"
-                          in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: toShipGroupSeqId, quantity: quantity]"/>
-                <!-- FIXME: Backward compatibility code end-->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderItemAdjustments" for-update="true">
                 <econdition field-name="orderId" from="orderId"/>
                 <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
