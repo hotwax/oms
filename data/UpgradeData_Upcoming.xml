@@ -19,6 +19,7 @@
     <moqui.basic.StatusFlow statusFlowId="TO_Fulfill_And_Receive" statusTypeId="ORDER_ITEM_STATUS"  description="Status Flow for Orders to be both fulfilled and received in OMS e.g. Store to Store"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Approve Item"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_FULFILL_RECEIPT" transitionSequence="2" transitionName="Partial Fulfill Item"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL_RECEIPT" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="Fulfill Item"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="Fulfill Item"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="3" transitionName="Receive Item"/>
 </entity-facade-xml>
