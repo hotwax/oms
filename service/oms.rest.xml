@@ -79,6 +79,13 @@ under the License.
                     <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
                 </method>
             </resource>
+            <resource name="soft-allocations">
+                <resource name="reserve-inventory">
+                    <method type="post">
+                        <service name="co.hotwax.oms.impl.OrderReservationServices.reserve#SoftAllocatedInventory"/>
+                    </method>
+                </resource>
+            </resource>
             <resource name="facilityChange">
                 <method type="get">
                     <entity name="co.hotwax.facility.OrderFacilityChange" operation="list"/>
@@ -119,7 +126,7 @@ under the License.
             </resource>
             <resource name="shipmentMethods">
                 <method type="get">
-                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="list"/>
+                    <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMethDetail" operation="list"/>
                 </method>
                 <method type="post">
                     <entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="create"/>
@@ -224,7 +231,7 @@ under the License.
             </resource>
             <resource name="parties">
                 <method type="get">
-                    <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="list"/>
+                    <entity name="org.apache.ofbiz.product.facility.FacilityPartyNameDetail" operation="list"/>
                 </method>
                 <method type="post">
                     <entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="create"/>
@@ -413,10 +420,10 @@ under the License.
             <method type="post"><service name="co.hotwax.oms.carrier.CarrierServices.create#Carrier"/></method>
             <id name="partyId">
                 <resource name="facilities">
-                    <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityParty" operation="list"/></method>
+                    <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityPartyNameDetail" operation="list"/></method>
                 </resource>
                 <resource name="productStoreShipmentMethods">
-                    <method type="get"><entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMeth" operation="list"/></method>
+                    <method type="get"><entity name="org.apache.ofbiz.product.store.ProductStoreShipmentMethDetail" operation="list"/></method>
                 </resource>
                 <resource name="shipmentMethods">
                     <method type="get"><entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" operation="list"/></method>

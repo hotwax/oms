@@ -1,0 +1,19 @@
+<secas xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-eca-3.xsd">
+    <!-- FIXME: This should be done using the DataFeed flow-->
+    <seca id="ProcessOrderItemAllocation" service="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation" when="tx-commit">
+        <condition><expression>allocatedShipGroupSeqId</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+                    ignore-error="true" />
+            <service-call name="co.hotwax.oms.search.SearchServices.index#Reservation" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+                          ignore-error="true" />
+        </actions>
+    </seca>
+    <seca id="CancelReservation" service="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" when="tx-commit">
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.update#OISGIRIFulfillmentStatus"
+                          in-map="context"
+                          ignore-error="true" />
+        </actions>
+    </seca>
+</secas>
