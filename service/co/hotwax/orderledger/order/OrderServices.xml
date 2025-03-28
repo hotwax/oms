@@ -58,15 +58,6 @@ under the License.
             <set field="orderItem.cancelQuantity" value="1"/>
             <entity-update value-field="orderItem"/>
 
-            <!-- Update the orderItemShipGroupAssoc cancel quantity -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="oisga">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find-one>
-            <set field="oisga.cancelQuantity" value="1"/>
-            <entity-update value-field="oisga"/>
-
             <!-- Call create#OrderItemChange service to register the cancellation -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderItemChange" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
                     changeTypeEnumId:'ODR_ITM_CANCEL', reasonEnumId:reasonEnum.enumId, changeComments:comment, cancelQuantity:1,
