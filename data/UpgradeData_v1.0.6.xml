@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="ext-upgrade">
+
+    <!-- Enumeration for product type keyword -->
+    <moqui.basic.Enumeration description="Product Type Enumeration" enumId="KWT_PROD_TYPE" enumTypeId="KEYWORD_TYPE" enumCode="PRODUCT_TYPE"/>
+</entity-facade-xml>
