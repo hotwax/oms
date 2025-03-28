@@ -1,85 +1,259 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
-    <service verb="create" noun="OrderItemInventoryReservation">
+
+    <service verb="get" noun="OrderItemSalesTaxTotal">
+        <description>Get the sales tax total for an order item</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="productId" required="true"/>
-            <parameter name="quantity" type="BigDecimal" required="true"/>
-            <parameter name="facilityId" required="true"/>
-            <parameter name="locationSeqId"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="itemTaxTotal" required="true" type="BigDecimal"/>
+        </out-parameters>
         <actions>
-            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem" in-map="[productId: productId,
-                          facilityId: facilityId]"
-                          out-map="findOrCreateResult"/>
-
-            <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
-
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="orderItemShipGroup">
+            <!-- Validate the order item -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
                 <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
             </entity-find-one>
-
-            <if condition="!orderItemShipGroup">
-                <return error="true" message="Order item ship group not found for orderId [${orderId}] and shipGroupSeqId [${shipGroupSeqId}]"/>
+            <if condition="!orderItem">
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
-            <set field="userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
-            <set field="orderItemShipGrpInvRes" type="NewMap" from="[
-                orderId: orderId,
-                orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: orderItemShipGroup.shipGroupSeqId,
-                inventoryItemId: inventoryItemId,
-                quantity: quantity,
-                userLogin: userLogin
-            ]"/>
 
-            <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="orderItemShipGrpInvRes"/>
+            <set field="itemTaxTotal" from="0.0"/>
 
-            <set field="inventoryItemDetail" type="NewMap" from="[
-                inventoryItemId: inventoryItemId,
-                orderId: orderId,
-                orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: orderItemShipGroup.shipGroupSeqId,
-                availableToPromiseDiff: -quantity,
-                userLogin: ec.user.getUsername()?:ec.user.getUserId()
-            ]"/>
+            <!-- Get the sales tax total for order item using the OrderAdjustment entity -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderAdjustments">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <econdition field-name="orderAdjustmentTypeId" value="SALES_TAX"/>
+                <select-field field-name="amount"/>
+            </entity-find>
+            <if condition="!orderAdjustments">
+                <!-- If no sales tax adjustments are found then return -->
+                <return type="info" message="Sales Tax OrderAdjustment [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+            </if>
 
-            <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="InventoryItemDetailMap"/>
+            <!-- Get the sales tax total amount by adding each adjustment's amount -->
+            <iterate list="orderAdjustments" entry="orderAdjustment">
+                <set field="itemTaxTotal" from="itemTaxTotal.add(orderAdjustment.amount)"/>
+            </iterate>
         </actions>
     </service>
 
-    <service verb="cancel" noun="OrderItemInventoryReservation">
-        <description>Cancel inventory reservations for an order item.</description>
+    <service verb="cancel" noun="OrderItemInvResQty" authenticate="anonymous-all">
+        <description>Cancel inventory reservation for an order item</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="shipGroupSeqId" required="true"/>
-            <parameter name="cancelQuantity" type="BigDecimal" required="true"/>
         </in-parameters>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem">
-                <field-map field-name="inventoryItemId" from="inventoryItemId"/>
-            </entity-find-one>
+            <!-- Find all the reservation records from the OrderItemShipGrpInvRes entity -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="oisgirs">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find>
 
-            <set field="userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
-
-            <if condition="inventoryItem">
-                <set field="createDetailMap" type="NewMap" from="[:]"/>
-                <set field="createDetailMap.inventoryItemId" from="inventoryItem.inventoryItemId"/>
-                <set field="createDetailMap.orderId" from="orderId"/>
-                <set field="createDetailMap.orderItemSeqId" from="orderItemSeqId"/>
-                <set field="createDetailMap.shipGroupSeqId" from="shipGroupSeqId"/>
-                <set field="createDetailMap.availableToPromiseDiff" from="cancelQuantity"/>
-                <set field="createDetailMap.userLogin" from="userLogin"/>
-
-                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="createDetailMap"/>
+            <if condition="!oisgirs">
+                <return type="info" message="Order Reservations [OrderItem ID: ${orderId}:${orderItemSeqId}] - Not found"/>
             </if>
 
-            <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="[orderId: orderId,
-                orderItemSeqId: orderItemSeqId,
-                shipGroupSeqId: shipGroupSeqId,
-                userLogin: userLogin]"/>
+            <!-- Iterate each OISGIR record and delete it; ideally it will have 1 record-->
+            <iterate list="oisgirs" entry="oisgir">
+                <!-- get the inventoryItemId from the OISGIR record, so we can record the changes in InventoryItemDetail -->
+                <set field="inventoryItemId" from="oisgir.inventoryItemId" />
+                <entity-delete value-field="oisgir"/>
+
+                <!-- Call create#InventoryItemDetail inline to register the inventoryItem change and mark it available for reservation -->
+                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp, quantityOnHandDiff:0, availableToPromiseDiff:1, accountingQuantityDiff:0, orderId:orderId, description: 'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId]"/>
+            </iterate>
+
+        </actions>
+    </service>
+
+    <service verb="change" noun="OrderItemStatus">
+        <description>Change the status of a sales order item</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="statusId" required="true"/>
+            <parameter name="changeReason"/>
+            <parameter name="statusDateTime"/>
+            <parameter name="checkCancelCompleteOrder" type="Boolean" default-value="true"/>
+        </in-parameters>
+        <actions>
+            <!-- Get the order item -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <!-- Log and return with error if order item doesn't exist -->
+            <if condition="!orderItem">
+                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+            </if>
+
+            <!-- Update the status of the order item -->
+            <set field="orderItemMap" from="orderItem"/>
+            <set field="orderItemMap.statusId" from="statusId"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="orderItemMap"/>
+
+            <if condition="!statusDateTime">
+                <set field="statusDateTime" from="ec.user.nowTimestamp"/>
+            </if>
+            <!-- Call create#OrderStatus to register the order item cancellation status change event-->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime, statusUserLogin:ec.user.getUsername()]"/>
+
+            <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED when checkCancelCompleteOrder is true-->
+            <if condition="checkCancelCompleteOrder">
+                <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
+                    <!-- Call checkCancelComplete#Order service to confirm if we need to completely cancel or complete the sales order -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId, changeReason:changeReason]"/>
+                </if>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="checkCancelComplete" noun="Order">
+        <description>This service checks if we need to completely cancel or complete a sales order.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="changeReason"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="oldStatusId"/>
+            <parameter name="statusChanged" type="Boolean"/>
+        </out-parameters>
+        <actions>
+            <set field="statusChanged" type="Boolean" value="false"/>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                <econdition field-name="orderId"/>
+            </entity-find>
+            <if condition="!orderItemList">
+                <return type="warning" message="OrderItem [ID: ${orderId}] - Not found"/>
+            </if>
+
+            <set field="allCancelled" type="Boolean" value="true"/>
+            <set field="anyCompleted" type="Boolean" value="false"/>
+            <set field="allCancelledOrCompleted" type="Boolean" value="true"/>
+            <iterate list="orderItemList" entry="curOrderItem">
+                <if condition="curOrderItem.statusId in ['ITEM_REJECTED', 'ITEM_CANCELLED']"><continue/></if>
+                <if condition="curOrderItem.statusId == 'ITEM_COMPLETED'">
+                    <set field="allCancelled" type="Boolean" value="false"/>
+                    <set field="anyCompleted" type="Boolean" value="true"/>
+                    <continue/>
+                </if>
+                <set field="allCancelled" type="Boolean" value="false"/>
+                <set field="allCancelledOrCompleted" type="Boolean" value="false"/>
+            </iterate>
+            <if condition="allCancelled">
+                <then>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
+                </then>
+                <else-if condition="anyCompleted &amp;&amp; allCancelledOrCompleted">
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
+                </else-if>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="change" noun="OrderStatus">
+        <description>This service validates and then changes the status of a sales order</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="statusId" required="true"/>
+            <parameter name="changeReason"/>
+            <parameter name="setItemStatus" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <actions>
+            <!-- Validate the orderHeader record -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader">
+                <return type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
+            </if>
+
+            <!-- Check if statusId is a valid status -->
+            <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
+                <field-map field-name="statusId" from="statusId"/>
+            </entity-find-one>
+            <if condition="!statusItem">
+                <return type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
+            </if>
+
+            <!-- Update the status of the OrderHeader -->
+            <set field="orderHeaderMap" from="orderHeader"/>
+            <set field="orderHeaderMap.statusId" from="statusId"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="orderHeaderMap" />
+
+            <!-- Create OrderStatus record to register the status change -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.getUsername()]"/>
+
+            <if condition="setItemStatus">
+                <!-- If setItemStatus is true then get all the order items -->
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <!-- Iterate through the order items and call change#OrderItemStatus service to update their status as well -->
+                <iterate list="orderItemList" entry="orderItem">
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="find" noun="OrderItemShipGroup">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="facilityId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="shipGroupSeqId"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                                primaryKey: 'facilityTypeId',
+                                childType: facility.facilityTypeId,
+                                parentTypeField: 'parentTypeId',
+                                parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <!-- Since a new ShipGroup is created for each routing attempt,
+                 reuse the existing ShipGroup only if the facility type is "virtual".
+                Additionally, filtering based on the shipment method type may be required in future.
+            -->
+            <if condition="outResult.hasParentType">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="facilityId" from="facilityId"/>
+                    <order-by field-name="shipGroupSeqId DESC"/>
+                </entity-find>
+                <if condition="orderItemShipGroups">
+                    <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
+                    <set field="shipGroupSeqId" from="orderItemShipGroup.shipGroupSeqId"/>
+                    <return/>
+                </if>
+            </if>
         </actions>
     </service>
 
@@ -165,7 +339,7 @@
                 List&lt;EntityValue&gt; orderItemsToReject = entityFind.list();
 
                 orderItemsToReject.each { itemToReject ->
-                ec.service.sync().name("co.hotwax.oms.order.OrderServices.reject#OrderItem")
+                ec.service.sync().name("co.hotwax.oms.impl.OrderReservationServices.reject#OrderItem")
                 .parameter("orderId", itemToReject.orderId)
                 .parameter("orderItemSeqId", itemToReject.orderItemSeqId)
                 .parameter("rejectionReasonId", rejectionReasonId)
@@ -199,7 +373,7 @@
         </out-parameters>
         <actions>
 
-            <!--            Check for shipment rejection -->
+            <!-- Check for shipment rejection -->
             <if condition="shipmentId &amp;&amp; shipmentItemSeqId">
 
                 <!--Fetch the Shipment record using shipmentId.-->
@@ -241,23 +415,21 @@
 
                 <set field="orderShipment" from="orderShipmentList[0]"/>
 
-                <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
-                              in-map="[orderId:orderShipment.orderId,orderItemSeqId:orderShipment.orderItemSeqId,fulfillmentStatus:'']"/>
-
-                <!--            delete orderShipment -->
+                <!-- delete orderShipment -->
                 <service-call name="delete#org.apache.ofbiz.order.order.OrderShipment"
                               in-map="orderShipment"/>
             </if>
 
-            <!--Fetch shipGroupSeqId before processing anything -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="currentShipGroup" >
-                <econdition field-name="orderId" from="orderId"/>
-            </entity-find>
+            <!--Fetch shipGroupSeqId of item before processing anything -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
 
-            <set field="shipGroupSeqId" from="currentShipGroup[0].shipGroupSeqId"/>
+            <set field="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
 
             <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
-            <service-call name="co.hotwax.oms.order.OrderServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
+            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId,
             orderItemSeqId:orderItemSeqId,shipGroupSeqId:shipGroupSeqId,cancelQuantity:1]"/>
 
             <!--2. Move to rejected facility-->
@@ -269,7 +441,7 @@
             <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="currentShipGroup"/>
 
             <!--3. Call create order facility change-->
-            <set field="orderFacilityChangeMap"  type="NewMap" from="[:]"/>
+            <set field="orderFacilityChangeMap" from="[:]"/>
             <set field="orderFacilityChangeMap.orderId" from="orderId"/>
             <set field="orderFacilityChangeMap.facilityId" from="rejectToFacilityId"/>
             <set field="orderFacilityChangeMap.fromFacilityId" from="facilityId"/>
@@ -280,48 +452,43 @@
             <set field="orderFacilityChangeMap.changeUserLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <set field="orderFacilityChangeMap.changeDatetime" from="ec.user.nowTimestamp"/>
             <set field="orderFacilityChangeMap.comments" from="rejectComments"/>
-            <set field="orderFacilityChangeMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.facility.OrderFacilityChange" in-map="orderFacilityChangeMap"/>
 
             <!--4. createUpdateExternalFulfillmentOrderItem-->
-            <set field="createUpdateExternalFulfillmentOrderItemMap"  type="NewMap" from="[:]"/>
+            <set field="createUpdateExternalFulfillmentOrderItemMap" from="[:]"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.orderId" from="orderId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.orderItemSeqId" from="orderItemSeqId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.shipGroupSeqId" from="currentShipGroup.shipGroupSeqId"/>
             <set field="createUpdateExternalFulfillmentOrderItemMap.fulfillmentStatus" value="REJECT"/>
-            <set field="createUpdateExternalFulfillmentOrderItemMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.integration.order.ExternalFulfillmentOrderItem" in-map="createUpdateExternalFulfillmentOrderItemMap"/>
 
             <!--5. createOrderHistory-->
-            <set field="orderHistoryMap"  type="NewMap" from="[:]"/>
+            <set field="orderHistoryMap" from="[:]"/>
             <set field="orderHistoryMap.orderId" from="orderId"/>
             <set field="orderHistoryMap.orderItemSeqId" from="orderItemSeqId"/>
             <set field="orderHistoryMap.shipGroupSeqId" from="currentShipGroup.shipGroupSeqId"/>
             <set field="orderHistoryMap.eventTypeEnumId" from="ITEM_BKD_REJECTED"/>
-            <set field="orderHistoryMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <service-call name="create#co.hotwax.customerservice.order.OrderHistory" in-map="orderHistoryMap"/>
 
+            <!-- Set the facility and fulfillment status in solr doc -->
+            <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
+                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,facilityId:rejectToFacilityId,fulfillmentStatus:'Rejected']"/>
+
             <!--6. Record inventory variance-->
-            <entity-find-one entity-name="org.apache.ofbiz.common.enum.Enumeration" value-field="enumMap" cache="true">
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumMap" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
 
             <set field="enumType" from="enumMap.enumTypeId"/>
             <set field="varianceQuantity" value="0" type="BigDecimal"/>
 
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="itemSeqId"/>
-            </entity-find-one>
-
             <if condition="enumType.equals('REPORT_NO_VAR')">
-                <return message="Rejection reason is not eligible for setting variance"/>
+                <return message="Item rejected succesfully to facility: $rejectToFacilityId}" type="success"/>
             </if>
 
             <if condition="enumType.equals('REPORT_VAR')">
                 <set field="varianceQuantity" value="1" type="BigDecimal"/>
             </if>
-
             <if condition="enumType.equals('REPORT_ALL_VAR')">
                 <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
                     <field-map field-name="productId" from="orderItem.productId"/>
@@ -331,15 +498,15 @@
                 <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
             </if>
 
-            <entity-find entity-name="org.apache.ofbiz.product.inventory.ProductFacilityInventoryItemView" list="productFacilityInventoryItemViews">
+            <entity-find entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" list="productFacilityInventoryItemViews">
                 <econdition field-name="productId" from="orderItem.productId"/>
                 <econdition field-name="facilityId" from="facilityId"/>
                 <econdition field-name="availableToPromise" operator="greater" value="0"/>
             </entity-find>
 
             <set field="productFacilityInventoryItemView" from="productFacilityInventoryItemViews[0]"/>
-
             <set field="availableToPromiseVar" type="BigDecimal" from="productFacilityInventoryItemView.availableToPromise"/>
+
             <if condition="varianceQuantity!=null">
                 <if condition="availableToPromiseVar >= varianceQuantity ">
                     <then>
@@ -347,20 +514,19 @@
                         <set field="varianceQuantity" type="BigDecimal" value="0"/>
                     </then>
                     <else>
-                        <!--                        Variance is greater than atp, what to do ?  Second pass ? -->
+                        <!-- Variance is greater than atp, what to do ?  Second pass ? -->
                         <set field="varianceQuantity" type="BigDecimal" from="varianceQuantity.subtract(availableToPromiseVar)"/>
                     </else>
                 </if>
             </if>
             <!--Run the code to record variance -->
 
-            <!--                These details go in a map placed inside 'inventoryItemVariances' list -->
-            <set field="inventoryItemVariances"  type="NewList" from="[]"/>
-            <set field="inventoryItemVarianceMap"  type="NewMap" from="[:]"/>
+            <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
+            <set field="inventoryItemVariances" from="[]"/>
+            <set field="inventoryItemVarianceMap" from="[:]"/>
             <set field="inventoryItemVarianceMap.inventoryItemId" from="productFacilityInventoryItemView.inventoryItemId"/>
             <set field="inventoryItemVarianceMap.varianceReasonId" from="rejectionReasonId"/>
             <set field="inventoryItemVarianceMap.comments" from="rejectComments"/>
-            <set field="inventoryItemVarianceMap.userLogin" from="ec.user.getUsername()?:ec.user.getUserId()"/>
             <set field="inventoryItemVarianceMap.availableToPromiseVar" from="availableToPromiseVar.negate()"/>
 
             <if condition="updateQOH">
@@ -371,47 +537,15 @@
                 inventoryItemVariances.add(inventoryItemVarianceMap)
             </script>
 
-            <!--                These go in top level Map - createPhysicalInventoryMap -->
-            <set field="createPhysicalInventoryMap"  type="NewMap" from="[:]"/>
+            <!--  These go in top level Map - createPhysicalInventoryMap -->
+            <set field="createPhysicalInventoryMap" from="[:]"/>
             <set field="createPhysicalInventoryMap.physicalInventoryDate" from="ec.user.nowTimestamp" />
             <set field="createPhysicalInventoryMap.partyId" from="ec.user.getUsername()?:ec.user.getUserId().partyId" />
             <set field="createPhysicalInventoryMap.inventoryItemVariances" from="inventoryItemVariances" />
 
-            <!--                Call create Physical Inventory -->
+            <!--  Call create Physical Inventory -->
             <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="createPhysicalInventoryMap" out-map="result"/>
 
-        </actions>
-    </service>
-
-    <service verb="findOrCreate" noun="OrderItemShipGroup">
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="facilityId" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="orderItemShipGroup" type="Map"/>
-        </out-parameters>
-        <actions>
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups" cache="true">
-                <econdition field-name="orderId" from="orderId"/>
-                <econdition field-name="facilityId" from="facilityId"/>
-                <order-by field-name="shipGroupSeqId DESC"/>
-            </entity-find>
-
-            <if condition="orderItemShipGroups">
-                <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
-                <else>
-                    <!--                    No need to generate nextseqId
-                                        <set field="shipGroupSeqId" from="ec.nextSeqId('OrderItemShipGroup')"/>-->
-                    <set field="orderItemShipGroupMap" type="NewMap" from="[
-              orderId: orderId,
-              shipGroupSeqId: shipGroupSeqId,
-              facilityId: facilityId,
-              userLogin: ec.user.getUsername()?:ec.user.getUserId()
-          ]"/>
-                    <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="orderItemShipGroup"/>
-                </else>
-            </if>
         </actions>
     </service>
 </services>

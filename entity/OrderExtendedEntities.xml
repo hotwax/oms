@@ -39,6 +39,12 @@ under the License.
         <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemShipGroup" short-alias="shipGroups">
             <key-map field-name="orderId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderStatus" short-alias="statuses">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="co.hotwax.order.OrderIdentification" short-alias="identifications">
+            <key-map field-name="orderId"/>
+        </relationship>
         <!-- Adding at order level for exchange orders where orderItemSeqId="_NA_" -->
         <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAssoc" short-alias="itemAssocs">
             <key-map field-name="orderId"/>
@@ -52,6 +58,8 @@ under the License.
             <detail relationship="attributes"/>
             <detail relationship="notes"/>
             <detail relationship="shipGroups" use-master="default"/>
+            <detail relationship="statuses"/>
+            <detail relationship="identifications"/>
             <detail relationship="itemAssocs"/>
         </master>
     </extend-entity>
@@ -90,7 +98,7 @@ under the License.
         </master>
     </extend-entity>
     <extend-entity entity-name="OrderContactMech" package="org.apache.ofbiz.order.order">
-        <relationship type="one-nofk" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
+        <relationship type="one" related="org.apache.ofbiz.party.contact.ContactMech" short-alias="contactMech">
             <key-map field-name="contactMechId"/>
         </relationship>
         <relationship type="one-nofk" related="org.apache.ofbiz.party.contact.PostalAddress" short-alias="postalAddress">

@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="create" noun="OrderItemInventoryReservation">
+        <description>
+            This service creates an InventoryItemDetail record only for the specified order and item with the given quantity at the specified facility.
+            It also creates OrderItemShipGrpInvRes records but does not perform any additional inventory adjustments or processing.
+
+            Additionally, this service handles marketing package item reservations. In the case of a marketing package,
+            the system creates reservation records for both the package and its components.
+            The component quantity is determined by multiplying the reservation quantity with the component’s required quantity,
+            and the corresponding OrderItemShipGrpInvRes records are created accordingly.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="quantity" type="BigDecimal" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <if condition="!orderItem">
+                <return error="true" message="Order item [${orderId}:${orderItemSeqId}] not found."/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
+                <field-map field-name="productId" from="orderItem.productId"/>
+            </entity-find-one>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                    in-map="[entityName: 'org.apache.ofbiz.product.product.ProductType',
+                    primaryKey: 'productTypeId',
+                    childType: product?.productTypeId,
+                    parentTypeField: 'parentTypeId',
+                    parentType: 'MARKETING_PKG_PICK']" out-map="outResult"/>
+
+            <set field="products" from="[[productId: orderItem.productId, quantity: quantity]]"/>
+            <if condition="outResult.hasParentType">
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
+                    <econdition field-name="productId" from="orderItem.productId"/>
+                    <econdition field-name="productAssocTypeId" value="PRODUCT_COMPONENT"/>
+                    <date-filter/>
+                </entity-find>
+                <iterate list="components" entry="component">
+                    <set field="componentQty" from="(component.quantity?:1) * quantity" type="BigDecimal"/>
+                    <script>
+                        products.add([productId: component.productIdTo, quantity: componentQty])
+                    </script>
+                </iterate>
+            </if>
+            <iterate list="products" entry="item">
+                <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                        in-map="[productId: item.productId, facilityId: orderItem.facilityId]"
+                        out-map="findOrCreateResult"/>
+
+                <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+                <set field="orderItemShipGrpInvRes" from="[orderId: orderId,
+                        orderItemSeqId: orderItemSeqId,
+                        shipGroupSeqId: orderItem.shipGroupSeqId,
+                        inventoryItemId: inventoryItemId,
+                        quantity: item.quantity,
+                        reservedDatetime: ec.user.nowTimestamp]"/>
+
+                <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                        in-map="orderItemShipGrpInvRes"/>
+
+                <set field="inventoryItemDetail" from="[
+                        inventoryItemId: inventoryItemId,
+                        orderId: orderId,
+                        orderItemSeqId: orderItemSeqId,
+                        shipGroupSeqId: orderItem.shipGroupSeqId,
+                        availableToPromiseDiff: quantity.negate(),
+                        effectiveDate: ec.user.nowTimestamp]"/>
+
+                <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
+                        in-map="inventoryItemDetail"/>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="cancel" noun="OrderItemInventoryReservation">
+        <description>
+            This service cancels inventory reservations for an order item.
+            It handles both finished goods and marketing package items.
+
+            For finished goods: Deletes the OrderItemShipGrpInvRes records. Increases the available-to-promise (ATP) inventory accordingly.
+            For marketing packages: Deletes the OrderItemShipGrpInvRes records for both the package and its components. Increases the ATP inventory for the respective inventory items.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="cancelQuantity" type="BigDecimal" required="true" default-value="1"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
+                <field-map field-name="productId" from="orderItem.productId"/>
+            </entity-find-one>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                    in-map="[entityName: 'org.apache.ofbiz.product.product.ProductType',
+                            primaryKey: 'productTypeId',
+                            childType: product?.productTypeId,
+                            parentTypeField: 'parentTypeId',
+                            parentType: 'MARKETING_PKG_PICK']" out-map="outResult"/>
+
+            <set field="reservedItems" from="[]"/>
+            <if condition="outResult.hasParentType">
+                <entity-find entity-name="co.hotwax.oms.order.OrderItemReservation" list="reservations">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                </entity-find>
+                <iterate list="reservations" entry="reservation">
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
+                        <econdition field-name="productId" from="orderItem.productId"/>
+                        <econdition field-name="productIdTo" from="reservation.reservedProductId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_COMPONENT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <set field="component" from="components?components[0]: null"/>
+                    <if condition="component">
+                        <set field="cancelReservedQty" from="(component.quantity?:1) * cancelQuantity" type="BigDecimal"/>
+                        <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
+                        <else>
+                            <set field="remainingQty" from="reservation.reservedQty - cancelQuantity" type="BigDecimal"/>
+                        </else>
+                    </if>
+                    <script>
+                        reservedItems.add([productId: reservation.reservedProductId, cancelQuantity: cancelReservedQty, remainingQty: remainingQty])
+                    </script>
+                </iterate>
+                <else>
+                    <script>
+                        reservedItems.add([productId: orderItem.productId, cancelQuantity: cancelQuantity, remainingQty: 0.0])
+                    </script>
+                </else>
+            </if>
+            <iterate list="reservedItems" entry="reservedItem">
+                <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                        in-map="[productId: reservedItem.productId, facilityId: orderItem.facilityId]"
+                        out-map="findOrCreateResult"/>
+
+                <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+
+                <set field="createDetailMap" from="[:]"/>
+                <set field="createDetailMap.inventoryItemId" from="inventoryItemId"/>
+                <set field="createDetailMap.orderId" from="orderId"/>
+                <set field="createDetailMap.orderItemSeqId" from="orderItemSeqId"/>
+                <set field="createDetailMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
+                <set field="createDetailMap.availableToPromiseDiff" from="reservedItem.cancelQuantity"/>
+
+                <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail" in-map="createDetailMap"/>
+                <if condition="(reservedItem.remainingQty).compareTo(BigDecimal.ZERO) > 0">
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                            in-map="[orderId: orderId,
+                                    orderItemSeqId: orderItemSeqId,
+                                    inventoryItemId: inventoryItemId,
+                                    shipGroupSeqId: orderItem.shipGroupSeqId,
+                                    quantity: reservedItem.remainingQty]"/>
+                <else>
+                    <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                            in-map="[orderId: orderId,
+                                    orderItemSeqId: orderItemSeqId,
+                                    inventoryItemId: inventoryItemId,
+                                    shipGroupSeqId: orderItem.shipGroupSeqId]"/>
+                </else>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="increase" noun="FacilityOrderCount">
+        <description>
+            This service increases the order count for a specific facility on a given date.
+            It either updates an existing record for the facility's order count or creates a new record if none exists for the current date.
+        </description>
+        <in-parameters>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="count" default-value="1" type="Long"/>
+        </in-parameters>
+        <actions>
+            <script>
+                import java.time.format.DateTimeFormatter
+                String entryDate = ec.user.nowTimestamp.toLocalDateTime().toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-d"))
+            </script>
+            <entity-find-one entity-name="co.hotwax.facility.FacilityOrderCount" value-field="facilityOrderCount">
+                <field-map field-name="facilityId" from="facilityId"/>
+                <field-map field-name="entryDate" from="entryDate"/>
+            </entity-find-one>
+            <if condition="facilityOrderCount">
+                <set field="lastOrderCount" from="facilityOrderCount.lastOrderCount" default-value="0" type="Long"/>
+                <set field="count" from="count + lastOrderCount" type="Long"/>
+                <service-call name="update#co.hotwax.facility.FacilityOrderCount"
+                              in-map="[facilityId: facilityId, entryDate: entryDate, lastOrderCount: count]"/>
+                <else>
+                    <service-call name="create#co.hotwax.facility.FacilityOrderCount"
+                                  in-map="[facilityId: facilityId, entryDate: entryDate, lastOrderCount: count]"/>
+                </else>
+            </if>
+        </actions>
+    </service>
+
+
+    <!--
+    * Allocate items to a specific facility within an order.
+    * Move items to the appropriate ship group.
+    * Perform item reservation.
+    * If an item is not on a non-virtual facility, it will throw an error.
+    * If an item is already allocated to the given facility, it will return success.
+    * Input Parameters:
+    * The service accepts the following input parameters:
+    * - orderId: The ID of the order for which allocation is being performed.
+    * - facilityAllocation: An array of objects, each representing the allocation of items to a specific facility.
+    *   Each object contains the following information:
+    *  - - facilityId: The ID of the facility to which items are allocated.
+    *  - - items: An array of item objects, each with the following details:
+    *  - - orderItemSeqId: The sequence ID of the order item.
+    *  - - quantity: The quantity of the item to allocate.
+    * Here's a sample JSON representation of the input parameters:
+    json
+        {
+            "orderId": "105",
+            "externalOrderId": "",
+            "facilityAllocation": [
+                {
+                    "facilityId": "1",
+                    "routingGroupId": '',
+                    "orderRoutingId": '',
+                    "routingRuleId": '',
+                    "routingRunId": ''
+                    "changeReasonEnumId": '',
+                    "suggestedShipMethodTypeId": '',
+                    "items": [
+                        {
+                            "orderItemSeqId": "00101",
+                            "quantity": 1,
+                            "comments": ''
+                        },
+                        {
+                            "orderItemSeqId": "00102",
+                            "quantity": 1
+                        }
+                    ]
+                },
+                {
+                    "facilityId": "10",
+                    "routingGroupId": '',
+                    "orderRoutingId": '',
+                    "routingRuleId": '',
+                    "routingRunId": ''
+                    "changeReasonEnumId": '',
+                    "suggestedShipMethodTypeId": '',
+                    "items": [
+                        {
+                            "orderItemSeqId": "00103",
+                            "quantity": 1,
+                        }
+                    ]
+                }
+            ]
+        }
+    * The service should validate the input parameters,
+    * check the item's current facility status, allocate the items to the specified facility, and perform item reservations as necessary.
+    * If an item is already allocated to the given facility, it should return a success response,
+    * and if an item is on a virtual facility or any other error condition occurs, it should throw an error.
+    -->
+    <service verb="process" noun="OrderFacilityAllocation" transaction-timeout="120">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="facilityAllocation" type="List" required="true">
+                <parameter name="facilityAllocationMap" type="Map" required="true">
+                    <parameter name="facilityId" required="true"/>
+                    <parameter name="items" type="List" required="true">
+                        <parameter name="itemMap" type="Map">
+                            <parameter name="orderItemSeqId"/>
+                            <parameter name="quantity" type="Integer"/>
+                            <parameter name="comments"/>
+                        </parameter>
+                    </parameter>
+                    <parameter name="routingGroupId"/>
+                    <parameter name="orderRoutingId"/>
+                    <parameter name="routingRuleId"/>
+                    <parameter name="routingRunId"/>
+                    <parameter name="suggestedShipMethodTypeId"/>
+                    <parameter name="changeReasonEnumId"/>
+                </parameter>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="allocatedFacilityList" type="List">
+                <parameter name="allocatedFacility" type="Map">
+                    <parameter name="facilityId"/>
+                    <parameter name="shipGroupSeqId"/>
+                </parameter>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+            <if condition="!orderHeader">
+                <return error="true" message="Order [ID: ${orderId}] not found."/>
+            </if>
+            <if condition="'ORDER_APPROVED' != orderHeader.statusId">
+                <return error="true" message="Order [ID: ${orderId}] not in approved status."/>
+            </if>
+            <set field="allocatedFacilityList" from="[]"/>
+            <set field="allocatedFacilityIds" from="[] as Set"/>
+            <iterate list="facilityAllocation" entry="allocation">
+                <set field="facilityId" from="allocation.facilityId"/>
+                <set field="toShipGroupSeqId" from="null"/>
+                <set field="allocatedItems" from="allocation.items" type="List"/>
+                <set field="orderFacilityChangeMap" from="[
+                        changeReasonEnumId: allocation.changeReasonEnumId,
+                        routingRule: allocation.routingRule,
+                        routingGroupId: allocation.routingGroupId,
+                        orderRoutingId: allocation.orderRoutingId,
+                        routingRuleId: allocation.routingRuleId,
+                        routingRunId: allocation.routingRunId,
+                        suggestedShipMethodTypeId: allocation.suggestedShipMethodTypeId,
+                        comments: allocation.comments
+                        ]"/>
+                <iterate list="allocatedItems" entry="allocatedItem">
+                    <set field="allocatedItem.toShipGroupSeqId" from="toShipGroupSeqId"/>
+                    <set field="allocatedItem.facilityId" from="facilityId"/>
+                    <set field="allocatedItem.orderId" from="orderId"/>
+                    <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                  in-map="allocation + allocatedItem + [orderFacilityChange: orderFacilityChangeMap]" out-map="outMap"/>
+                    <if condition="outMap.allocatedShipGroupSeqId">
+                        <set field="toShipGroupSeqId" from="outMap.allocatedShipGroupSeqId"/>
+                        <script>
+                            allocatedFacilityList.add([facilityId: facilityId, shipGroupSeqId:toShipGroupSeqId])
+                            allocatedFacilityIds.add(facilityId);
+                        </script>
+                    </if>
+                </iterate>
+            </iterate>
+            <iterate list="allocatedFacilityIds" entry="allocatedFacilityId">
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.increase#FacilityOrderCount"
+                              in-map="[facilityId: allocatedFacilityId, shipGroupSeqId: shipGroupSeqId]" ignore-error="true"/>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="process" noun="OrderItemAllocation">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="quantity" type="BigDecimal" default-value="1"/>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="autoCancelDate" type="Timestamp"/>
+            <parameter name="clearAutoCancelDate" type="Boolean" default-value="false"/>
+            <parameter name="toShipGroupSeqId"/>
+            <parameter name="orderFacilityChange" type="Map">
+                <parameter name="changeReasonEnumId"/>
+                <parameter name="routingRule"/>
+                <parameter name="routingGroupId"/>
+                <parameter name="orderRoutingId"/>
+                <parameter name="routingRuleId"/>
+                <parameter name="routingRunId"/>
+                <parameter name="suggestedShipMethodTypeId"/>
+                <parameter name="comments"/>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="allocatedShipGroupSeqId"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem"/>
+            <if condition="!orderItem">
+                <return error="true" message="Order Item [${orderId}:${orderItemSeqId}] not found"/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="fromShipGroup">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+            </entity-find-one>
+            <!--
+                Check if the OrderItem is not at a virtual facility.
+                If it's already reserved at a different facility, do not allocate inventory again to prevent double reservation.
+            -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="fromFacility" cache="true">
+                <field-map field-name="facilityId" from="fromShipGroup.facilityId"/>
+            </entity-find-one>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                            primaryKey: 'facilityTypeId',
+                            childType: fromFacility?.facilityTypeId,
+                            parentTypeField: 'parentTypeId',
+                            parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <!-- If the OrderItem is already allocated at facilityId, do not reallocate.
+            Instead, verify if the auto-cancel date scenario applies and update the OrderItem accordingly. -->
+            <set field="fromShipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
+            <if condition="outResult.hasParentType &amp;&amp; facilityId == fromShipGroup?.facilityId">
+                <log level="warn" message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
+                <if condition="autoCancelDate || clearAutoCancelDate">
+                    <set field="serviceInCtx" from="[orderId: orderId, orderItemSeqId: orderItemSeqId]"/>
+                    <if condition="clearAutoCancelDate">
+                        <set field="serviceInCtx.autoCancelDate" from="null"/>
+                        <else-if condition="autoCancelDate">
+                            <set field="serviceInCtx.autoCancelDate" from="autoCancelDate"/>
+                        </else-if>
+                    </if>
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="serviceInCtx"/>
+                </if>
+                <return message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="toFacility" cache="true">
+                <field-map field-name="facilityId" from="facilityId"/>
+            </entity-find-one>
+            <if condition="!toFacility">
+                <return error="true" message="Facility [ID: ${facilityId} not found"/>
+            </if>
+            <!-- If toShipGroupSeqId pass as service in param use it -->
+            <if condition="!toShipGroupSeqId">
+                <!--
+                    Find the OrderItemShipGroup.
+                    If the item is allocated to a virtual facility, the find#OrderItemShipGroup service returns the existing ship group sequence ID.
+                -->
+                <service-call name="co.hotwax.oms.order.OrderServices.find#OrderItemShipGroup"
+                          in-map="[orderId: orderId, facilityId: facilityId]" out-map="outMap"/>
+                <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
+                <!-- Create a new ship group and copy the fields from the original ship group sequence ID.-->
+                <if condition="!toShipGroupSeqId">
+                    <set field="serviceInCtx" from="fromShipGroup.getValueMap()" />
+                    <script>
+                        serviceInCtx.remove("shipGroupSeqId");
+                    </script>
+                    <set field="serviceInCtx.facilityId" from="facilityId"/>
+                    <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGroup"
+                                  in-map="serviceInCtx" out-map="outMap"/>
+                    <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
+                </if>
+            </if>
+            <if condition="fromShipGroupSeqId != toShipGroupSeqId">
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderItemAdjustments" for-update="true">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                <econdition field-name="shipGroupSeqId" from="fromShipGroupSeqId"/>
+            </entity-find>
+            <iterate list="orderItemAdjustments" entry="orderItemAdjustment">
+                <set field="orderItemAdjustment.shipGroupSeqId" from="toShipGroupSeqId"/>
+                <entity-update value-field="orderItemAdjustment"/>
+            </iterate>
+            </if>
+            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
+                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
+                            primaryKey: 'facilityTypeId',
+                            childType: toFacility?.facilityTypeId,
+                            parentTypeField: 'parentTypeId',
+                            parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <!-- Do not perform inventory reservation if destination facility is virtual facility -->
+            <if condition="!clearAutoCancelDate &amp;&amp; !outResult.hasParentType">
+                <set field="clearAutoCancelDate" value="true" type="Boolean"/>
+            </if>
+            <if condition="autoCancelDate || clearAutoCancelDate || fromShipGroupSeqId != toShipGroupSeqId">
+                <set field="serviceInCtx" from="[orderId: orderId, orderItemSeqId: orderItemSeqId, shipGroupSeqId: toShipGroupSeqId]"/>
+                <if condition="clearAutoCancelDate">
+                    <set field="serviceInCtx.autoCancelDate" from="null"/>
+                    <else-if condition="autoCancelDate">
+                        <set field="serviceInCtx.autoCancelDate" from="autoCancelDate"/>
+                    </else-if>
+                </if>
+                <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
+                              in-map="serviceInCtx"/>
+            </if>
+            <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
+
+            <if condition="!outResult.hasParentType">
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
+                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:quantity ]"/>
+            </if>
+            <if condition="fromShipGroupSeqId != toShipGroupSeqId">
+            <set field="orderFacilityChangeMap" from="orderFacilityChange?:[:]"/>
+            <set field="orderFacilityChangeMap.orderId" from="orderId"/>
+            <set field="orderFacilityChangeMap.orderItemSeqId" from="orderItemSeqId"/>
+            <set field="orderFacilityChangeMap.facilityId" from="facilityId"/>
+            <set field="orderFacilityChangeMap.shipGroupSeqId" from="toShipGroupSeqId"/>
+            <set field="orderFacilityChangeMap.fromFacilityId" from="fromFacility.facilityId"/>
+            <set field="orderFacilityChangeMap.shipmentMethodTypeId" from="orderFacilityChangeMap.suggestedShipMethodTypeId"/>
+            <set field="orderFacilityChangeMap.routerUserLogin" from="ec.user.username"/>
+            <set field="orderFacilityChangeMap.changeUserLogin" from="ec.user.username"/>
+            <set field="orderFacilityChangeMap.changeDatetime" from="ec.user.nowTimestamp"/>
+
+            <service-call name="create#co.hotwax.facility.OrderFacilityChange"
+                          in-map="orderFacilityChangeMap"/>
+            </if>
+        </actions>
+    </service>
+    <service verb="reserve" noun="SoftAllocatedInventory">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+            <if condition="!('SALES_ORDER.equals(orderHeader?.orderTypeId)' || 'TRANSFER_ORDER.equals(orderHeader?.orderTypeId)')">
+                <return error="true" message="[Order Id: ${orderId}] Inventory reservation not enabled for ${orderHeader?.orderTypeId} "/>
+            </if>
+            <entity-find-related-one value-field="orderHeader" relationship-name="org.apache.ofbiz.product.store.ProductStore" to-value-field="productStore" cache="true"/>
+            <if condition="'N'.equalsIgnoreCase(productStore?.reserveInventory)">
+                <return message="[Order Id: ${orderId}] Inventory reservation not enabled for product store ID ${productStore.productStoreId}"/>
+            </if>
+            <entity-find entity-name="co.hotwax.oms.order.OrderItemAndReservation" list="softAllocations" distinct="true">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="statusId" value="ORDER_APPROVED"/>
+                <econdition field-name="itemStatusId" value="ITEM_APPROVED"/>
+                <econdition field-name="inventoryItemId" operator="is-null"/>
+                <select-field field-name="orderId,shipGroupSeqId,facilityId"/>
+            </entity-find>
+            <log message="==softAllocations==${softAllocations}="/>
+            <iterate list="softAllocations" entry="softAllocation">
+                <entity-find entity-name="co.hotwax.oms.order.OrderItemAndReservation" list="items">
+                    <econdition field-name="orderId" from="softAllocation.orderId"/>
+                    <econdition field-name="shipGroupSeqId" from="softAllocation.shipGroupSeqId"/>
+                    <econdition field-name="itemStatusId" value="ITEM_APPROVED"/>
+                    <econdition field-name="inventoryItemId" operator="is-null"/>
+                </entity-find>
+                <iterate list="items" entry="item">
+                    <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                  in-map="[orderId: item.orderId, orderItemSeqId:item.orderItemSeqId, facilityId: item.facilityId, quantity: item.quantity, toShipGroupSeqId: item.shipGroupSeqId]" out-map="outMap"/>
+                </iterate>
+            </iterate>
+        </actions>
+    </service>
+</services>
