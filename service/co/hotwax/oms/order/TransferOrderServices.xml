@@ -131,7 +131,6 @@ under the License.
         <actions>
             <!-- Get Order Header -->
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
-            <set field="statusFlowId" from="orderHeader?.statusFlowId"/>
 
             <if condition="'ORDER_APPROVED'.equals(orderHeader.statusId)">
                 <return error="true" message="Order [ID: ${orderId}] is already in Approved status."/>
@@ -150,21 +149,42 @@ under the License.
                 <entity-find-related value-field="shipGroup" relationship-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList"/>
 
                 <iterate list="orderItemList" entry="orderItem">
-                    <!-- Get the next valid Order Item Status -->
-                    <service-call name="co.hotwax.oms.order.TransferOrderServices.get#ValidOrderItemStatus" 
-                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId]" out-map="itemStatusOut"/>
+                    <!-- Get the next valid Order Item Status start -->
+                    <!-- Get the Status Flow Transitions for the current item status -->
+                    <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
+                        <econdition field-name="statusFlowId" from="orderHeader.statusFlowId"/>
+                        <econdition field-name="statusId" from="orderItem.statusId"/>
+                        <order-by field-name="transitionSequence"/>
+                    </entity-find>
+                    <!-- Here we set the status from the first valid status transition either with or without the
+                    conditionExpression if defined -->
+                    <iterate list="statusFlowTransitionList" entry="statusFlowTransition">
+                        <if condition="statusFlowTransition.conditionExpression"><then>
+                            <if condition="ec.resource.condition(statusFlowTransition.conditionExpression, '')">
+                                <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                                <break/>
+                            </if>
+                        </then><else>
+                            <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                            <break/>
+                        </else></if>
+                    </iterate>
+                    <!-- NOTE Extracting the next valid item status into separate service does not help in scenario say ship#Shipment
+                            where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
+                            does not get set as expected in the extracted service. -->
+                    <!-- Get the next valid Order Item Status end -->
 
-                    <if condition="!itemStatusOut">
+                    <if condition="!toItemStatusId">
                         <return type="warning" message="Cannot Approve Order ID [${orderId}] - No Valid Status Flow transition found for Item [ID: ${orderItem.orderItemSeqId}] Status [ID: ${orderItem.statusId} update.]"/>
                     </if>
 
                     <!-- Update the order item status -->
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
                             in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
-                            statusId:itemStatusOut.toItemStatusId, checkCancelCompleteOrder:false]"/>
+                            statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
 
                     <!-- Perform order item reservation if next order item status is ITEM_PENDING_FULFILL -->
-                    <if condition="'ITEM_PENDING_FULFILL'.equals(itemStatusOut.toItemStatusId)">
+                    <if condition="'ITEM_PENDING_FULFILL'.equals(toItemStatusId)">
                         <!-- Check if multiple times reservation done if order approved again,
                                 - done, this returns error for duplicate entry of OISGR, so this should be good. -->
                         <!-- Used process#OrderItemAllocation since this will also take care of updating indexing added as part of seca on this service -->
@@ -177,52 +197,6 @@ under the License.
             </iterate>
             <!-- NOTE: separate indexing for order not required for change in status, the process#OrderItemAllocation has seca
                     to run index#OrderItem and index#Reservation which is taking care of indexing the order and item updates in Solr -->
-        </actions>
-    </service>
-
-    <service verb="get" noun="ValidOrderItemStatus">
-        <description>
-            Get the next eligible Order Item Status from StatusFlowTransition using current Order Item status
-            and Order Header Status Flow Id.
-        </description>
-        <in-parameters>
-            <parameter name="orderId" required="true">
-                <description>The ID of the Transfer Order in OMS.</description>
-            </parameter>
-            <parameter name="orderItemSeqId" required="true">
-                <description>The ID of the Order Item in OMS.</description>
-            </parameter>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="toItemStatusId"/>
-        </out-parameters>
-        <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem"/>
-
-            <!-- Get the statusFlowId from OrderHeader -->
-            <entity-find-related-one value-field="orderItem" relationship-name="org.apache.ofbiz.order.order.OrderHeader" to-value-field="orderHeader"/>
-            <set field="statusFlowId" from="orderHeader.statusFlowId"/>
-
-            <!-- Get the Status Flow Transitions for the current item status -->
-            <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
-                <econdition field-name="statusFlowId"/>
-                <econdition field-name="statusId" from="orderItem.statusId"/>
-                <order-by field-name="transitionSequence"/>
-            </entity-find>
-
-            <!-- NOTE: Here we set the status from the first valid status transition either with or without the
-                    conditionExpression if defined -->
-            <iterate list="statusFlowTransitionList" entry="statusFlowTransition">
-                <if condition="statusFlowTransition.conditionExpression"><then>
-                    <if condition="ec.resource.condition(statusFlowTransition.conditionExpression, '')">
-                        <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
-                        <break/>
-                    </if>
-                </then><else>
-                    <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
-                    <break/>
-                </else></if>
-            </iterate>
         </actions>
     </service>
 </services>
