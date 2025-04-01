@@ -507,7 +507,6 @@
                 <econdition field-name="inventoryItemId" operator="is-null"/>
                 <select-field field-name="orderId,shipGroupSeqId,facilityId"/>
             </entity-find>
-            <log message="==softAllocations==${softAllocations}="/>
             <iterate list="softAllocations" entry="softAllocation">
                 <entity-find entity-name="co.hotwax.oms.order.OrderItemAndReservation" list="items">
                     <econdition field-name="orderId" from="softAllocation.orderId"/>
