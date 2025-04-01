@@ -54,12 +54,17 @@ under the License.
                     <method type="put">
                         <entity name="org.apache.ofbiz.order.order.OrderItem" operation="update"/>
                     </method>
-                    <resource name="allocation">
+                    <resource name="reservation">
                         <method type="delete">
                             <service name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"/>
                         </method>
                         <method type="post">
                             <service name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"/>
+                        </method>
+                    </resource>
+                    <resource name="allocation">
+                        <method type="post">
+                            <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"/>
                         </method>
                     </resource>
                 </id>
