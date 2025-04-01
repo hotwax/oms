@@ -16,8 +16,8 @@
                           ignore-error="true" />
         </actions>
     </seca>
-    <!-- Index Transfer Order on creation -->
-    <seca id="TOCreatedIndexOrder" service="co.hotwax.oms.order.TransferOrderServices.create#TransferOrder" when="tx-commit">
+    <!-- Index Order on creation -->
+    <seca id="OrderCreatedIndexOrder" service="create#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
         <condition>
             <expression>orderId</expression>
         </condition>
