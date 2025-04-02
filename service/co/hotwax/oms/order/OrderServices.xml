@@ -339,7 +339,7 @@ under the License.
                 List&lt;EntityValue&gt; orderItemsToReject = entityFind.list();
 
                 orderItemsToReject.each { itemToReject ->
-                ec.service.sync().name("co.hotwax.oms.impl.OrderReservationServices.reject#OrderItem")
+                ec.service.sync().name("co.hotwax.oms.order.OrderServices.reject#OrderItem")
                 .parameter("orderId", itemToReject.orderId)
                 .parameter("orderItemSeqId", itemToReject.orderItemSeqId)
                 .parameter("rejectionReasonId", rejectionReasonId)
@@ -372,6 +372,17 @@ under the License.
             <parameter name="cancelledReservations" type="Map"/>
         </out-parameters>
         <actions>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderItemSeqId"/>
+            </entity-find>
+
+            <if condition="orderShipmentList">
+                <set field="orderShipment" from="orderShipmentList[0]"/>
+                <set field="shipmentId" from="orderShipment.shipmentId" />
+                <set field="shipmentItemSeqId" from="orderShipment.shipmentItemSeqId" />
+            </if>
 
             <!-- Check for shipment rejection -->
             <if condition="shipmentId &amp;&amp; shipmentItemSeqId">
