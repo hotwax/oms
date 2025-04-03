@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade-dev">
+    <!-- NOTE For now transition to ITEM_PENDING_FULFILL or ITEM_PENDING_FULFILL_RECEIPT is identified by transitionName="Created"
+            Todo if required change it to PendingFulfill but only when indexing in Solr being done in approve transfer order for all TO scenarios
+                and change the corresponding query in Fulfillment app -->
+
     <!-- New Status Item to be used in Transfer Order items lifecycle -->
     <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILL" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
     <moqui.basic.StatusItem statusId="ITEM_PENDING_RECEIPT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_RECEIPT" description="Pending Receipt"/>
@@ -7,20 +11,20 @@
 
     <!-- Status Flow for Transfer Orders to be fulfilled only in OMS -->
     <moqui.basic.StatusFlow statusFlowId="TO_Fulfill_Only" statusTypeId="ORDER_ITEM_STATUS" description="Status Flow for Transfer Orders to be fulfilled in OMS and receiving by third party e.g. Store to Warehouse"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_Only" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="PendingFulfill"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_Only" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Created"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_Only" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Completed" conditionExpression="isItemPendingFulfill == false"/>
 
     <!-- Status Flow for Transfer Orders to be only received in OMS -->
     <moqui.basic.StatusFlow statusFlowId="TO_Receive_Only" statusTypeId="ORDER_ITEM_STATUS" description="Status Flow for Transfer Orders fulfilled by third party and receiving in OMS e.g. Warehouse to Store"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_Receive_Only" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="PendingReceipt"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Receive_Only" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Created"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Receive_Only" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Completed" conditionExpression="isItemPendingReceipt == false"/>
 
     <!-- Status Flow for Transfer Orders to be both fulfilled and received in OMS -->
     <moqui.basic.StatusFlow statusFlowId="TO_Fulfill_And_Receive" statusTypeId="ORDER_ITEM_STATUS" description="Status Flow for Orders to be both fulfilled and received in OMS e.g. Store to Store"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="PendingFulfill"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_FULFILL_RECEIPT" transitionSequence="1" transitionName="PendingFulfill" conditionExpression="isItemPendingFulfill == true &amp;&amp; isItemPendingReceipt == true"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Created"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_FULFILL_RECEIPT" transitionSequence="1" transitionName="Created" conditionExpression="isItemPendingFulfill == true &amp;&amp; isItemPendingReceipt == true"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="PendingReceipt" conditionExpression="isItemPendingFulfill == false &amp;&amp; isItemPendingReceipt == true"/>
-    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL_RECEIPT" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="PendingFulfill" conditionExpression="isItemPendingFulfill == true &amp;&amp; isItemPendingReceipt == false"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL_RECEIPT" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Created" conditionExpression="isItemPendingFulfill == true &amp;&amp; isItemPendingReceipt == false"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL_RECEIPT" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="2" transitionName="PendingReceipt" conditionExpression="isItemPendingFulfill == false &amp;&amp; isItemPendingReceipt == true"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Completed" conditionExpression="isItemPendingFulfill == false &amp;&amp; isItemPendingReceipt == false"/>
 </entity-facade-xml>

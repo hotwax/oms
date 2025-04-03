@@ -22,6 +22,7 @@ under the License.
         Defining an unnecessary service will add extra overhead when calling it.
      -->
 
+    <!--@Deprecated use OmsUtil.hasParentType method -->
     <service verb="check" noun="ParentType">
         <description>
             This service checks whether a given Entity belongs to a specific type hierarchy.
