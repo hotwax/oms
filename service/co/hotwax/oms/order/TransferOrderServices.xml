@@ -86,9 +86,10 @@ under the License.
 
                     <!-- Perform order item reservation if next order item status is ITEM_PENDING_FULFILL -->
                     <if condition="'ITEM_PENDING_FULFILL'.equals(toItemStatusId)">
-                        <!-- Check if multiple times reservation done if order approved again,
-                                - done, this returns error for duplicate entry of OISGR, so this should be good. -->
-                        <!-- Used process#OrderItemAllocation since this will also take care of updating indexing added as part of seca on this service -->
+                        <!-- Used process#OrderItemAllocation to reserve item.
+                             NOTE index#OrderItem called as part of seca added to this service, but this will not index
+                             for TO_Receive_Only items, this will be ok for now as we not use Solr to fetch orders in
+                             the Receiving app -->
                         <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                                 in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
                                 facilityId:shipGroup.facilityId, quantity:orderItem.quantity,
@@ -96,8 +97,6 @@ under the License.
                     </if>
                 </iterate>
             </iterate>
-            <!-- NOTE: separate indexing for order not required for change in status, the process#OrderItemAllocation has seca
-                    to run index#OrderItem and index#Reservation which is taking care of indexing the order and item updates in Solr -->
         </actions>
     </service>
 </services>
