@@ -356,7 +356,6 @@ under the License.
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="rejectToFacilityId" default-value="REJECTED_ITM_PARKING"/>
-            <parameter name="recordVariance" default-value="Y"/>
             <parameter name="updateQOH" default-value="false" type="Boolean"/>
             <parameter name="rejectionReasonId" required="true"/>
             <parameter name="rejectComments" />
@@ -367,10 +366,14 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="rejectToFacility" cache="true">
+                <field-map field-name="facilityId" from="rejectToFacilityId"/>
+            </entity-find-one>
             <set field="hasParentType"
-                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', rejectToFacilityId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', rejectToFacility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
             <if condition="!hasParentType">
-                <return error="true" message="Order item [${orderId}:${orderItemSeqId} can't be rejected to non virtual facility]"/>
+                <set field="facilityName" from="rejectToFacility != null ? rejectToFacility.facilityName : rejectToFacilityId"/>
+                <return error="true" message="Order item [${orderId}:${orderItemSeqId} can't be rejected to non virtual facility ${facilityName}"/>
             </if>
             <!--Fetch shipGroupSeqId of item before processing anything -->
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
@@ -405,79 +408,45 @@ under the License.
             <!-- TODO: Move this to SECA: Set the facility and fulfillment status in solr doc -->
             <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
                           in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,facilityId:rejectToFacilityId,fulfillmentStatus:'Rejected']"/>
-
             <!--6. Record inventory variance-->
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumMap" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
+            <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" value-field="productFacility">
+                <field-map field-name="productId" from="orderItem.productId"/>
+                <field-map field-name="facilityId" from="facilityId"/>
+            </entity-find-one>
 
             <set field="enumType" from="enumMap.enumTypeId"/>
             <set field="varianceQuantity" value="0" type="BigDecimal"/>
-
-            <if condition="enumType.equals('REPORT_NO_VAR')">
-                <return message="Item rejected succesfully to facility: $rejectToFacilityId}" type="success"/>
-            </if>
-
-            <if condition="enumType.equals('REPORT_VAR')">
-                <set field="varianceQuantity" value="1" type="BigDecimal"/>
-            </if>
-            <if condition="enumType.equals('REPORT_ALL_VAR')">
-                <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
-                    <field-map field-name="productId" from="orderItem.productId"/>
-                    <field-map field-name="facilityId" from="facilityId"/>
-                </entity-find-one>
-
-                <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
-            </if>
-
-            <entity-find entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" list="productFacilityInventoryItemViews">
-                <econdition field-name="productId" from="orderItem.productId"/>
-                <econdition field-name="facilityId" from="facilityId"/>
-                <econdition field-name="availableToPromise" operator="greater" value="0"/>
-            </entity-find>
-
-            <set field="productFacilityInventoryItemView" from="productFacilityInventoryItemViews[0]"/>
-            <set field="availableToPromiseVar" type="BigDecimal" from="productFacilityInventoryItemView.availableToPromise"/>
-
-            <if condition="varianceQuantity!=null">
-                <if condition="availableToPromiseVar >= varianceQuantity ">
-                    <then>
-                        <set field="availableToPromiseVar" type="BigDecimal" from="varianceQuantity"/>
-                        <set field="varianceQuantity" type="BigDecimal" value="0"/>
-                    </then>
-                    <else>
-                        <!-- Variance is greater than atp, what to do ?  Second pass ? -->
-                        <set field="varianceQuantity" type="BigDecimal" from="varianceQuantity.subtract(availableToPromiseVar)"/>
-                    </else>
-                </if>
+            <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_NO_VAR')">
+                <return message="Item rejected successfully to facility: $rejectToFacilityId}" type="success"/>
+            <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_VAR')">
+                    <set field="varianceQuantity" from="orderItem.quantity" type="BigDecimal"/>
+                <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_ALL_VAR')">
+                    <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
+                </else-if>
+            </else-if>
             </if>
             <!--Run the code to record variance -->
-
+            <if condition="varianceQuantity>0">
             <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
-            <set field="inventoryItemVariances" from="[]"/>
-            <set field="inventoryItemVarianceMap" from="[:]"/>
-            <set field="inventoryItemVarianceMap.inventoryItemId" from="productFacilityInventoryItemView.inventoryItemId"/>
-            <set field="inventoryItemVarianceMap.varianceReasonId" from="rejectionReasonId"/>
-            <set field="inventoryItemVarianceMap.comments" from="rejectComments"/>
-            <set field="inventoryItemVarianceMap.availableToPromiseVar" from="availableToPromiseVar.negate()"/>
+            <set field="inventoryItemVarianceMap"
+                    from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
+                        comments: rejectComments, availableToPromiseVar: varianceQuantity.negative()]"/>
 
             <if condition="updateQOH">
-                <set field="inventoryItemVarianceMap.quantityOnHandVar" from="availableToPromiseVar.negate()"/>
+                <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
             </if>
-
-            <script>
-                inventoryItemVariances.add(inventoryItemVarianceMap)
-            </script>
+            <set field="inventoryItemVarianceMap.inventoryItemDetail"
+                    from="[orderId: orderId, orderItemSeqId: orderItemSeqId,shipGroupSeqId:shipGroupSeqId, rejectionReasonId: rejectionReasonId,
+                     availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
             <!--  These go in top level Map - createPhysicalInventoryMap -->
-            <set field="createPhysicalInventoryMap" from="[:]"/>
-            <set field="createPhysicalInventoryMap.physicalInventoryDate" from="ec.user.nowTimestamp" />
-            <set field="createPhysicalInventoryMap.partyId" from="ec.user.getUsername()?:ec.user.getUserId().partyId" />
-            <set field="createPhysicalInventoryMap.inventoryItemVariances" from="inventoryItemVariances" />
-
+            <set field="createPhysicalInventoryMap" from="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: [inventoryItemVarianceMap]]"/>
             <!--  Call create Physical Inventory -->
             <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="createPhysicalInventoryMap" out-map="result"/>
-
+            </if>
         </actions>
     </service>
 </services>
