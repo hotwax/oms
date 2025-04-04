@@ -187,36 +187,30 @@ under the License.
         <actions>
             <!-- Validate the orderHeader record -->
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
-                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderId"/>
             </entity-find-one>
             <if condition="!orderHeader">
                 <return type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
             </if>
 
-            <!-- Check if statusId is a valid status -->
-            <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
-                <field-map field-name="statusId" from="statusId"/>
-            </entity-find-one>
-            <if condition="!statusItem">
-                <return type="warning" message="StatusItem [ID: ${statusId}] - Not found"/>
-            </if>
-
             <!-- Update the status of the OrderHeader -->
-            <set field="orderHeaderMap" from="orderHeader"/>
-            <set field="orderHeaderMap.statusId" from="statusId"/>
-            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="orderHeaderMap" />
+            <set field="orderHeader.statusId" from="statusId"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="orderHeader" />
 
             <!-- Create OrderStatus record to register the status change -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.getUsername()]"/>
 
             <if condition="setItemStatus">
+                <set field="orderAndItemStatusMapping" from="[ORDER_CREATED:'ITEM_CREATED', ORDER_APPROVED:'ITEM_APPROVED', ORDER_COMPLETED:'ITEM_COMPLETED', ORDER_CANCELLED:'ITEM_CANCELLED', ORDER_EXPIRED:'ITEM_EXPIRED', ORDER_REJECTED:'ITEM_REJECTED', ORDER_HOLD:'ITEM_HOLD']"/>
+                <set field="itemStatusId" from="orderAndItemStatusMapping.get(statusId)"/>
+
                 <!-- If setItemStatus is true then get all the order items -->
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
-                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderId"/>
                 </entity-find>
                 <!-- Iterate through the order items and call change#OrderItemStatus service to update their status as well -->
                 <iterate list="orderItemList" entry="orderItem">
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:statusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemStatusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
                 </iterate>
             </if>
         </actions>
