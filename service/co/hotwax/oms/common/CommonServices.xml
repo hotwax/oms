@@ -17,10 +17,6 @@ under the License.
 -->
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
-    <!--
-        FIXME: Instead of having check#ParentType as a service, this should be a helper method call.
-        Defining an unnecessary service will add extra overhead when calling it.
-     -->
 
     <!--@Deprecated use OmsUtil.hasParentType method -->
     <service verb="check" noun="ParentType">
