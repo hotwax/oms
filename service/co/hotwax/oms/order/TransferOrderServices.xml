@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="approve" noun="TransferOrder" transaction-timeout="300">
+        <description>
+            Service to approve Transfer Order.
+            The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
+            Status based on the statusFlowId associated with the Transfer Order.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true">
+                <description>The ID of the Transfer Order in OMS.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Get Order Header -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+
+            <if condition="'ORDER_APPROVED'.equals(orderHeader.statusId)">
+                <return error="true" message="Order [ID: ${orderId}] is already in Approved status."/>
+            </if>
+
+            <!-- Update the order status to ORDER_APPROVED -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId,
+                    statusId:'ORDER_APPROVED']"/>
+
+            <!-- Get Ship Groups -->
+            <entity-find-related value-field="orderHeader" relationship-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList"/>
+
+            <!-- Update Item Status and Reserve the item if item's next status is ITEM_PENDING_FULFILL -->
+            <iterate list="shipGroupList" entry="shipGroup">
+                <!-- Get Order Items -->
+                <entity-find-related value-field="shipGroup" relationship-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList"/>
+
+                <iterate list="orderItemList" entry="orderItem">
+                    <!-- Get the next valid Order Item Status start -->
+                    <!-- Get the Status Flow Transitions for the current item status -->
+                    <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
+                        <econdition field-name="statusFlowId" from="orderHeader.statusFlowId"/>
+                        <econdition field-name="statusId" from="orderItem.statusId"/>
+                        <order-by field-name="transitionSequence"/>
+                    </entity-find>
+                    <!-- Here we set the status from the first valid status transition either with or without the
+                    conditionExpression if defined -->
+                    <iterate list="statusFlowTransitionList" entry="statusFlowTransition">
+                        <if condition="statusFlowTransition.conditionExpression"><then>
+                            <if condition="ec.resource.condition(statusFlowTransition.conditionExpression, '')">
+                                <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                                <break/>
+                            </if>
+                        </then><else>
+                            <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                            <break/>
+                        </else></if>
+                    </iterate>
+                    <!-- NOTE Extracting the next valid item status into separate service does not help in scenario say ship#Shipment
+                            where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
+                            does not get set as expected in the extracted service. -->
+                    <!-- Get the next valid Order Item Status end -->
+
+                    <if condition="!toItemStatusId">
+                        <return type="warning" message="Cannot Approve Order ID [${orderId}] - No Valid Status Flow transition found for Item [ID: ${orderItem.orderItemSeqId}] Status [ID: ${orderItem.statusId} update.]"/>
+                    </if>
+
+                    <!-- Update the order item status -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                            statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
+
+                    <!-- Perform order item reservation if next order item status is ITEM_PENDING_FULFILL -->
+                    <if condition="'ITEM_PENDING_FULFILL'.equals(toItemStatusId)">
+                        <!-- Used process#OrderItemAllocation to reserve item.
+                             NOTE index#OrderItem called as part of seca added to this service, but this will not index
+                             for TO_Receive_Only items, this will be ok for now as we not use Solr to fetch orders in
+                             the Receiving app -->
+                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                                facilityId:shipGroup.facilityId, quantity:orderItem.quantity,
+                                toShipGroupSeqId:shipGroup.shipGroupSeqId]"/>
+                    </if>
+                </iterate>
+            </iterate>
+        </actions>
+    </service>
+</services>
