@@ -76,7 +76,7 @@ under the License.
                     <!-- Get the next valid Order Item Status end -->
 
                     <if condition="!toItemStatusId">
-                        <return type="warning" message="Cannot Approve Order ID [${orderId}] - No Valid Status Flow transition found for Item [ID: ${orderItem.orderItemSeqId}] Status [ID: ${orderItem.statusId} update.]"/>
+                        <return error="true" message="Cannot Approve Order ID [${orderId}] - No Valid Status Flow transition found for Item [ID: ${orderItem.orderItemSeqId}] Status [ID: ${orderItem.statusId} update.]"/>
                     </if>
 
                     <!-- Update the order item status -->
