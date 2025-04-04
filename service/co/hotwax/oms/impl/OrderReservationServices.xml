@@ -69,7 +69,7 @@
                         orderId: orderId,
                         orderItemSeqId: orderItemSeqId,
                         shipGroupSeqId: orderItem.shipGroupSeqId,
-                        availableToPromiseDiff: quantity.negate(),
+                        availableToPromiseDiff: item.quantity.negate(),
                         effectiveDate: ec.user.nowTimestamp]"/>
 
                 <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
@@ -122,11 +122,11 @@
                     <set field="component" from="components?components[0]: null"/>
                     <if condition="component">
                         <set field="cancelReservedQty" from="(component.quantity?:1) * cancelQuantity" type="BigDecimal"/>
-                        <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
-                        <else>
-                            <set field="remainingQty" from="reservation.reservedQty - cancelQuantity" type="BigDecimal"/>
-                        </else>
+                    <else>
+                        <set field="cancelReservedQty" from="cancelQuantity" type="BigDecimal"/>
+                    </else>
                     </if>
+                    <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
                     <script>
                         reservedItems.add([productId: reservation.reservedProductId, cancelQuantity: cancelReservedQty, remainingQty: remainingQty])
                     </script>
@@ -151,7 +151,6 @@
                 <set field="createDetailMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
                 <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
                 <set field="createDetailMap.availableToPromiseDiff" from="reservedItem.cancelQuantity"/>
-
                 <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail" in-map="createDetailMap"/>
                 <if condition="(reservedItem.remainingQty).compareTo(BigDecimal.ZERO) > 0">
                     <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
