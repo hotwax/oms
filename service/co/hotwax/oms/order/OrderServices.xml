@@ -232,17 +232,13 @@ under the License.
         </out-parameters>
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
-                                primaryKey: 'facilityTypeId',
-                                childType: facility.facilityTypeId,
-                                parentTypeField: 'parentTypeId',
-                                parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
             <!-- Since a new ShipGroup is created for each routing attempt,
                  reuse the existing ShipGroup only if the facility type is "virtual".
                 Additionally, filtering based on the shipment method type may be required in future.
             -->
-            <if condition="outResult.hasParentType">
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
+            <if condition="hasParentType">
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
