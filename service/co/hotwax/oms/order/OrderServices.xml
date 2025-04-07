@@ -385,7 +385,7 @@ under the License.
             <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
                           in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,facilityId:rejectToFacilityId,fulfillmentStatus:'Rejected']"/>
             <!--6. Record inventory variance-->
-            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumMap" cache="true">
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionEnum" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
             <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" value-field="productFacility">
@@ -393,13 +393,12 @@ under the License.
                 <field-map field-name="facilityId" from="facilityId"/>
             </entity-find-one>
 
-            <set field="enumType" from="enumMap.enumTypeId"/>
             <set field="varianceQuantity" value="0" type="BigDecimal"/>
-            <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_NO_VAR')">
+            <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_NO_VAR')">
                 <return message="Item rejected successfully to facility: $rejectToFacilityId}" type="success"/>
-            <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_VAR')">
+            <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_VAR')">
                     <set field="varianceQuantity" from="orderItem.quantity" type="BigDecimal"/>
-                <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', 'REPORT_NO_VAR', 'parentTypeId', 'REPORT_ALL_VAR')">
+                <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_ALL_VAR')">
                     <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
                 </else-if>
             </else-if>
