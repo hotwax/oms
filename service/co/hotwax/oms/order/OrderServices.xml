@@ -58,38 +58,6 @@ under the License.
         </actions>
     </service>
 
-    <service verb="cancel" noun="OrderItemInvResQty" authenticate="anonymous-all">
-        <description>Cancel inventory reservation for an order item</description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="shipGroupSeqId" required="true"/>
-        </in-parameters>
-        <actions>
-            <!-- Find all the reservation records from the OrderItemShipGrpInvRes entity -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="oisgirs">
-                <econdition field-name="orderId" from="orderId"/>
-                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find>
-
-            <if condition="!oisgirs">
-                <return type="info" message="Order Reservations [OrderItem ID: ${orderId}:${orderItemSeqId}] - Not found"/>
-            </if>
-
-            <!-- Iterate each OISGIR record and delete it; ideally it will have 1 record-->
-            <iterate list="oisgirs" entry="oisgir">
-                <!-- get the inventoryItemId from the OISGIR record, so we can record the changes in InventoryItemDetail -->
-                <set field="inventoryItemId" from="oisgir.inventoryItemId" />
-                <entity-delete value-field="oisgir"/>
-
-                <!-- Call create#InventoryItemDetail inline to register the inventoryItem change and mark it available for reservation -->
-                <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemDetail" in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp, quantityOnHandDiff:0, availableToPromiseDiff:1, accountingQuantityDiff:0, orderId:orderId, description: 'Cancelled item to order: ' + orderId + ', item: ' + orderItemSeqId]"/>
-            </iterate>
-
-        </actions>
-    </service>
-
     <service verb="change" noun="OrderItemStatus">
         <description>Change the status of a sales order item</description>
         <in-parameters>

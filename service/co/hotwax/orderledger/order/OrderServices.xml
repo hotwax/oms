@@ -71,9 +71,9 @@ under the License.
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:noteDataResponse.noteId]"/>
             <!-- TODO: internalNote:Y or N ; Also we can save the comment/reason as a part of the note-->
 
-            <!-- Call cancel#OrderItemInvResQty to cancel the inventory reservation -->
-            <service-call name="co.hotwax.oms.order.OrderServices.cancel#OrderItemInvResQty" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                    shipGroupSeqId:shipGroupSeqId]"/>
+            <!-- Call cancel#OrderItemInventoryReservation to cancel the inventory reservation -->
+            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
+                    cancelQuantity:orderItem.quantity]"/>
 
             <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
             <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
