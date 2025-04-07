@@ -329,8 +329,15 @@ under the License.
             <parameter name="rejectComments" />
         </in-parameters>
         <out-parameters>
-            <parameter name="cancelledReservations" type="Map">
-
+            <!-- Returning a list, as in the case of a marketing package, we also perform reservation for its components.-->
+            <parameter name="cancelledReservations" type="List">
+                <parameter name="cancelledReservation">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="shipGroupSeqId"/>
+                    <parameter name="inventoryItemId"/>
+                    <parameter name="cancelledQuantity" type="BigDecimal"/>
+                </parameter>
             </parameter>
         </out-parameters>
         <actions>
@@ -353,8 +360,9 @@ under the License.
 
             <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
-                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,cancelQuantity:orderItem.quantity]"/>
+                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,cancelQuantity:orderItem.quantity]" out-map="outResult"/>
 
+            <set field="cancelledReservations" from="outResult.cancelledReservations"/>
             <!--2. Move to rejected facility-->
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="currentShipGroup">
                 <field-map field-name="shipGroupSeqId"/>
