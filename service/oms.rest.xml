@@ -84,6 +84,11 @@ under the License.
                     <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderFacilityAllocation"/>
                 </method>
             </resource>
+            <resource name="reject">
+                <method type="post">
+                    <service name="co.hotwax.oms.order.OrderServices.reject#OrderItems"/>
+                </method>
+            </resource>
             <resource name="soft-allocations">
                 <resource name="reserve-inventory">
                     <method type="post">
