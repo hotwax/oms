@@ -67,6 +67,11 @@ under the License.
                             <service name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"/>
                         </method>
                     </resource>
+                    <resource name="reject">
+                        <method type="post">
+                            <service name="co.hotwax.oms.order.OrderServices.reject#OrderItem"/>
+                        </method>
+                    </resource>
                 </id>
             </resource>
             <resource name="shipGroups">
