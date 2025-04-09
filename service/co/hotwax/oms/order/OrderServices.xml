@@ -222,102 +222,132 @@ under the License.
     </service>
 
     <service verb="reject" noun="OrderItems">
+        <description>
+            The rejectOrderItems service processes a rejection request for one or more items in an order.
+            The rejection logic is driven by two key flags: maySplit and cascadeRejectByProduct, which determine the scope of the rejection.
+            Rejection Logic:
+            - maySplit = Y, cascadeRejectByProduct = N
+              - Reject only the specific item included in the request.
+            - maySplit = N, cascadeRejectByProduct = N
+              - Reject all items in the same ship group as the specified item.
+            - maySplit = Y, cascadeRejectByProduct = Y
+              - Reject items with the same productId in the same facility and match the rejection criteria (e.g., shipment not yet packed or shipped).
+            - maySplit = N, cascadeRejectByProduct = Y
+              - Reject entire ship groups across all orders that contain the specified productId in the same facility, provided the shipment is not yet packed or shipped.
+        </description>
         <in-parameters>
-            <parameter name="rejectOrderItems" required="true" type="List"/>
+            <parameter name="orderId" required="true"/>
+            <parameter name="rejectToFacilityId" required="true"/>
+            <parameter name="items" type="List" required="true">
+                <parameter name="item" type="Map">
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="quantity" default-value="1"/>
+                    <parameter name="updateQOH"/>
+                    <parameter name="maySplit" default-value="N">
+                        <description>Whether to allow rejection of individual items or reject the entire ship group. Default is N.</description>
+                    </parameter>
+                    <parameter name="cascadeRejectByProduct" default-value="N">
+                        <description>Whether to reject other items in the order with the same product in the same facility. Default is N.</description>
+                    </parameter>
+                    <parameter name="comments"/>
+                    <parameter name="rejectionReasonId" required="true"/>
+                </parameter>
+            </parameter>
         </in-parameters>
+        <out-parameters>
+            <parameter name="cancelledReservations" type="List">
+                <parameter name="cancelledReservation">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="shipGroupSeqId"/>
+                    <parameter name="inventoryItemId"/>
+                    <parameter name="cancelledQuantity" type="BigDecimal"/>
+                </parameter>
+            </parameter>
+        </out-parameters>
         <actions>
-            <script>
-                import org.moqui.entity.EntityDynamicView;
-                import org.moqui.entity.EntityValue;
-                import org.moqui.entity.EntityCondition;
-                import org.moqui.entity.EntityConditionFactory;
+            <set field="cancelledReservations" from="[]"/>
+            <set field="conditionFactory" from="ec.entity.getConditionFactory()"/>
+            <set field="shipmentCondition"
+                    from="conditionFactory.makeCondition(
+                            conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.IN, ['SHIPMENT_INPUT', 'SHIPMENT_APPROVED']),
+                                org.moqui.entity.EntityCondition.JoinOperator.OR,
+                            conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, null)
+                        )"/>
+            <iterate list="items" entry="item">
+                <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                    <field-map field-name="orderId" from="orderId"/>
+                    <field-map field-name="orderItemSeqId" from="item.orderItemSeqId"/>
+                </entity-find-one>
+                <if condition="!orderItem">
+                    <return error="true" message="Order item [${orderId}:${item.orderItemSeqId}] not found."/>
+                </if>
+                <set field="rejectItemCond" from="[]"/>
+                <set field="facilityId" from="orderItem.facilityId"/>
+                <script>rejectItemCond.add(conditionFactory.makeCondition([facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']))</script>
+                <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
+                <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
+                <if condition="maySplit">
+                    <if condition="cascadeRejectByProduct">
+                        <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
+                        <!-- This query includes all order items in facility with status `ITEM_APPROVED`
+                            and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
+                        <script>
+                            rejectItemCond.add(conditionFactory.makeCondition([productId: orderItem.productId]))
+                            rejectItemCond.add(shipmentCondition)
+                        </script>
+                        <else>
+                            <!--maySplit = Y, cascadeRejectByProduct = N:  Reject only the single item. -->
+                            <!-- No shipment status filter -->
+                            <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, orderItemSeqId: item.orderItemSeqId]))</script>
+                        </else>
+                    </if>
+                    <else>
+                        <if condition="cascadeRejectByProduct">
+                            <!-- maySplit = N, cascadeRejectByProduct = Y: Reject entire ship groups for all orders containing the specified product. -->
+                            <!--  Utilized Moqui framework's support for subqueries in the WHERE clause.
+                                 There are two ways to retrieve all order items that contain a specified product at same facility:
+                                   1. Fetch eligible order IDs, then loop through them to get the items at the desired facility.
+                                   2. Use a subquery directly in the WHERE clause to filter orders containing the specified product.
 
-                rejectOrderItems.each { rejectOrderItem ->
-
-                def orderId = rejectOrderItem.orderId
-                def orderItemSeqId = rejectOrderItem.orderItemSeqId
-                def productId = rejectOrderItem.productId
-                def facilityId = rejectOrderItem.facilityId
-                def rejectToFacilityId = rejectOrderItem.rejectToFacilityId
-                def updateQOH = rejectOrderItem.updateQOH
-                def rejectionReasonId = rejectOrderItem.rejectionReasonId
-                def maySplit = rejectOrderItem.maySplit ?: 'N'
-                def cascadeRejectByProduct = rejectOrderItem.cascadeRejectByProduct ?: 'N'
-                def comments = rejectOrderItem.comments
-
-
-                def entityFind = ec.entity.find("org.apache.ofbiz.order.order.OrderItem");
-
-                EntityDynamicView dynamicView = entityFind.makeEntityDynamicView();
-
-                // Add member entities
-                dynamicView.addMemberEntity("OI", "org.apache.ofbiz.order.order.OrderItem", null, null, null);
-                dynamicView.addMemberEntity("OISG", "org.apache.ofbiz.order.order.OrderItemShipGroup", "OI", false,
-                ["orderId": "orderId"]);
-                dynamicView.addMemberEntity("OS", "org.apache.ofbiz.order.order.OrderShipment", "OI", true,
-                ["orderId": "orderId"]);
-                dynamicView.addMemberEntity("S", "org.apache.ofbiz.shipment.shipment.Shipment", "OS", true,
-                ["shipmentId": "shipmentId"]);
-
-
-                dynamicView.addAlias("OI", "orderId");
-                dynamicView.addAlias("OI", "orderItemSeqId");
-                dynamicView.addAlias("OI", "productId");
-                dynamicView.addAlias("S", "shipmentStatusId","statusId",null);
-                dynamicView.addAlias("OISG", "facilityId","facilityId",null);
-                dynamicView.addAlias("OI", "itemStatusId","statusId",null);
-
-
-                entityFind.condition("facilityId", facilityId);
-                entityFind.condition("itemStatusId", "ITEM_APPROVED");
-
-                // Add filter based on maySplit and cascadeRejectByProduct
-                if (maySplit) {
-                if (cascadeRejectByProduct) {
-                entityFind.condition("productId", productId);
-                }
-                else {
-                entityFind.condition("orderId", orderId);
-                entityFind.condition("orderItemSeqId", orderItemSeqId);
-                }
-                }
-                else {
-                if (cascadeRejectByProduct) {
-                entityFind.condition("product", productId);
-                }
-                else {
-                entityFind.condition("orderId", orderId);
-                }
-                }
-
-                // Add shipment status condition (common for all cases)
-                EntityConditionFactory conditionFactory = entityFind.efi.conditionFactory;
-
-                entityFind.condition(conditionFactory.makeCondition(
-                conditionFactory.makeCondition("shipmentStatusId", EntityCondition.ComparisonOperator.IN,
-                ["SHIPMENT_INPUT", "SHIPMENT_APPROVED"]),
-                EntityCondition.JoinOperator.OR,
-                conditionFactory.makeCondition("shipmentStatusId", EntityCondition.ComparisonOperator.EQUALS, null)
-                ));
-
-                List&lt;EntityValue&gt; orderItemsToReject = entityFind.list();
-
-                orderItemsToReject.each { itemToReject ->
-                ec.service.sync().name("co.hotwax.oms.order.OrderServices.reject#OrderItem")
-                .parameter("orderId", itemToReject.orderId)
-                .parameter("orderItemSeqId", itemToReject.orderItemSeqId)
-                .parameter("rejectionReasonId", rejectionReasonId)
-                .parameter("rejectComments", comments)
-                .parameter("facilityId", facilityId)
-                .parameter("rejectToFacilityId", rejectToFacilityId)
-                .parameter("updateQOH", updateQOH)
-                .call()
-                }
-                }
-            </script>
+                                 Opted for approach #2 as it is more efficient and avoids additional looping logic.
+                             -->
+                            <!-- This query includes all order items in facility  with status `ITEM_APPROVED`
+                                and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
+                            <script>
+                                <![CDATA[
+                                    rejectItemCond.add(
+                                                conditionFactory.makeConditionWhere("""OI.order_ID in ( SELECT DISTINCT OI_INNER.ORDER_ID
+                                                    FROM ORDER_ITEM OI_INNER
+                                                    INNER JOIN ORDER_ITEM_SHIP_GROUP OISG_INNER ON OI_INNER.ORDER_ID = OISG_INNER.ORDER_ID AND OI_INNER.SHIP_GROUP_SEQ_ID = OISG_INNER.SHIP_GROUP_SEQ_ID
+                                                    WHERE  OI_INNER.PRODUCT_ID = '${orderItem.productId}'
+                                                    AND OISG_INNER.facility_id = '${facilityId}'
+                                                    AND OI_INNER.status_id = 'ITEM_APPROVED')""")
+                                            )
+                                    rejectItemCond.add(shipmentCondition)
+                                    ]]>
+                            </script>
+                            <else>
+                                <!-- maySplit = N, cascadeRejectByProduct = N: Reject all items in the specified ship group.-->
+                                <!-- No shipment status filter -->
+                                <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, shipGroupSeqId: orderItem.shipGroupSeqId]))</script>
+                            </else>
+                        </if>
+                    </else>
+                </if>
+                <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems">
+                    <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
+                </entity-find>
+                <iterate list="eligibleItems" entry="eligibleItem">
+                    <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
+                                  in-map="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]" out-map="outResult"/>
+                    <if condition="outResult.cancelledReservations">
+                        <script>cancelledReservations.addAll(outResult.cancelledReservations)</script>
+                    </if>
+                </iterate>
+            </iterate>
         </actions>
     </service>
-
     <service verb="reject" noun="OrderItem">
         <description>Service to reject an order item with various identification methods and record variance details.</description>
         <in-parameters>
@@ -326,7 +356,7 @@ under the License.
             <parameter name="rejectToFacilityId" default-value="REJECTED_ITM_PARKING"/>
             <parameter name="updateQOH" default-value="false" type="Boolean"/>
             <parameter name="rejectionReasonId" required="true"/>
-            <parameter name="rejectComments" />
+            <parameter name="comments" />
         </in-parameters>
         <out-parameters>
             <!-- Returning a list, as in the case of a marketing package, we also perform reservation for its components.-->
@@ -390,31 +420,31 @@ under the License.
             </entity-find-one>
             <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" value-field="productFacility">
                 <field-map field-name="productId" from="orderItem.productId"/>
-                <field-map field-name="facilityId" from="facilityId"/>
+                <field-map field-name="facilityId" from="fromFacilityId"/>
             </entity-find-one>
-
             <set field="varianceQuantity" value="0" type="BigDecimal"/>
             <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_NO_VAR')">
-                <return message="Item rejected successfully to facility: $rejectToFacilityId}" type="success"/>
+                <return message="Order Item [${orderId}: ${orderItemSeqId}] rejected successfully to facility: $rejectToFacilityId}" type="success"/>
             <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_VAR')">
                     <set field="varianceQuantity" from="orderItem.quantity" type="BigDecimal"/>
+            </else-if>
                 <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_ALL_VAR')">
                     <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
                 </else-if>
-            </else-if>
+
             </if>
             <!--Run the code to record variance -->
             <if condition="varianceQuantity>0">
             <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
             <set field="inventoryItemVarianceMap"
                     from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
-                        comments: rejectComments, availableToPromiseVar: varianceQuantity.negative()]"/>
+                        comments: comments, availableToPromiseVar: varianceQuantity.negate()]"/>
 
             <if condition="updateQOH">
                 <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
             </if>
             <set field="inventoryItemVarianceMap.inventoryItemDetail"
-                    from="[orderId: orderId, orderItemSeqId: orderItemSeqId,shipGroupSeqId:shipGroupSeqId, rejectionReasonId: rejectionReasonId,
+                    from="[rejectionReasonId: rejectionReasonId,
                      availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
             <!--  These go in top level Map - createPhysicalInventoryMap -->
