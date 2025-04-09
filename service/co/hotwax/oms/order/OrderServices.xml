@@ -263,39 +263,63 @@ under the License.
                     <field-map field-name="orderItemSeqId" from="item.orderItemSeqId"/>
                 </entity-find-one>
                 <if condition="!orderItem">
-                    <return error="true" message="Order item not found"/>
+                    <return error="true" message="Order item [${orderId}:${item.orderItemSeqId}] not found."/>
                 </if>
                 <set field="facilityId" from="orderItem.facilityId"/>
                 <set field="conditionMap" from="[facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']"/>
                 <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
                 <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
+                <set field="rejectItemCond" from="null"/>
                 <if condition="maySplit">
                     <if condition="cascadeRejectByProduct">
                         <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
                         <set field="conditionMap.productId" from="orderItem.productId"/>
                         <else>
-                            <!--maySplit = Y, cascadeRejectByProduct = N: Reject all items in the specified ship group. -->
+                            <!--maySplit = Y, cascadeRejectByProduct = N:  Reject only the single item. -->
                             <set field="conditionMap.orderId" from="orderId"/>
-                            <set field="conditionMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                            <set field="conditionMap.orderItemSeqId" from="item.orderItemSeqId"/>
                         </else>
                     </if>
                     <else>
                         <if condition="cascadeRejectByProduct">
                             <!-- maySplit = N, cascadeRejectByProduct = Y: Reject entire ship groups for all orders containing the specified product. -->
-                            <!-- TODO: Need to implement  -->
+                            <!--  Utilized Moqui framework's support for subqueries in the WHERE clause.
+                                 There are two ways to retrieve all order items that contain a specified product at same facility:
+                                   1. Fetch eligible order IDs, then loop through them to get the items at the desired facility.
+                                   2. Use a subquery directly in the WHERE clause to filter orders containing the specified product.
+
+                                 Opted for approach #2 as it is more efficient and avoids additional looping logic.
+                             -->
+                            <script>
+                                <![CDATA[
+                                    conditionFactory = ec.entity.getConditionFactory();
+                                    rejectItemCond = conditionFactory.makeCondition(
+                                            conditionFactory.makeCondition(conditionMap),
+                                            conditionFactory.getJoinOperator('and'),
+                                            conditionFactory.makeConditionWhere("""OI.order_ID in ( SELECT DISTINCT OI_INNER.ORDER_ID
+                                                    FROM ORDER_ITEM OI_INNER
+                                                    INNER JOIN ORDER_ITEM_SHIP_GROUP OISG_INNER ON OI_INNER.ORDER_ID = OISG_INNER.ORDER_ID AND OI_INNER.SHIP_GROUP_SEQ_ID = OISG_INNER.SHIP_GROUP_SEQ_ID
+                                                    WHERE  OI_INNER.PRODUCT_ID = '${orderItem.productId}'
+                                                    AND OISG_INNER.facility_id = '${facilityId}'
+                                                    AND OI_INNER.status_id = 'ITEM_APPROVED')""")
+                                            )
+                                    ]]>
+                            </script>
+
                             <else>
-                                <!-- maySplit = N, cascadeRejectByProduct = N: Reject only the single item. -->
+                                <!-- maySplit = N, cascadeRejectByProduct = N: Reject all items in the specified ship group.-->
                                 <set field="conditionMap.orderId" from="orderId"/>
-                                <set field="conditionMap.orderItemSeqId" from="item.orderItemSeqId"/>
+                                <set field="conditionMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
                             </else>
                         </if>
                     </else>
                 </if>
-                <set field="shipmentCondition1"
-                     from="conditionFactory.makeCondition(conditionMap)"/>
+                <if condition="!rejectItemCond">
+                    <set field="rejectItemCond" from="conditionFactory.makeCondition(conditionMap)"/>
+                </if>
                 <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems">
-                        <econdition-object field="shipmentCondition"/>
-                    <econdition-object field="shipmentCondition1"/>
+                    <econdition-object field="shipmentCondition"/>
+                    <econdition-object field="rejectItemCond"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
                     <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
