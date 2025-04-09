@@ -265,19 +265,24 @@ under the License.
                 <if condition="!orderItem">
                     <return error="true" message="Order item [${orderId}:${item.orderItemSeqId}] not found."/>
                 </if>
+                <set field="rejectItemCond" from="[]"/>
                 <set field="facilityId" from="orderItem.facilityId"/>
-                <set field="conditionMap" from="[facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']"/>
+                <script>rejectItemCond.add(conditionFactory.makeCondition([facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']))</script>
                 <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
                 <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
-                <set field="rejectItemCond" from="null"/>
                 <if condition="maySplit">
                     <if condition="cascadeRejectByProduct">
                         <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
-                        <set field="conditionMap.productId" from="orderItem.productId"/>
+                        <!-- This query includes all order items in facility with status `ITEM_APPROVED`
+                            and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
+                        <script>
+                            rejectItemCond.add(conditionFactory.makeCondition([productId: orderItem.productId]))
+                            rejectItemCond.add(shipmentCondition)
+                        </script>
                         <else>
                             <!--maySplit = Y, cascadeRejectByProduct = N:  Reject only the single item. -->
-                            <set field="conditionMap.orderId" from="orderId"/>
-                            <set field="conditionMap.orderItemSeqId" from="item.orderItemSeqId"/>
+                            <!-- No shipment status filter -->
+                            <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, orderItemSeqId: item.orderItemSeqId]))</script>
                         </else>
                     </if>
                     <else>
@@ -290,36 +295,31 @@ under the License.
 
                                  Opted for approach #2 as it is more efficient and avoids additional looping logic.
                              -->
+                            <!-- This query includes all order items in facility  with status `ITEM_APPROVED`
+                                and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
                             <script>
                                 <![CDATA[
-                                    conditionFactory = ec.entity.getConditionFactory();
-                                    rejectItemCond = conditionFactory.makeCondition(
-                                            conditionFactory.makeCondition(conditionMap),
-                                            conditionFactory.getJoinOperator('and'),
-                                            conditionFactory.makeConditionWhere("""OI.order_ID in ( SELECT DISTINCT OI_INNER.ORDER_ID
+                                    rejectItemCond.add(
+                                                conditionFactory.makeConditionWhere("""OI.order_ID in ( SELECT DISTINCT OI_INNER.ORDER_ID
                                                     FROM ORDER_ITEM OI_INNER
                                                     INNER JOIN ORDER_ITEM_SHIP_GROUP OISG_INNER ON OI_INNER.ORDER_ID = OISG_INNER.ORDER_ID AND OI_INNER.SHIP_GROUP_SEQ_ID = OISG_INNER.SHIP_GROUP_SEQ_ID
                                                     WHERE  OI_INNER.PRODUCT_ID = '${orderItem.productId}'
                                                     AND OISG_INNER.facility_id = '${facilityId}'
                                                     AND OI_INNER.status_id = 'ITEM_APPROVED')""")
                                             )
+                                    rejectItemCond.add(shipmentCondition)
                                     ]]>
                             </script>
-
                             <else>
                                 <!-- maySplit = N, cascadeRejectByProduct = N: Reject all items in the specified ship group.-->
-                                <set field="conditionMap.orderId" from="orderId"/>
-                                <set field="conditionMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                                <!-- No shipment status filter -->
+                                <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, shipGroupSeqId: orderItem.shipGroupSeqId]))</script>
                             </else>
                         </if>
                     </else>
                 </if>
-                <if condition="!rejectItemCond">
-                    <set field="rejectItemCond" from="conditionFactory.makeCondition(conditionMap)"/>
-                </if>
                 <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems">
-                    <econdition-object field="shipmentCondition"/>
-                    <econdition-object field="rejectItemCond"/>
+                    <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
                     <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
