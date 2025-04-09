@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="ext-upgrade-v1.0.0">
+
+    <!-- Enumeration for Service Jobs -->
+    <moqui.basic.Enumeration enumId="BULK_APPROVE_TO" enumCode="BULK_APPROVE_TO" description="Bulk Approve Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
+
+    <!-- Service Job to bulk approve Transfer Orders -->
+    <moqui.service.job.ServiceJob jobName="bulkApprove_TransferOrders" jobTypeEnumId="BULK_APPROVE_TO"
+            description="Service Job to bulk approve the Transfer Orders in OMS"
+            serviceName="co.hotwax.oms.order.TransferOrderServices.bulkApprove#TransferOrders"
+            cronExpression="0 0 0 * * ?" paused="Y">
+        <parameters parameterName="orderIds"/>
+    </moqui.service.job.ServiceJob>
+</entity-facade-xml>
