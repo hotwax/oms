@@ -20,7 +20,7 @@
             receivePath="/home/${sftpUsername}/hotwax/ProductsFeed"
             receiveResponseEnumId="MsgRrMove"
             receiveMovePath="/home/${sftpUsername}/hotwax/ProductsFeed/archive"
-            sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
+            sendServiceName="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
             sendPath="${contentRoot}/oms/NewProductsFeed"/>
     <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
 
@@ -33,7 +33,7 @@
             receivePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed"
             receiveResponseEnumId="MsgRrMove"
             receiveMovePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed/archive"
-            sendService="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
+            sendServiceName="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
             sendPath="${contentRoot}/oms/ProductUpdatesFeed"/>
     <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeed" enumTypeId="OMSMessageTypeEnum"/>
 

@@ -27,15 +27,10 @@
             <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
                 <field-map field-name="productId" from="orderItem.productId"/>
             </entity-find-one>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                    in-map="[entityName: 'org.apache.ofbiz.product.product.ProductType',
-                    primaryKey: 'productTypeId',
-                    childType: product?.productTypeId,
-                    parentTypeField: 'parentTypeId',
-                    parentType: 'MARKETING_PKG_PICK']" out-map="outResult"/>
-
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.product.ProductType', 'productTypeId', product?.productTypeId, 'parentTypeId', 'MARKETING_PKG_PICK')" type="Boolean"/>
             <set field="products" from="[[productId: orderItem.productId, quantity: quantity]]"/>
-            <if condition="outResult.hasParentType">
+            <if condition="hasParentType">
                 <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
                     <econdition field-name="productId" from="orderItem.productId"/>
                     <econdition field-name="productAssocTypeId" value="PRODUCT_COMPONENT"/>
@@ -69,7 +64,7 @@
                         orderId: orderId,
                         orderItemSeqId: orderItemSeqId,
                         shipGroupSeqId: orderItem.shipGroupSeqId,
-                        availableToPromiseDiff: quantity.negate(),
+                        availableToPromiseDiff: item.quantity.negate(),
                         effectiveDate: ec.user.nowTimestamp]"/>
 
                 <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
@@ -91,6 +86,17 @@
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="cancelQuantity" type="BigDecimal" required="true" default-value="1"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="cancelledReservations" type="List">
+                <parameter name="cancelledReservation">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="shipGroupSeqId"/>
+                    <parameter name="inventoryItemId"/>
+                    <parameter name="cancelledQuantity" type="BigDecimal"/>
+                </parameter>
+            </parameter>
+        </out-parameters>
         <actions>
             <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
                 <field-map field-name="orderId" from="orderId"/>
@@ -99,15 +105,10 @@
             <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
                 <field-map field-name="productId" from="orderItem.productId"/>
             </entity-find-one>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                    in-map="[entityName: 'org.apache.ofbiz.product.product.ProductType',
-                            primaryKey: 'productTypeId',
-                            childType: product?.productTypeId,
-                            parentTypeField: 'parentTypeId',
-                            parentType: 'MARKETING_PKG_PICK']" out-map="outResult"/>
-
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.product.ProductType', 'productTypeId', product?.productTypeId, 'parentTypeId', 'MARKETING_PKG_PICK')" type="Boolean"/>
             <set field="reservedItems" from="[]"/>
-            <if condition="outResult.hasParentType">
+            <if condition="hasParentType">
                 <entity-find entity-name="co.hotwax.oms.order.OrderItemReservation" list="reservations">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
@@ -122,11 +123,11 @@
                     <set field="component" from="components?components[0]: null"/>
                     <if condition="component">
                         <set field="cancelReservedQty" from="(component.quantity?:1) * cancelQuantity" type="BigDecimal"/>
-                        <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
-                        <else>
-                            <set field="remainingQty" from="reservation.reservedQty - cancelQuantity" type="BigDecimal"/>
-                        </else>
+                    <else>
+                        <set field="cancelReservedQty" from="cancelQuantity" type="BigDecimal"/>
+                    </else>
                     </if>
+                    <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
                     <script>
                         reservedItems.add([productId: reservation.reservedProductId, cancelQuantity: cancelReservedQty, remainingQty: remainingQty])
                     </script>
@@ -137,13 +138,16 @@
                     </script>
                 </else>
             </if>
+            <set field="cancelledReservations" from="[]"/>
             <iterate list="reservedItems" entry="reservedItem">
                 <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
                         in-map="[productId: reservedItem.productId, facilityId: orderItem.facilityId]"
                         out-map="findOrCreateResult"/>
 
                 <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
-
+                <script>
+                    cancelledReservations.add([orderId: orderId, orderItemSeqId:orderItemSeqId, inventoryItemId:inventoryItemId, shipGroupSeqId: orderItem.shipGroupSeqId, cancelledQuantity: reservedItem.cancelQuantity])
+                </script>
                 <set field="createDetailMap" from="[:]"/>
                 <set field="createDetailMap.inventoryItemId" from="inventoryItemId"/>
                 <set field="createDetailMap.orderId" from="orderId"/>
@@ -151,7 +155,6 @@
                 <set field="createDetailMap.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
                 <set field="createDetailMap.effectiveDate" from="ec.user.nowTimestamp"/>
                 <set field="createDetailMap.availableToPromiseDiff" from="reservedItem.cancelQuantity"/>
-
                 <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail" in-map="createDetailMap"/>
                 <if condition="(reservedItem.remainingQty).compareTo(BigDecimal.ZERO) > 0">
                     <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
@@ -381,16 +384,13 @@
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="fromFacility" cache="true">
                 <field-map field-name="facilityId" from="fromShipGroup.facilityId"/>
             </entity-find-one>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
-                            primaryKey: 'facilityTypeId',
-                            childType: fromFacility?.facilityTypeId,
-                            parentTypeField: 'parentTypeId',
-                            parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
             <!-- If the OrderItem is already allocated at facilityId, do not reallocate.
             Instead, verify if the auto-cancel date scenario applies and update the OrderItem accordingly. -->
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', fromFacility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
+
             <set field="fromShipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
-            <if condition="outResult.hasParentType &amp;&amp; facilityId == fromShipGroup?.facilityId">
+            <if condition="hasParentType &amp;&amp; facilityId == fromShipGroup?.facilityId">
                 <log level="warn" message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
                 <if condition="autoCancelDate || clearAutoCancelDate">
                     <set field="serviceInCtx" from="[orderId: orderId, orderItemSeqId: orderItemSeqId]"/>
@@ -443,14 +443,10 @@
                 <entity-update value-field="orderItemAdjustment"/>
             </iterate>
             </if>
-            <service-call name="co.hotwax.oms.common.CommonServices.check#ParentType"
-                          in-map="[entityName: 'org.apache.ofbiz.product.facility.FacilityType',
-                            primaryKey: 'facilityTypeId',
-                            childType: toFacility?.facilityTypeId,
-                            parentTypeField: 'parentTypeId',
-                            parentType: 'VIRTUAL_FACILITY']" out-map="outResult"/>
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', toFacility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
             <!-- Do not perform inventory reservation if destination facility is virtual facility -->
-            <if condition="!clearAutoCancelDate &amp;&amp; !outResult.hasParentType">
+            <if condition="!clearAutoCancelDate &amp;&amp; !hasParentType">
                 <set field="clearAutoCancelDate" value="true" type="Boolean"/>
             </if>
             <if condition="autoCancelDate || clearAutoCancelDate || fromShipGroupSeqId != toShipGroupSeqId">
@@ -466,7 +462,7 @@
             </if>
             <set field="allocatedShipGroupSeqId" from="toShipGroupSeqId"/>
 
-            <if condition="!outResult.hasParentType">
+            <if condition="!hasParentType">
                 <service-call name="co.hotwax.oms.impl.OrderReservationServices.create#OrderItemInventoryReservation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, quantity:quantity ]"/>
             </if>
