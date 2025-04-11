@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="create" noun="FulfillmentOrderIssuance">
+        <in-parameters>
+            <parameter name="payload" type="Map" required="true"/>
+        </in-parameters>
+        <actions>
+            <set field="facilityId" from="payload.facilityId"/>
+            <set field="orderId" from="payload.orderId"/>
+            <set field="changeReasonEnumId" from="payload.changeReasonEnumId"/>
+            <set field="items" from="payload.items"/>
+            <set field="inventoryVariances" from="[]" type="List"/>
+            <iterate list="items" entry="item">
+                <service-call name="co.hotwax.sob.order.FulfillmentOrderServices.process#OrderItemFacilityChange"
+                      in-map="[orderId: orderId, orderItemSeqId: item.orderItemSeqId, facilityId: facilityId, quantity: item.quantity, changeReasonEnumId: changeReasonEnumId]"
+                      out-map="facilityChangeOutMap"/>
+
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                      in-map="[orderId:orderId, orderItemSeqId:item.orderItemSeqId, statusId: 'ITEM_COMPLETED', changeReason: 'Fulfillment synced from Shopify']"
+                      out-map="context"/>
+
+                <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" value-field="productFacility">
+                    <field-map field-name="productId" from="item.productId"/>
+                    <field-map field-name="facilityId" from="facilityId"/>
+                </entity-find-one>
+
+                <set field="varianceQuantity" from="item.quantity" type="BigDecimal"/>
+                <set field="inventoryItemVarianceMap" from="[inventoryItemId: productFacility.inventoryItemId, availableToPromiseVar: varianceQuantity.negate(), quantityOnHandVar: varianceQuantity.negate()]"/>
+                <set field="inventoryItemVarianceMap.inventoryItemDetail"
+                     from="[orderId:orderId, orderItemSeqId:item.orderItemSeqId, shipGroupSeqId:facilityChangeOutMap.shipGroupSeqId, availableToPromiseDiff:inventoryItemVarianceMap.availableToPromiseVar, quantityOnHandDiff:inventoryItemVarianceMap.quantityOnHandVar]"
+                />
+                <script>inventoryVariances.add(inventoryItemVarianceMap)</script>
+            </iterate>
+
+            <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: inventoryVariances]" out-map="result"/>
+        </actions>
+    </service>
+
+    <service verb="process" noun="OrderItemFacilityChange">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="quantity" type="BigDecimal" default-value="1"/>
+            <parameter name="changeReasonEnumId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="shipGroupSeqId"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem"/>
+            <if condition="!orderItem">
+                <return error="true" message="Order Item [${orderId}:${orderItemSeqId}] not found"/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="fromShipGroup">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+            </entity-find-one>
+            
+            <set field="shipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
+
+            <if condition="fromShipGroup?.facilityId == facilityId">
+                <log message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
+                <return/>
+            </if>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="itemShipGroups" limit="1">
+                <econdition field-name="orderId"/>
+                <econdition field-name="facilityId"/>
+                <order-by field-name="shipGroupSeqId DESC"/>
+            </entity-find>
+
+            <if condition="itemShipGroups">
+                <set field="toShipGroupSeqId" from="itemShipGroups[0].shipGroupSeqId"/>
+            </if>
+            <if condition="!toShipGroupSeqId">
+                <set field="serviceInCtx" from="fromShipGroup.getValueMap()" />
+                <script>serviceInCtx.remove("shipGroupSeqId")</script>
+                <set field="serviceInCtx.facilityId" from="facilityId"/>
+                <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="serviceInCtx" out-map="outMap"/>
+                <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
+            </if>
+
+            <if condition="shipGroupSeqId != toShipGroupSeqId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderItemAdjustments" for-update="true">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+                    <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                </entity-find>
+                <iterate list="orderItemAdjustments" entry="orderItemAdjustment">
+                    <set field="orderItemAdjustment.shipGroupSeqId" from="toShipGroupSeqId"/>
+                    <entity-update value-field="orderItemAdjustment"/>
+                </iterate>
+
+                <set field="orderItem.shipGroupSeqId" from="toShipGroupSeqId"/>
+                <entity-update value-field="orderItem"/>
+
+                <set field="orderFacilityChangeMap" from="orderFacilityChange?:[:]"/>
+                <set field="orderFacilityChangeMap.orderId" from="orderId"/>
+                <set field="orderFacilityChangeMap.orderItemSeqId" from="orderItemSeqId"/>
+                <set field="orderFacilityChangeMap.shipGroupSeqId" from="toShipGroupSeqId"/>
+                <set field="orderFacilityChangeMap.facilityId" from="facilityId"/>
+                <set field="orderFacilityChangeMap.fromFacilityId" from="fromShipGroup.facilityId"/>
+                <set field="orderFacilityChangeMap.changeReasonEnumId" from="changeReasonEnumId"/>
+                <set field="orderFacilityChangeMap.shipmentMethodTypeId" from="fromShipGroup.shipmentMethodTypeId"/>
+                <set field="orderFacilityChangeMap.changeUserLogin" from="ec.user.username"/>
+                <set field="orderFacilityChangeMap.changeDatetime" from="ec.user.nowTimestamp"/>
+                <service-call name="create#co.hotwax.facility.OrderFacilityChange" in-map="orderFacilityChangeMap"/>
+            </if>
+        </actions>
+    </service>
+</services>
