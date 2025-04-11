@@ -11,7 +11,7 @@
             <set field="items" from="payload.items"/>
             <set field="inventoryVariances" from="[]" type="List"/>
             <iterate list="items" entry="item">
-                <service-call name="co.hotwax.sob.order.FulfillmentOrderServices.process#OrderItemFacilityChange"
+                <service-call name="co.hotwax.oms.impl.FulfillmentOrderServices.process#OrderItemFacilityChange"
                       in-map="[orderId: orderId, orderItemSeqId: item.orderItemSeqId, facilityId: facilityId, quantity: item.quantity, changeReasonEnumId: changeReasonEnumId]"
                       out-map="facilityChangeOutMap"/>
 
