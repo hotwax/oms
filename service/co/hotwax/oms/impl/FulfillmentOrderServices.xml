@@ -32,7 +32,7 @@
                 <script>inventoryVariances.add(inventoryItemVarianceMap)</script>
             </iterate>
 
-            <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: inventoryVariances]" out-map="result"/>
+            <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="[partyId:'system', inventoryItemVariances: inventoryVariances]" out-map="result"/>
         </actions>
     </service>
 
