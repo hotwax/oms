@@ -51,7 +51,7 @@
          receivePath="/home/${sftpUsername}/hotwax/FulfillmentOrdersFeed"
          receiveResponseEnumId="MsgRrMove"
          receiveMovePath="/home/${sftpUsername}/hotwax/FulfillmentOrdersFeed/archive"
-         sendServiceName="co.hotwax.sob.order.FulfillmentOrderServices.create#FulfillmentOrderIssuance"
+         sendServiceName="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance"
          sendPath="${contentRoot}/oms/FulfillmentOrdersFeed"/>
     <moqui.basic.Enumeration description="Fulfillment Orders Feed" enumId="FulfillmentOrdersFeed" enumTypeId="OMSMessageTypeEnum"/>
 </entity-facade-xml>
