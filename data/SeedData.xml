@@ -54,4 +54,7 @@
          sendServiceName="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance"
          sendPath="${contentRoot}/oms/FulfillmentOrdersFeed"/>
     <moqui.basic.Enumeration description="Fulfillment Orders Feed" enumId="FulfillmentOrdersFeed" enumTypeId="OMSMessageTypeEnum"/>
+
+    <!-- Enumeration data from order facility change reason -->
+    <moqui.basic.Enumeration description="Shopify Allocations" enumId="ALLOCATED" enumTypeId="BROKERING_REASN_TYPE" enumCode="BROKERING_REASON"/>
 </entity-facade-xml>
