@@ -23,6 +23,7 @@
                     <field-map field-name="facilityId" from="facilityId"/>
                 </entity-find-one>
 
+                <!-- TODO: Needs to re-think this logic for creating inventory variances" -->
                 <if condition="!productFacility">
                     <return error="true" message="ProductFacility record is not exists for productId:${item.productId}, facilityId:${facilityId}"/>
                 </if>
