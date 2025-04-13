@@ -35,6 +35,12 @@ under the License.
 
             <set field="itemDetailED" from="ec.entity.getEntityDefinition('org.apache.ofbiz.product.inventory.InventoryItemDetail')"/>
             <set field="newEntity.inventoryItemDetailSeqId" from="ec.entityFacade.sequencedIdPrimaryEd(itemDetailED)"/>
+            <set field="inventoryItemDetailSeqId" from="newEntity.inventoryItemDetailSeqId"/>
+
+            <entity-find-one entity-name="co.hotwax.oms.product.inventory.InventoryItemDetailSummary" value-field="inventoryItemDetailSummary"/>
+            <set field="newEntity.lastQuantityOnHand" from="inventoryItemDetailSummary.quantityOnHandTotal"/>
+            <set field="newEntity.lastAvailableToPromise" from="inventoryItemDetailSummary.availableToPromiseTotal"/>
+
             <if condition="!newEntity.availableToPromiseDiff">
                 <set field="newEntity.availableToPromiseDiff" value="0" type="BigDecimal"/>
             </if>
