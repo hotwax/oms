@@ -43,4 +43,18 @@
         <parameters parameterName="systemMessageTypeIds" parameterValue="NewProductsFeed,ProductUpdatesFeed"/>
     </moqui.service.job.ServiceJob>
 
+    <!-- SystemMessageType data for consuming Fulfillment Orders Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="FulfillmentOrdersFeed"
+         description="Fulfillment Orders Feed"
+         parentTypeId="LocalFeedFile"
+         consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
+         receivePath="/home/${sftpUsername}/hotwax/FulfillmentOrdersFeed"
+         receiveResponseEnumId="MsgRrMove"
+         receiveMovePath="/home/${sftpUsername}/hotwax/FulfillmentOrdersFeed/archive"
+         sendServiceName="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance"
+         sendPath="${contentRoot}/oms/FulfillmentOrdersFeed"/>
+    <moqui.basic.Enumeration description="Fulfillment Orders Feed" enumId="FulfillmentOrdersFeed" enumTypeId="OMSMessageTypeEnum"/>
+
+    <!-- Enumeration data from order facility change reason -->
+    <moqui.basic.Enumeration description="Shopify Allocations" enumId="ALLOCATED" enumTypeId="BROKERING_REASN_TYPE" enumCode="BROKERING_REASON"/>
 </entity-facade-xml>
