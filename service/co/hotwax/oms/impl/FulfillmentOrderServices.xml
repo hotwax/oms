@@ -125,9 +125,9 @@
                 <set field="orderItem.shipGroupSeqId" from="toShipGroupSeqId"/>
                 <entity-update value-field="orderItem"/>
 
-                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="fromShipGroupAssoc"/>
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="fromShipGroupAssoc"/>
                 <entity-delete value-field="fromShipGroupAssoc"/>
-                <entity-make-value entity-name="org.apache.ofbiz.order.order.OrderItemShipGroupAssoc" value-field="toShipGroupAssoc" map="[orderId: orderItem.orderId, orderItemSeqId:orderItem.orderItemSeqId, shipGroupSeqId:toShipGroupSeqId, quantity:orderItem.quantity, cancelQuantity:orderItem.cancelQuantity]"/>
+                <entity-make-value entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="toShipGroupAssoc" map="[orderId: orderItem.orderId, orderItemSeqId:orderItem.orderItemSeqId, shipGroupSeqId:toShipGroupSeqId, quantity:orderItem.quantity, cancelQuantity:orderItem.cancelQuantity]"/>
                 <entity-create value-field="toShipGroupAssoc"/>
 
                 <set field="orderFacilityChangeMap" from="orderFacilityChange?:[:]"/>
