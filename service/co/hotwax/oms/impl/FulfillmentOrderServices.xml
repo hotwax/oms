@@ -4,6 +4,9 @@
         <in-parameters>
             <parameter name="payload" type="Map" required="true"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="orderId" required="true"/>
+        </out-parameters>
         <actions>
             <set field="facilityId" from="payload.facilityId"/>
             <set field="orderId" from="payload.orderId"/>
