@@ -16,4 +16,14 @@
                           ignore-error="true" />
         </actions>
     </seca>
+
+    <seca service="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance" when="tx-commit">
+        <actions>
+            <iterate list="issuedOrderItems" entry="item">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
+                      in-map="[orderId:item.orderId, orderItemSeqId: item.orderItemSeqId]"
+                      ignore-error="true" />
+            </iterate>
+        </actions>
+    </seca>
 </secas>
