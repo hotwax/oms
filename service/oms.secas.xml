@@ -20,10 +20,9 @@
     <seca service="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance" when="tx-commit">
         <actions>
             <iterate list="issuedOrderItems" entry="item">
-                <log message="============================ [${item.orderId}:${item.orderItemSeqId}]"/>
-<!--                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"-->
-<!--                              in-map="[orderId:item.orderId, orderItemSeqId: item.orderItemSeqId]"-->
-<!--                              ignore-error="true" />-->
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
+                      in-map="[orderId:item.orderId, orderItemSeqId: item.orderItemSeqId]"
+                      ignore-error="true" />
             </iterate>
         </actions>
     </seca>
