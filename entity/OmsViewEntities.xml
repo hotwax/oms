@@ -199,4 +199,26 @@
         <alias name="shipmentStatusId" field="statusId" entity-alias="S"/>
     </view-entity>
 
+    <view-entity entity-name="FacilityContentAndDataResource" package="org.apache.ofbiz.product.facility">
+        <member-entity entity-alias="FC" entity-name="org.apache.ofbiz.product.facility.FacilityContent"/>
+        <member-entity entity-alias="CON" entity-name="org.apache.ofbiz.content.content.Content" join-from-alias="FC">
+            <key-map field-name="contentId"/>
+        </member-entity>
+        <member-entity entity-alias="DR" entity-name="org.apache.ofbiz.content.data.DataResource" join-from-alias="CON">
+            <key-map field-name="dataResourceId"/>
+        </member-entity>
+        <alias entity-alias="FC" name="facilityId"/>
+        <alias entity-alias="FC" name="facilityContentTypeEnumId"/>
+        <alias entity-alias="FC" name="fromDate"/>
+        <alias entity-alias="FC" name="thruDate"/>
+        <alias entity-alias="CON" name="contentId"/>
+        <alias entity-alias="CON" name="contentTypeId"/>
+        <alias entity-alias="CON" name="contentName"/>
+        <alias entity-alias="CON" name="statusId"/>
+        <alias entity-alias="CON" name="mimeTypeId"/>
+        <alias entity-alias="CON" name="createdByUserLogin"/>
+        <alias entity-alias="DR" name="dataResourceId"/>
+        <alias entity-alias="DR" name="dataResourceTypeId"/>
+        <alias entity-alias="DR" name="objectInfo"/>
+    </view-entity>
 </entities>
