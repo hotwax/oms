@@ -16,4 +16,11 @@
                           ignore-error="true" />
         </actions>
     </seca>
+    <seca id="IndexItemOnStatusUpdate" service="update#org.apache.ofbiz.order.order.OrderItem" when="tx-commit">
+        <condition><expression>statusChanged</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId,
+                orderItemSeqId:orderItemSeqId]" ignore-error="true" />
+        </actions>
+    </seca>
 </secas>
