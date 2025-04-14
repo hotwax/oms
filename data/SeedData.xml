@@ -57,4 +57,15 @@
 
     <!-- Enumeration data from order facility change reason -->
     <moqui.basic.Enumeration description="Shopify Allocations" enumId="ALLOCATED" enumTypeId="BROKERING_REASN_TYPE" enumCode="BROKERING_REASON"/>
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="CreateTransferOrder"
+         description="Create Transfer Orders"
+         receivePath=""
+         parentTypeId="LocalFeedFile"
+         consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
+         sendServiceName="co.hotwax.oms.order.OrderServices.create#TransferOrder"
+         sendPath="${contentRoot}/netsuite/transferOrder">
+    </moqui.service.message.SystemMessageType>
+    <moqui.basic.Enumeration description="create transfer order" enumId="CreateTransferOrder" enumTypeId="OMSMessageTypeEnum"/>
+
 </entity-facade-xml>
