@@ -5,9 +5,15 @@
             <parameter name="payload" type="Map" required="true"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="orderId" required="true"/>
+            <parameter name="issuedOrderItems" type="List">
+                <parameter name="items" type="Map">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                </parameter>
+            </parameter>
         </out-parameters>
         <actions>
+            <set field="issuedOrderItems" from="[]"/>
             <set field="facilityId" from="payload.facilityId"/>
             <set field="orderId" from="payload.orderId"/>
             <set field="changeReasonEnumId" from="payload.changeReasonEnumId"/>
@@ -32,7 +38,7 @@
                 </if>
 
                 <service-call name="create#org.apache.ofbiz.product.inventory.PhysicalInventory" in-map="[partyId:'system', physicalInventoryDate: ec.user.nowTimestamp]" out-map="physicalInventoryResult"/>
-
+                <script>issuedOrderItems.add([orderId: orderId, orderItemSeqId: item.orderItemSeqId])</script>
                 <set field="availableToPromiseDiff" from="item.quantity" type="BigDecimal"/>
                 <set field="quantityOnHandDiff" from="item.quantity" type="BigDecimal"/>
                 <set field="inventoryItemVariance" from="[
