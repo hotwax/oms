@@ -251,7 +251,9 @@ under the License.
                     </parameter>
                     <parameter name="comments"/>
                     <parameter name="rejectionReasonId" required="true"/>
-                    <parameter name="kitComponents" type="List"/>
+                    <parameter name="kitComponents" type="List">
+                        <parameter name="kitProductId"/>
+                    </parameter>
                 </parameter>
             </parameter>
         </in-parameters>
@@ -358,7 +360,9 @@ under the License.
             <parameter name="updateQOH" default-value="false" type="Boolean"/>
             <parameter name="rejectionReasonId" required="true"/>
             <parameter name="comments" />
-            <parameter name="kitComponents" type="List"/>
+            <parameter name="kitComponents" type="List">
+                <parameter name="kitProductId"/>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <!-- Returning a list, as in the case of a marketing package, we also perform reservation for its components.-->
