@@ -514,6 +514,9 @@ under the License.
             </resource>
         </id>
     </resource>
+    <resource name="goodIdentificationTypes">
+        <method type="get"><entity name="org.apache.ofbiz.product.product.GoodIdentificationType" operation="list"/></method>
+    </resource>
     <resource name="systemMessageRemotes">
         <method type="get"><entity name="moqui.service.message.SystemMessageRemote" operation="list"/></method>
         <method type="post"><entity name="moqui.service.message.SystemMessageRemote" operation="create"/></method>
