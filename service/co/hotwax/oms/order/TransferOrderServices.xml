@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <!-- NOTE This service is being used to fetch Eligible Fulfill Transfer Orders in the Fulfillment and Receiving App -->
+    <service verb="get" noun="TransferOrders">
+        <description>
+            Service to get all Transfer Orders.
+            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId and facilityId.
+            Also supports keyword search to find orders on the basis of orderId, orderName and orderExternalId.
+        </description>
+        <in-parameters>
+            <parameter name="orderId"/>
+            <parameter name="orderStatusId"/>
+            <parameter name="itemStatusId"/>
+            <parameter name="facilityId"/>
+            <parameter name="keyword">
+                <description>
+                    Parameter to support keyword search on orderId, orderName and orderExternalId.
+                </description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer" default="0"/>
+            <parameter name="limit" type="Integer" default="20"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orders" type="List"/>
+            <parameter name="ordersCount" type="Integer"/>
+        </out-parameters>
+        <actions>
+            <set field="keyWordConditionMap" from="[:]"/>
+            <if condition="keyword">
+                <set field="keyWordConditionMap.orderId" value="%${keyword}%"/>
+                <set field="keyWordConditionMap.orderName" value="%${keyword}%"/>
+                <set field="keyWordConditionMap.orderExternalId" value="%${keyword}%"/>
+            </if>
+            <script>
+                import org.moqui.entity.EntityCondition
+                if (keyWordConditionMap)
+                    keywordCondition = ec.entity.conditionFactory.makeCondition(keyWordConditionMap, EntityCondition.ComparisonOperator.LIKE, EntityCondition.JoinOperator.OR)
+            </script>
+            <!-- Entity Find on OrderHeaderItemShipGroup view entity -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
+                <search-form-inputs default-order-by="-orderDate"/>
+                <econdition field-name="orderId" ignore-if-empty="true"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                <econdition field-name="orderStatusId" ignore-if-empty="true"/>
+                <econdition field-name="itemStatusId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" ignore-if-empty="true"/>
+                <econdition-object field="keywordCondition"/>
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
+            </entity-find>
+        </actions>
+    </service>
+</services>
+
+
