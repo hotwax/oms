@@ -10,7 +10,7 @@
     <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="THIRD_DAY" roleTypeId="CARRIER" deliveryDays="3"/>
     <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="SHIP_AGGREGATOR" shipmentMethodTypeId="NEXT_DAY" roleTypeId="CARRIER" deliveryDays="1"/>
 
-    <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="SHIP_AGGREGATOR" packagingTypeCode="YOURPACKAGING"/>
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="SHIP_AGGREGATOR" packagingTypeCode="YOURPACKAGING"/>
 
     <moqui.service.message.SystemMessageRemote systemMessageRemoteId="STORE.SHIP_AGGREGATOR" description="Shipping service configuration for productStore STORE" sendUrl="" privateKey=""/>
 
@@ -35,6 +35,6 @@
     <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="GROUND_HOME" roleTypeId="CARRIER" sequenceNumber="12" carrierServiceCode="GROUND_HOME_DELIVERY" deliveryDays="7"/>
     <org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod partyId="FEDEX" shipmentMethodTypeId="SMART_POST" roleTypeId="CARRIER" sequenceNumber="16" carrierServiceCode="SMART_POST" deliveryDays="7"/>
 
-    <CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="FEDEX" packagingTypeCode="YOUR_PACKAGING"/>
-    -->
+    <org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType shipmentBoxTypeId="YOURPACKNG" partyId="FEDEX" packagingTypeCode="YOUR_PACKAGING"/>
+    <org.apache.ofbiz.common.property.SystemProperty systemResourceId="FEDEX" systemPropertyId="shipment.carrier.default.packagingType" systemPropertyValue="YOUR_PACKAGING" description="The default packaging type of Fedex"/>    -->
 </entity-facade-xml>
