@@ -57,4 +57,9 @@
 
     <!-- Enumeration data from order facility change reason -->
     <moqui.basic.Enumeration description="Shopify Allocations" enumId="ALLOCATED" enumTypeId="BROKERING_REASN_TYPE" enumCode="BROKERING_REASON"/>
+
+    <!-- Enumeration Types for Service Jobs -->
+    <moqui.basic.EnumerationType enumTypeId="FULFILLMENT_SYS_JOB" description="Fulfillment Jobs"/>
+    <moqui.basic.EnumerationType enumTypeId="MISC_SYS_JOB" description="Miscellaneous Jobs"/>
+    <moqui.basic.EnumerationType enumTypeId="PRODUCT_SYS_JOB" description="Product Jobs"/>
 </entity-facade-xml>
