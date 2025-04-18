@@ -503,6 +503,9 @@ under the License.
         <method type="get"><entity name="co.hotwax.common.status.StatusItemAndType" operation="list"/></method>
     </resource>
     <resource name="products">
+        <method type="get">
+            <entity name="org.apache.ofbiz.product.product.Product" operation="list"/>
+        </method>
         <id name="productId">
             <method type="get">
                 <entity name="org.apache.ofbiz.product.product.Product" operation="one"/>
@@ -513,6 +516,11 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="averageCosts">
+            <method type="get">
+                <entity name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" operation="list"/>
+            </method>
+        </resource>
     </resource>
     <resource name="goodIdentificationTypes">
         <method type="get"><entity name="org.apache.ofbiz.product.product.GoodIdentificationType" operation="list"/></method>
