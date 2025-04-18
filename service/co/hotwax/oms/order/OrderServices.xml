@@ -237,7 +237,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
-            <parameter name="rejectToFacilityId" required="true"/>
+            <parameter name="rejectToFacilityId"/>
             <parameter name="items" type="List" required="true">
                 <parameter name="item" type="Map">
                     <parameter name="orderItemSeqId"/>
@@ -406,7 +406,8 @@ under the License.
             </entity-find-one>
             <set field="fromFacilityId" from="currentShipGroup.facilityId"/>
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
-                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity]"
+                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity,
+                          orderFacilityChange: [changeReasonEnumId: rejectionReasonId, comments: comments]]"
                           out-map="outMap"/>
 
             <!--4. createUpdateExternalFulfillmentOrderItem-->
