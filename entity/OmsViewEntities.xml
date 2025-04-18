@@ -199,4 +199,23 @@
         <alias name="shipmentStatusId" field="statusId" entity-alias="S"/>
     </view-entity>
 
+    <view-entity entity-name="PostalAddressAndGeo" package="co.hotwax.oms.contact">
+        <member-entity entity-alias="PA" entity-name="org.apache.ofbiz.party.contact.PostalAddress"/>
+        <member-entity entity-alias="GC" entity-name="moqui.basic.Geo" join-from-alias="PA" join-optional="true">
+            <key-map field-name="countryGeoId"/>
+        </member-entity>
+        <member-entity entity-alias="GS" entity-name="moqui.basic.Geo" join-from-alias="PA" join-optional="true">
+            <key-map field-name="stateProvinceGeoId"/>
+        </member-entity>
+        <alias-all entity-alias="PA"/>
+        <alias entity-alias="GC" name="countryGeoName" field="geoName"/>
+        <alias entity-alias="GC" name="countryGeoCodeAlpha2" field="geoCodeAlpha2"/>
+        <alias entity-alias="GC" name="countryGeoCodeAlpha3" field="geoCodeAlpha3"/>
+        <alias entity-alias="GC" name="countryGeoCodeNumeric" field="geoCodeNumeric"/>
+        <alias entity-alias="GS" name="stateGeoName" field="geoName"/>
+        <alias entity-alias="GS" name="stateGeoCodeAlpha2" field="geoCodeAlpha2"/>
+        <alias entity-alias="GS" name="stateGeoCodeAlpha3" field="geoCodeAlpha3"/>
+        <alias entity-alias="GS" name="stateGeoCodeNumeric" field="geoCodeNumeric"/>
+    </view-entity>
+
 </entities>
