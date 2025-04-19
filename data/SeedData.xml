@@ -64,7 +64,7 @@
          parentTypeId="LocalFeedFile"
          consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
          sendServiceName="co.hotwax.oms.order.OrderServices.create#TransferOrder"
-         sendPath="${contentRoot}/netsuite/transferOrder">
+         sendPath="${contentRoot}/oms/transferOrder">
     </moqui.service.message.SystemMessageType>
     <moqui.basic.Enumeration description="create transfer order" enumId="CreateTransferOrder" enumTypeId="OMSMessageTypeEnum"/>
 
