@@ -182,8 +182,9 @@
             <key-map field-name="orderId"/>
             <key-map field-name="shipGroupSeqId"/>
         </member-entity>
-        <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderShipment" join-from-alias="OISG" join-optional="true">
+        <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderShipment" join-from-alias="OI" join-optional="true">
             <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
         </member-entity>
         <member-entity entity-alias="S" entity-name="org.apache.ofbiz.shipment.shipment.Shipment" join-from-alias="OS" join-optional="true">
             <key-map field-name="shipmentId"/>
