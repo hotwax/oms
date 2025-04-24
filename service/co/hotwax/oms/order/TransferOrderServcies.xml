@@ -12,17 +12,27 @@
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
                 <field-map field-name="externalId" from="payload.externalId"/>
             </entity-find-one>
+
+            <!-- TODO: Consider moving these validation checks (externalId check, facilityId/orderFacilityId presence, and item.productId)
+                into the mapping service defined in the connector component -->
+
+            <!-- Validate if Order with externalId already exists -->
             <if condition="orderHeader">
-                <return error="true" message="Transfer Order already Order with ExternalId: ${payload.externalId}"/>
+                <return error="true" message="Order [External ID: ${payload.externalId}] - Duplicate detected, order already exists"/>
             </if>
+
+            <!-- Validate if facility and orderFacility exits in shipGroups -->
             <if condition="!payload.shipGroups[0].facilityId || !payload.shipGroups[0].orderFacilityId">
-                <return error="true" message="Missing facilityId or orderFacilityId."/>
+                <return error="true" message="Order [External ID: ${payload.externalId}] - Missing facilityId or orderFacilityId in shipGroup"/>
             </if>
+
+            <!-- Validate if productId exits in shipGroups.items -->
             <iterate list="payload.shipGroups[0].items" entry="item">
                 <if condition="!item.productId">
-                    <return error="true" message="One or more items have missing productId."/>
+                    <return error="true" message="Order [External ID: ${payload.externalId}] - Missing productId in shipGroups.items"/>
                 </if>
             </iterate>
+
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
         </actions>
