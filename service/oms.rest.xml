@@ -533,4 +533,7 @@ under the License.
             <method type="delete"><entity name="moqui.service.message.SystemMessageRemote" operation="delete"/></method>
         </id>
     </resource>
+    <resource name="transferOrders">
+        <method type="get"><service name="co.hotwax.oms.order.TransferOrderServices.get#TransferOrders"/></method>
+    </resource>
 </resource>
