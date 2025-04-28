@@ -40,6 +40,11 @@
             <parameter name="ordersCount" type="Integer"/>
         </out-parameters>
         <actions>
+            <!-- NOTE Since this is a simple fetch from view entity, we could have directly used the entity in REST end-point
+                    with method type="get", but due to the limitation of using distinct, created this service for now.
+                    Also the ordersCount is directly prepared from the entity-find operation and can be used to return the
+                    distinct orders here.
+                    TODO check the possible application of distinct when get on entity in rest.xml file  -->
             <!-- Entity Find on OrderHeaderItemShipGroup view entity -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
                 <search-form-inputs default-order-by="orderDate"/>
