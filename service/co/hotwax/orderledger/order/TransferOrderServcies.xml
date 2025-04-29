@@ -8,13 +8,11 @@
                 <description>The ID of the Transfer Order created in OMS.</description>
             </parameter>
         </out-parameters>
+        <description>Create Transfer Order in OMS.</description> 
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
                 <field-map field-name="externalId" from="payload.externalId"/>
             </entity-find-one>
-
-            <!-- TODO: Consider moving these validation checks (externalId check, facilityId/orderFacilityId presence, and item.productId)
-                into the mapping service defined in the connector component -->
 
             <!-- Validate if Order with externalId already exists -->
             <if condition="orderHeader">
