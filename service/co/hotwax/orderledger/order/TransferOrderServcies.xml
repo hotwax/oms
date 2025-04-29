@@ -1,5 +1,6 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
     <service verb="create" noun="TransferOrder">
+        <description>Create a Transfer Order</description> 
         <in-parameters>
             <parameter name="payload" type="Map"/>
         </in-parameters>
@@ -8,7 +9,6 @@
                 <description>The ID of the Transfer Order created in OMS.</description>
             </parameter>
         </out-parameters>
-        <description>Create Transfer Order in OMS.</description> 
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
                 <field-map field-name="externalId" from="payload.externalId"/>
