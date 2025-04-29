@@ -2,7 +2,7 @@
     <service verb="create" noun="TransferOrder">
         <description>Create a Transfer Order</description> 
         <in-parameters>
-            <parameter name="payload" type="Map"/>
+            <parameter name="payload" type="Map" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId">
