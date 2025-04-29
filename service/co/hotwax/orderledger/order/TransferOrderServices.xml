@@ -31,12 +31,16 @@
         <actions>
             <set field="order" from="[:]"/>
 
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="orders" distinct="true">
-                <econdition field-name="orderId" from="orderId"/>
-                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
-            </entity-find>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <select-field field-name="orderId,orderName,externalId,statusId"/>
+            </entity-find-one>
 
-            <set field="order" from="orders.first.getPlainValueMap(0)"/>
+            <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
+                <field-map field-name="statusId" from="orderHeader.statusId"/>
+            </entity-find-one>
+
+            <set field="order" from="orderHeader.getPlainValueMap(0)"/>
+            <set field="order.orderStatusDesc" from="statusItem?.description"/>
 
             <!-- Get Order Item details -->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
