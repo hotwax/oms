@@ -23,6 +23,7 @@
                         <parameter name="statusId"/>
                         <parameter name="productId"/>
                         <parameter name="totalIssuedQuantity"/>
+                        <parameter name="totalReceivedQuantity"/>
                     </parameter>
                 </parameter>
             </parameter>
@@ -52,6 +53,13 @@
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
                 <set field="orderItem.totalIssuedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                 <!-- Get Item total Received Quantity -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
+                </entity-find>
+                <set field="orderItem.totalReceivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
             </iterate>
         </actions>
     </service>
