@@ -35,9 +35,7 @@
                 <select-field field-name="orderId,orderName,externalId,statusId"/>
             </entity-find-one>
 
-            <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
-                <field-map field-name="statusId" from="orderHeader.statusId"/>
-            </entity-find-one>
+            <entity-find-related-one value-field="orderHeader" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
 
             <set field="order" from="orderHeader.getPlainValueMap(0)"/>
             <set field="order.statusDesc" from="statusItem?.description"/>
