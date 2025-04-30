@@ -4,6 +4,7 @@
     <!-- Handy cron strings: [0 0 2 * * ?] every night at 2:00 am, [0 0/15 * * * ?] every 15 minutes, [0 0/2 * * * ?] every 2 minutes -->
 
     <!-- Service Job to bulk approve Transfer Orders -->
+    <moqui.basic.Enumeration enumId="BULK_APPROVE_TO" enumCode="BULK_APPROVE_TO" description="Bulk Approve Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
     <moqui.service.job.ServiceJob jobName="bulkApprove_TransferOrders" jobTypeEnumId="BULK_APPROVE_TO"
             description="Service Job to bulk approve the Transfer Orders in OMS"
             serviceName="co.hotwax.oms.order.TransferOrderServices.bulkApprove#TransferOrders"

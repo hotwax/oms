@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-
-<entity-facade-xml type="ext-seed">
-
-    <!-- Enumeration for Service Jobs -->
-    <moqui.basic.Enumeration enumId="BULK_APPROVE_TO" enumCode="BULK_APPROVE_TO" description="Bulk Approve Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
-</entity-facade-xml>
