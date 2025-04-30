@@ -82,13 +82,25 @@ under the License.
             <parameter name="orderIds" type="List">
                 <description>List of order Ids to be approved.</description>
             </parameter>
+            <parameter name="bufferMinutes" type="Integer" default-value="1">
+                <description>
+                    Time to consider as buffer time from order entry date time (in minutes).
+                </description>
+            </parameter>
         </in-parameters>
         <actions>
+            <!-- Subtract bufferTime minutes from nowTimestamp using Calendar -->
+            <script>
+                Calendar delayCal = ec.user.getNowCalendar()
+                delayCal.add(Calendar.MINUTE, (int) -bufferMinutes)
+                delayTimestamp = new Timestamp(delayCal.getTimeInMillis())
+            </script>
             <!-- Fetch the list of Transfer Orders in Created Status -->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orders">
                 <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
                 <econdition field-name="statusId" value="ORDER_CREATED"/>
                 <econdition field-name="orderId" from="orderIds" operator="in" ignore-if-empty="true"/>
+                <econdition field-name="entryDate" from="delayTimestamp" operator="less-equals"/>
             </entity-find>
 
             <iterate list="orders" entry="order">
