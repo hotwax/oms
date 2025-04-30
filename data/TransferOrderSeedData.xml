@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<entity-facade-xml type="ext-upgrade-dev">
+
+<entity-facade-xml type="seed">
     <!-- New Status Item to be used in Transfer Order items lifecycle -->
     <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILL" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
     <moqui.basic.StatusItem statusId="ITEM_PENDING_RECEIPT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_RECEIPT" description="Pending Receipt"/>
@@ -19,15 +20,4 @@
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_CREATED" toStatusId="ITEM_PENDING_FULFILL" transitionSequence="1" transitionName="Approve Item"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Fulfill Item" conditionExpression="isItemPendingFulfill == false"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Receive Item" conditionExpression="isItemPendingReceipt == false"/>
-
-    <!-- Enumeration for Service Job for Bulk Approve Transfer Orders -->
-    <moqui.basic.Enumeration enumId="BULK_APPROVE_TO" enumCode="BULK_APPROVE_TO" description="Bulk Approve Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
-
-    <!-- Service Job to bulk approve Transfer Orders -->
-    <moqui.service.job.ServiceJob jobName="bulkApprove_TransferOrders" jobTypeEnumId="BULK_APPROVE_TO"
-            description="Service Job to bulk approve the Transfer Orders in OMS"
-            serviceName="co.hotwax.oms.order.TransferOrderServices.bulkApprove#TransferOrders"
-            cronExpression="0 0 0 * * ?" paused="Y">
-        <parameters parameterName="orderIds"/>
-    </moqui.service.job.ServiceJob>
 </entity-facade-xml>
