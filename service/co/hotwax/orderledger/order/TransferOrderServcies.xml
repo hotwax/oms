@@ -31,8 +31,9 @@
                 <if condition="!item.productId">
                     <message error="true">Order [External ID: ${payload.externalId}] - Missing productId in shipGroups.items</message>
                 </if>
-                <check-errors/>
             </iterate>
+            <check-errors/>
+            <!--Calling the OOTB transfer order service -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
         </actions>
