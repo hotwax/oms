@@ -49,7 +49,7 @@
                 <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity"/>
             </entity-find>
 
-            <set field="order.orderItems" from="[]"/>
+            <set field="order.items" from="[]"/>
 
             <iterate list="orderItemList" entry="orderItem">
                 <entity-find-related-one value-field="orderItem" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
@@ -70,7 +70,7 @@
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
 
-                <script>order.orderItems.add(orderItem + [status:statusItem?.description,totalIssuedQuantity:itemIssuanceList?.first?.quantity,totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
+                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:itemIssuanceList?.first?.quantity, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
             </iterate>
         </actions>
     </service>
