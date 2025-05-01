@@ -11,7 +11,7 @@
         <out-parameters>
             <parameter name="order" type="Map">
                 <parameter name="orderId"/>
-                <parameter name="statusDesc"/>
+                <parameter name="status"/>
                 <parameter name="orderName"/>
                 <parameter name="externalId"/>
                 <parameter name="statusId"/>
@@ -21,6 +21,7 @@
                         <parameter name="shipGroupSeqId"/>
                         <parameter name="quantity"/>
                         <parameter name="statusId"/>
+                        <parameter name="status"/>
                         <parameter name="productId"/>
                         <parameter name="totalIssuedQuantity"/>
                         <parameter name="totalReceivedQuantity"/>
@@ -38,16 +39,22 @@
             <entity-find-related-one value-field="orderHeader" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
 
             <set field="order" from="orderHeader.getPlainValueMap(0)"/>
-            <set field="order.statusDesc" from="statusItem?.description"/>
+            <set field="order.status" from="statusItem?.description"/>
 
             <!-- Get Order Item details -->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
                 <econdition field-name="orderId"/>
                 <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId"/>
             </entity-find>
-            <set field="order.orderItems" from="orderItemList?.getPlainValueList(0)"/>
 
-            <iterate list="order.orderItems" entry="orderItem">
+            <set field="order.orderItems" from="[]"/>
+
+            <iterate list="orderItemList" entry="orderItem">
+                <entity-find-related-one value-field="orderItem" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
+
+                <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
+                <set field="orderItem.status" from="statusItem?.description"/>
+
                 <!-- Get total issued quantity -->
                 <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
                     <econdition field-name="orderId"/>
@@ -62,6 +69,7 @@
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
                 <set field="orderItem.totalReceivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
+                <script>order.orderItems.add(orderItem)</script>
             </iterate>
         </actions>
     </service>
