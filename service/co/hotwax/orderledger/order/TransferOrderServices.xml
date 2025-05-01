@@ -55,16 +55,17 @@
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
                 <set field="orderItem.status" from="statusItem?.description"/>
 
-                <!-- Get total issued quantity -->
+                <!-- Get total Issued quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
                     <econdition field-name="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
                 <set field="orderItem.totalIssuedQuantity" from="itemIssuanceList?.first?.quantity"/>
-                 <!-- Get Item total Received Quantity -->
+
+                 <!-- Get total Received Quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
-                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
