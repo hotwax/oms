@@ -1,7 +1,8 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
     <service verb="create" noun="TransferOrder">
+        <description>Create a Transfer Order</description> 
         <in-parameters>
-            <parameter name="payload" type="Map"/>
+            <parameter name="payload" type="Map" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId">
@@ -12,9 +13,6 @@
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
                 <field-map field-name="externalId" from="payload.externalId"/>
             </entity-find-one>
-
-            <!-- TODO: Consider moving these validation checks (externalId check, facilityId/orderFacilityId presence, and item.productId)
-                into the mapping service defined in the connector component -->
 
             <!-- Validate if Order with externalId already exists -->
             <if condition="orderHeader">
