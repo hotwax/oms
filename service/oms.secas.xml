@@ -16,15 +16,21 @@
                           ignore-error="true" />
         </actions>
     </seca>
-    <!-- Index Order on creation -->
-    <seca id="OrderCreatedIndexOrder" service="create#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
-        <condition>
-            <expression>orderId</expression>
-        </condition>
+
+    <seca service="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance" when="tx-commit">
         <actions>
-            <log level="info" message="Creating order index for oms orderId: ${orderId}"/>
-            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                    ignore-error="true"/>
+            <iterate list="issuedOrderItems" entry="item">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
+                      in-map="[orderId:item.orderId, orderItemSeqId: item.orderItemSeqId]"
+                      ignore-error="true" />
+            </iterate>
+        </actions>
+    </seca>
+    <seca id="OrderItemStatusChange" service="update#org.apache.ofbiz.order.order.OrderItem" when="tx-commit">
+        <condition><expression>statusChanged</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+                          ignore-error="true" />
         </actions>
     </seca>
 </secas>

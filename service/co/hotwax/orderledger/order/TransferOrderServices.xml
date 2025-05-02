@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="get" noun="TransferOrder">
+        <description>
+            Service to get Transfer Order Details.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="order" type="Map">
+                <parameter name="orderId"/>
+                <parameter name="status"/>
+                <parameter name="orderName"/>
+                <parameter name="externalId"/>
+                <parameter name="statusId"/>
+                <parameter name="items" type="List">
+                    <parameter name="orderItemMap" type="Map">
+                        <parameter name="orderItemSeqId"/>
+                        <parameter name="shipGroupSeqId"/>
+                        <parameter name="quantity"/>
+                        <parameter name="statusId"/>
+                        <parameter name="status"/>
+                        <parameter name="itemDescription"/>
+                        <parameter name="cancelQuantity"/>
+                        <parameter name="productId"/>
+                        <parameter name="totalIssuedQuantity"/>
+                        <parameter name="totalReceivedQuantity"/>
+                    </parameter>
+                </parameter>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <set field="order" from="[:]"/>
+
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <select-field field-name="orderId,orderName,externalId,statusId"/>
+            </entity-find-one>
+
+            <entity-find-related-one value-field="orderHeader" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
+
+            <set field="order" from="orderHeader.getPlainValueMap(0)"/>
+            <set field="order.status" from="statusItem?.description"/>
+
+            <!-- Get Order Item details -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                <econdition field-name="orderId"/>
+                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity"/>
+            </entity-find>
+
+            <set field="order.items" from="[]"/>
+
+            <iterate list="orderItemList" entry="orderItem">
+                <entity-find-related-one value-field="orderItem" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
+
+                <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
+
+                <!-- Get total Issued quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantity"/>
+                </entity-find>
+
+                 <!-- Get total Received Quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
+                </entity-find>
+
+                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:itemIssuanceList?.first?.quantity, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
+            </iterate>
+        </actions>
+    </service>
+</services>

@@ -1,22 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
--->
+        Licensed to the Apache Software Foundation (ASF) under one
+        or more contributor license agreements.  See the NOTICE file
+        distributed with this work for additional information
+        regarding copyright ownership.  The ASF licenses this file
+        to you under the Apache License, Version 2.0 (the
+        "License"); you may not use this file except in compliance
+        with the License.  You may obtain a copy of the License at
+        http://www.apache.org/licenses/LICENSE-2.0
+        Unless required by applicable law or agreed to in writing,
+        software distributed under the License is distributed on an
+        "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+        KIND, either express or implied.  See the License for the
+        specific language governing permissions and limitations
+        under the License.
+        -->
 
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+<!-- NOTE This service is being used to fetch Eligible Fulfill Transfer Orders in the Fulfillment and Receiving App -->
+    <service verb="get" noun="TransferOrders">
+        <description>
+            Service to get all Transfer Orders.
+            By default, the service will return orders with status ORDER_APPROVED.
+            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
+            originFacilityId, destinationFacilityId and orderName.
+        </description>
+        <in-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="orderStatusId" default-value="ORDER_APPROVED">
+                <description>The ID of the status of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="itemStatusId">
+                <description>The ID of the status of the Transfer Order Item in OMS.</description>
+            </parameter>
+            <parameter name="originFacilityId">
+                <description>The ID of the origin facility of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="destinationFacilityId">
+                <description>The ID of the destination facility of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="orderName">
+                <description>The order name of Transfer Order.</description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer" default="0">
+                <description>Page number to return, starting with zero.</description>
+            </parameter>
+            <parameter name="limit" type="Integer" default="20">
+                <description>Number of records per page (default 20).</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orders" type="List"/>
+            <parameter name="ordersCount" type="Integer"/>
+        </out-parameters>
+        <actions>
+            <!-- NOTE Since this is a simple fetch from view entity, we could have directly used the entity in REST end-point
+                    with method type="get", but due to the limitation of using distinct, created this service for now.
+                    Also the ordersCount is directly prepared from the entity-find operation and can be used to return the
+                    distinct orders here.
+                    TODO check the possible application of distinct when get on entity in rest.xml file  -->
+            <!-- Entity Find on OrderHeaderItemShipGroup view entity -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
+                <search-form-inputs default-order-by="orderDate"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                <econdition field-name="orderId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId"/>
+                <econdition field-name="itemStatusId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
+            </entity-find>
+        </actions>
+    </service>
 
     <service verb="approve" noun="TransferOrder" transaction-timeout="300">
         <description>
@@ -39,7 +98,7 @@ under the License.
 
             <!-- Update the order status to ORDER_APPROVED -->
             <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId,
-                    statusId:'ORDER_APPROVED']"/>
+            statusId:'ORDER_APPROVED']"/>
 
             <!-- Get Ship Groups -->
             <entity-find-related value-field="orderHeader" relationship-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList"/>
@@ -71,8 +130,8 @@ under the License.
                         </else></if>
                     </iterate>
                     <!-- NOTE Extracting the next valid item status into separate service does not help in scenario say ship#Shipment
-                            where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
-                            does not get set as expected in the extracted service. -->
+                    where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
+                    does not get set as expected in the extracted service. -->
                     <!-- Get the next valid Order Item Status end -->
 
                     <if condition="!toItemStatusId">
@@ -81,19 +140,19 @@ under the License.
 
                     <!-- Update the order item status -->
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
-                            in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
-                            statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
+                    in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                    statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
 
                     <!-- Perform order item reservation if next order item status is ITEM_PENDING_FULFILL -->
                     <if condition="'ITEM_PENDING_FULFILL'.equals(toItemStatusId)">
                         <!-- Used process#OrderItemAllocation to reserve item.
-                             NOTE index#OrderItem called as part of seca added to this service, but this will not index
-                             for TO_Receive_Only items, this will be ok for now as we not use Solr to fetch orders in
-                             the Receiving app -->
+                        NOTE index#OrderItem called as part of seca added to this service, but this will not index
+                        for TO_Receive_Only items, this will be ok for now as we not use Solr to fetch orders in
+                        the Receiving app -->
                         <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
-                                in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
-                                facilityId:shipGroup.facilityId, quantity:orderItem.quantity,
-                                toShipGroupSeqId:shipGroup.shipGroupSeqId]"/>
+                        in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                        facilityId:shipGroup.facilityId, quantity:orderItem.quantity,
+                        toShipGroupSeqId:shipGroup.shipGroupSeqId]"/>
                     </if>
                 </iterate>
             </iterate>
