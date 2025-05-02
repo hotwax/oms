@@ -332,7 +332,7 @@ under the License.
                         </if>
                     </else>
                 </if>
-                <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems">
+                <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems" distinct="true">
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
