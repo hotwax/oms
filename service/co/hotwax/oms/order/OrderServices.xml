@@ -486,6 +486,26 @@ under the License.
                     <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory"
                                   in-map="createPhysicalInventoryMap" out-map="result"/>
 
+                    <!-- Call find or create cycle count service -->
+
+                    <entity-find-one entity-name="orderHeader"
+                                     value-field="currentProductStore">
+                        <field-map field-name="orderId" from="orderId"/>
+                    </entity-find-one>
+
+                    <entity-find-one entity-name="productStoreSetting"
+                                     value-field="rejectedItemCycleCountSetting">
+                        <field-map field-name="settingTypeEnumId" from="REJ_ITM_CC_CRT"/>
+                        <field-map field-name="productStoreId" value="currentProductStore.productStoreId"/>
+                    </entity-find-one>
+
+                    <set field="rejectedItemSettingValue" from="rejectedItemCycleCountSetting.settingValue"/>
+
+                    <if condition="rejectedItemSettingValue=true">
+                        <service-call name="co.hotwax.cycleCount.InventoryCountServices.findOrCreate#RejectedItemCycleCount"
+                                      in-map="productId: product.productId, facilityId: fromFacilityId" out-map="cycleCount"/>
+                    </if>
+
                 </if>
             </iterate>
         </actions>
