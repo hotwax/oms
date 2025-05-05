@@ -451,37 +451,42 @@ under the License.
                 </if>
             </if>
             <iterate list="products" entry="product">
-            <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView" value-field="productFacility">
-                <field-map field-name="productId" from="product.productId"/>
-                <field-map field-name="facilityId" from="fromFacilityId"/>
-            </entity-find-one>
-            <set field="varianceQuantity" value="0" type="BigDecimal"/>
+                <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView"
+                                 value-field="productFacility">
+                    <field-map field-name="productId" from="product.productId"/>
+                    <field-map field-name="facilityId" from="fromFacilityId"/>
+                </entity-find-one>
+                <set field="varianceQuantity" value="0" type="BigDecimal"/>
 
-            <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_VAR')">
-                <set field="varianceQuantity" from="product.quantity" type="BigDecimal"/>
-            <else-if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_ALL_VAR')">
-                <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
-            </else-if>
-            </if>
-            <!--Run the code to record variance -->
-            <if condition="varianceQuantity>0">
-            <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
-            <set field="inventoryItemVarianceMap"
-                    from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
+                <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_VAR')">
+                    <set field="varianceQuantity" from="product.quantity" type="BigDecimal"/>
+                    <else-if
+                            condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_ALL_VAR')">
+                        <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
+                    </else-if>
+                </if>
+                <!--Run the code to record variance -->
+                <if condition="varianceQuantity>0">
+                    <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
+                    <set field="inventoryItemVarianceMap"
+                         from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
                         comments: comments, availableToPromiseVar: varianceQuantity.negate()]"/>
 
-            <if condition="updateQOH">
-                <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
-            </if>
-            <set field="inventoryItemVarianceMap.inventoryItemDetail"
-                    from="[rejectionReasonId: rejectionReasonId,
+                    <if condition="updateQOH">
+                        <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
+                    </if>
+                    <set field="inventoryItemVarianceMap.inventoryItemDetail"
+                         from="[rejectionReasonId: rejectionReasonId,
                      availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
-            <!--  These go in top level Map - createPhysicalInventoryMap -->
-            <set field="createPhysicalInventoryMap" from="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: [inventoryItemVarianceMap]]"/>
-            <!--  Call create Physical Inventory -->
-            <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory" in-map="createPhysicalInventoryMap" out-map="result"/>
-            </if>
+                    <!--  These go in top level Map - createPhysicalInventoryMap -->
+                    <set field="createPhysicalInventoryMap"
+                         from="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: [inventoryItemVarianceMap]]"/>
+                    <!--  Call create Physical Inventory -->
+                    <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory"
+                                  in-map="createPhysicalInventoryMap" out-map="result"/>
+
+                </if>
             </iterate>
         </actions>
     </service>
