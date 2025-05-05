@@ -493,9 +493,16 @@ under the License.
                                   in-map="createPhysicalInventoryMap" out-map="result"/>
 
                     <!-- Call find or create cycle count service -->
+
+                    <entity-find-one entity-name="orderHeader"
+                                     value-field="currentProductStore">
+                        <field-map field-name="orderId" from="orderId"/>
+                    </entity-find-one>
+
                     <entity-find-one entity-name="productStoreSetting"
                                      value-field="rejectedItemCycleCountSetting">
                         <field-map field-name="settingTypeEnumId" from="REJ_ITM_CC_CRT"/>
+                        <field-map field-name="productStoreId" value="currentProductStore.productStoreId"/>
                     </entity-find-one>
 
                     <set field="rejectedItemSettingValue" from="rejectedItemCycleCountSetting.settingValue"/>
