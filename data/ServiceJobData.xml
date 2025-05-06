@@ -7,7 +7,7 @@
     <moqui.basic.Enumeration enumId="BLK_APR_ST_FLF_TO" enumCode="BLK_APR_ST_FLF_TO" description="Bulk Approve Store Fulfill Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
     <moqui.service.job.ServiceJob jobName="bulkApprove_StoreFulfillTransferOrders" jobTypeEnumId="BLK_APR_ST_FLF_TO"
             description="Service Job to bulk approve the Store Fulfill Transfer Orders in OMS"
-            serviceName="co.hotwax.orderledger.order.TransferOrderServices.StoreFulfillTransferOrder#TransferOrders"
+            serviceName="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#StoreFulfillTransferOrder"
             cronExpression="0 0 0 * * ?" paused="Y">
         <parameters parameterName="orderIds"/>
     </moqui.service.job.ServiceJob>

@@ -79,7 +79,7 @@
         <description>
             Service to bulk approve transfer orders where fulfillment is done by OMS i.e. Store to Store and Store to Warehouse Transfer Orders.
             The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
-            Status based on the statusFlowId associated with the Transfer Order i.e. i.e. ITEM_PENDING_FULFILL.
+            Status based on the statusFlowId associated with the Transfer Order i.e. ITEM_PENDING_FULFILL.
         </description>
         <in-parameters>
             <parameter name="orderIds" type="List">
@@ -118,7 +118,7 @@
         <description>
             Service to approve transfer orders where fulfillment is done by OMS i.e. Store to Store and Store to Warehouse Transfer Orders.
             The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
-            Status based on the statusFlowId associated with the Transfer Order i.e. i.e. ITEM_PENDING_FULFILL.
+            Status based on the statusFlowId associated with the Transfer Order i.e. ITEM_PENDING_FULFILL.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true">
