@@ -20,6 +20,14 @@
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Fulfill Item" conditionExpression="isItemPendingFulfill == false"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Receive Item" conditionExpression="isItemPendingReceipt == false"/>
 
+    <moqui.service.message.SystemMessageType systemMessageTypeId="OMSTransferOrderFeed"
+         description="Create Transfer Order Feed for OMS"
+         parentTypeId="LocalFeedFile"
+         consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
+         sendServiceName="co.hotwax.orderledger.order.TransferOrderServcies.create#TransferOrder"
+         sendPath="${contentRoot}/oms/TransferOrderFeed">
+    </moqui.service.message.SystemMessageType>
+
     <!-- Enumeration for Service Job for Bulk Approve Transfer Orders -->
     <moqui.basic.Enumeration enumId="BULK_APPROVE_TO" enumCode="BULK_APPROVE_TO" description="Bulk Approve Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
 
