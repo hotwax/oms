@@ -114,7 +114,7 @@
         </actions>
     </service>
 
-    <service verb="approve" noun="WhFulfillTransferOrder">
+    <service verb="approve" noun="WhFulfillTransferOrder" transaction-timeout="300">
         <description>
             Service to bulk approve transfer orders where fulfillment is done by third party i.e. Warehouse to Store Transfer Orders.
             The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
