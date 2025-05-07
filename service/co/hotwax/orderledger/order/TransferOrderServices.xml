@@ -149,7 +149,7 @@
             <!-- Get Order Items -->
             <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItemList">
                 <econdition field-name="orderId"/>
-                <econdition field-name="statusId" operator="not-in" value="ITEM_CANCELLED"/>
+                <econdition field-name="statusId" operator="not-in" value="ITEM_CANCELLED,ITEM_COMPLETED"/>
             </entity-find>
 
             <!-- Update Order Item Status and Reserve the item -->
