@@ -75,6 +75,131 @@
         </actions>
     </service>
 
+    <service verb="bulkApprove" noun="StoreFulfillTransferOrder" transaction-timeout="3600">
+        <description>
+            Service to bulk approve transfer orders where fulfillment is done by OMS i.e. Store to Store and Store to Warehouse Transfer Orders.
+            The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
+            Status based on the statusFlowId associated with the Transfer Order i.e. ITEM_PENDING_FULFILL.
+        </description>
+        <in-parameters>
+            <parameter name="orderIds" type="List">
+                <description>List of order Ids to be approved.</description>
+            </parameter>
+            <parameter name="bufferTime" type="Integer" default-value="1">
+                <description>
+                    Time to consider as buffer time from order entry date time (in minutes).
+                </description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Subtract bufferTime minutes from nowTimestamp using Calendar -->
+            <script>
+                Calendar delayCal = ec.user.getNowCalendar()
+                delayCal.add(Calendar.MINUTE, (int) -bufferTime)
+                delayTimestamp = new Timestamp(delayCal.getTimeInMillis())
+            </script>
+            <!-- Fetch the list of Transfer Orders in Created Status -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orders">
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                <econdition field-name="statusId" value="ORDER_CREATED"/>
+                <econdition field-name="orderId" from="orderIds" operator="in" ignore-if-empty="true"/>
+                <econdition field-name="entryDate" from="delayTimestamp" operator="less-equals"/>
+                <econdition field-name="statusFlowId" operator="in" value="TO_Fulfill_Only,TO_Fulfill_And_Receive"/>
+            </entity-find>
+
+            <iterate list="orders" entry="order">
+                <service-call name="co.hotwax.oms.order.TransferOrderServices.approve#StoreFulfillTransferOrder"
+                        in-map="[orderId:order.orderId]" async="true"/>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="approve" noun="StoreFulfillTransferOrder" transaction-timeout="300">
+        <description>
+            Service to approve transfer orders where fulfillment is done by OMS i.e. Store to Store and Store to Warehouse Transfer Orders.
+            The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
+            Status based on the statusFlowId associated with the Transfer Order i.e. ITEM_PENDING_FULFILL.
+        </description>
+        <in-parameters>
+            <parameter name="orderId" required="true">
+                <description>The ID of the Transfer Order in OMS.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Get Order Header -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+
+            <if condition="!orderHeader">
+                <message error="true">Transfer Order [ID: ${orderId}] does not exist.</message>
+            </if>
+
+            <if condition="orderHeader &amp;&amp; !'TRANSFER_ORDER'.equals(orderHeader.orderTypeId)">
+                <message error="true">Order [ID: ${orderId}] is not a Transfer Order.</message>
+            </if>
+
+            <if condition="orderHeader &amp;&amp; 'ORDER_APPROVED'.equals(orderHeader.statusId)">
+                <message error="true">Transfer Order [ID: ${orderId}] is already in Approved status.</message>
+            </if>
+            <check-errors/>
+
+            <!-- Update the order status to ORDER_APPROVED -->
+            <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" in-map="[orderId:orderId,
+                    statusId:'ORDER_APPROVED']"/>
+
+            <!-- Get Order Items -->
+            <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItemList">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" operator="not-in" value="ITEM_CANCELLED,ITEM_COMPLETED"/>
+            </entity-find>
+
+            <!-- Update Order Item Status and Reserve the item -->
+            <iterate list="orderItemList" entry="orderItem">
+                <!-- Get the next valid Order Item Status start -->
+                <!-- Get the Status Flow Transitions for the current item status -->
+                <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList">
+                    <econdition field-name="statusFlowId" from="orderHeader.statusFlowId"/>
+                    <econdition field-name="statusId" from="orderItem.statusId"/>
+                    <order-by field-name="transitionSequence"/>
+                </entity-find>
+                <!-- Here we set the status from the first valid status transition either with or without the
+                conditionExpression if defined -->
+                <iterate list="statusFlowTransitionList" entry="statusFlowTransition">
+                    <if condition="statusFlowTransition.conditionExpression"><then>
+                        <if condition="ec.resource.condition(statusFlowTransition.conditionExpression, '')">
+                            <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                            <break/>
+                        </if>
+                    </then><else>
+                        <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                        <break/>
+                    </else></if>
+                </iterate>
+                <!-- NOTE Extracting the next valid item status into separate service does not help in scenario say ship#Shipment
+                where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
+                does not get set as expected in the extracted service. -->
+                <!-- Get the next valid Order Item Status end -->
+
+                <if condition="!toItemStatusId">
+                    <return error="true" message="Cannot Approve Transfer Order [ID: ${orderId}] - No Valid Status Flow transition found for Item [ID: ${orderItem.orderItemSeqId}] Status [ID: ${orderItem.statusId} update.]"/>
+                </if>
+
+                <!-- Update the order item status -->
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                        in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                        statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
+
+                <!-- Used process#OrderItemAllocation to reserve item.
+                    NOTE index#OrderItem called as part of seca added to this service, but this will not index
+                    for TO_Receive_Only items, this will be ok for now as we not use Solr to fetch orders in
+                    the Receiving app -->
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                        in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                        facilityId:orderItem.facilityId, quantity:orderItem.quantity,
+                        toShipGroupSeqId:orderItem.shipGroupSeqId]"/>
+            </iterate>
+        </actions>
+    </service>
+
     <service verb="bulkApprove" noun="WhFulfillTransferOrders" transaction-timeout="3600">
         <description>
             Service to bulk approve transfer orders where fulfillment is done by third party i.e. Warehouse to Store Transfer Orders.
