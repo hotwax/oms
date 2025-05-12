@@ -543,10 +543,10 @@ under the License.
     </resource>
     <resource name="product" require-authentication="anonymous-all">
         <method type="post">
-            <service name="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"/>
+            <service name="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"/>
         </method>
         <method type="put">
-            <service name="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"/>
+            <service name="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"/>
         </method>
     </resource>
 </resource>
