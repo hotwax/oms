@@ -541,4 +541,12 @@ under the License.
             </method>
         </id>
     </resource>
+    <resource name="product" require-authentication="anonymous-all">
+        <method type="post">
+            <service name="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"/>
+        </method>
+        <method type="put">
+            <service name="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"/>
+        </method>
+    </resource>
 </resource>
