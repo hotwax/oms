@@ -62,7 +62,7 @@
          description="Create Transfer Order Feed for OMS"
          parentTypeId="LocalFeedFile"
          consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
-         sendServiceName="co.hotwax.orderledger.order.TransferOrderServcies.create#TransferOrder"
+         sendServiceName="co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder"
          sendPath="${contentRoot}/oms/TransferOrderFeed">
     </moqui.service.message.SystemMessageType>
 </entity-facade-xml>
