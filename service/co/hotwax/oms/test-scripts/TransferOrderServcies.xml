@@ -1,0 +1,56 @@
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="test" noun="BulkApproveWhFulfillTransferOrders" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="orderMap" type="Map">
+                <description>Sample data: {"M101277":2}</description>
+            </parameter>
+            <parameter name="orderIds" type="List">
+                <description>List of order Ids to be approved.</description>
+            </parameter>
+            <parameter name="bufferTime" type="Integer" default-value="1">
+                <description>
+                    Time to consider as buffer time from order entry date time (in minutes).
+                </description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="isPassed" type="Boolean" default-value="false"/>
+        </out-parameters>
+        <actions>
+            <log message="==== orderMap: ${orderMap} ===="/>
+            <!-- Mock Data -->
+            <!-- Set the data based on  -->
+<!--            <set field="orderId" value="M101277"/>-->
+<!--            <set field="orderMap" from="[M101277:2, M101278:3]" type="NewMap"/>-->
+<!--            <set field="orderMap" from="[M101277:2]"/>-->
+
+            <set field="orderIds" from="[]"/>
+            <set field="totalItemCount" from="0" type="Integer"/>
+            <iterate list="orderMap" entry="itemCount" key="orderId">
+                <script>orderIds.add(orderId)</script>
+                <set field="totalItemCount" from="totalItemCount + itemCount"/>
+            </iterate>
+
+            <set field="ordersCount" from="orderMap.size()"/>
+
+            <log message="==== orderIds: ${orderIds} ===="/>
+            <!-- Actual Actions -->
+            <service-call name="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#WhFulfillTransferOrders"
+                    in-map="[orderIds:orderIds]"/>
+
+            <!-- Assertions -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="approvedWhFulfillToCount">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" value="ORDER_APPROVED"/>
+            </entity-find-count>
+            <set field="isPassed" from="(approvedWhFulfillToCount == ordersCount) ? true : false"/>
+
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItem" count-field="approvedWhFulfillToItemCount">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" value="ITEM_PENDING_RECEIPT"/>
+            </entity-find-count>
+            <set field="isPassed" from="(approvedWhFulfillToItemCount == totalItemCount) ? true : false"/>
+        </actions>
+    </service>
+</services>
