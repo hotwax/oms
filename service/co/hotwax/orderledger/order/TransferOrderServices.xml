@@ -1,6 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
+    <!-- NOTE This service is being used to fetch Eligible Fulfill Transfer Orders in the Fulfillment and Receiving App -->
+    <service verb="get" noun="TransferOrders">
+        <description>
+            Service to get all Transfer Orders.
+            By default, the service will return orders with status ORDER_APPROVED.
+            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
+            originFacilityId, destinationFacilityId and orderName.
+        </description>
+        <in-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="orderStatusId" default-value="ORDER_APPROVED">
+                <description>The ID of the status of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="itemStatusId">
+                <description>The ID of the status of the Transfer Order Item in OMS.</description>
+            </parameter>
+            <parameter name="originFacilityId">
+                <description>The ID of the origin facility of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="destinationFacilityId">
+                <description>The ID of the destination facility of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="orderName">
+                <description>The order name of Transfer Order.</description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer" default="0">
+                <description>Page number to return, starting with zero.</description>
+            </parameter>
+            <parameter name="limit" type="Integer" default="20">
+                <description>Number of records per page (default 20).</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orders" type="List"/>
+            <parameter name="ordersCount" type="Integer"/>
+        </out-parameters>
+        <actions>
+            <!-- NOTE Since this is a simple fetch from view entity, we could have directly used the entity in REST end-point
+                    with method type="get", but due to the limitation of using distinct, created this service for now.
+                    Also the ordersCount is directly prepared from the entity-find operation and can be used to return the
+                    distinct orders here.
+                    TODO check the possible application of distinct when get on entity in rest.xml file  -->
+            <!-- Entity Find on OrderHeaderItemShipGroup view entity -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
+                <search-form-inputs default-order-by="orderDate"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                <econdition field-name="orderId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId"/>
+                <econdition field-name="itemStatusId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
+            </entity-find>
+        </actions>
+    </service>
+
     <service verb="get" noun="TransferOrder">
         <description>
             Service to get Transfer Order Details.
@@ -72,6 +131,44 @@
 
                 <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:itemIssuanceList?.first?.quantity, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
             </iterate>
+        </actions>
+    </service>
+
+    <service verb="create" noun="TransferOrder">
+        <description>Create a Transfer Order</description>
+        <in-parameters>
+            <parameter name="payload" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Transfer Order created in OMS.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="externalId" from="payload.externalId"/>
+            </entity-find-one>
+
+            <!-- Validate if Order with externalId already exists -->
+            <if condition="orderHeader">
+                <message error="true">Order [External ID: ${payload.externalId}] - Duplicate detected, order already exists</message>
+            </if>
+
+            <!-- Validate if facility and orderFacility exits in shipGroups -->
+            <if condition="!payload.shipGroups[0].facilityId || !payload.shipGroups[0].orderFacilityId">
+                <message error="true">Order [External ID: ${payload.externalId}] - Missing facilityId or orderFacilityId in shipGroup</message>
+            </if>
+
+            <!-- Validate if productId exits in shipGroups.items -->
+            <iterate list="payload.shipGroups[0].items" entry="item">
+                <if condition="!item.productId">
+                    <message error="true">Order [External ID: ${payload.externalId}] - Missing productId in shipGroups.items</message>
+                </if>
+            </iterate>
+            <check-errors/>
+            <!--Calling the OOTB transfer order service -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
+            <set field="orderId" from="orderOut.orderId"/>
         </actions>
     </service>
 
