@@ -476,7 +476,7 @@ under the License.
                         <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
                     </if>
                     <set field="inventoryItemVarianceMap.inventoryItemDetail"
-                         from="[rejectionReasonId: rejectionReasonId,
+                         from="[orderId: orderId, orderItemSeqId: orderItemSeqId, rejectionReasonId: rejectionReasonId,
                      availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
                     <!--  These go in top level Map - createPhysicalInventoryMap -->
