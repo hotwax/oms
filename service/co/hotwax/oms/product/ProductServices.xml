@@ -291,6 +291,29 @@ under the License.
             <set field="productVariants" from="payload.remove('variants')"/>
 
             <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <set field="diffJsonFilePathRef" from="ec.resource.expand('${contentRoot}/sob/OMSUpdateProductsFeed/Diff-${dateTime}.json', null,
+                    [contentRoot: ec.user.getPreference('mantle.content.root') ?: 'dbresource://datamanager', dateTime:ec.l10n.format(nowDate, 'yyyy-MM-dd-HH-mm-ss-SSS')], false)"/>
+            <set field="diffJsonFilePath" from="ec.resource.getLocationReference(diffJsonFilePathRef).getUri().getPath()"/>
+            <set field="fileMapToWrite" from="[:]"/>
+            <script>
+                import com.fasterxml.jackson.core.JsonGenerator
+                import com.fasterxml.jackson.core.JsonFactory
+                import com.fasterxml.jackson.databind.ObjectMapper
+                import java.nio.charset.StandardCharsets
+
+                try {
+                File file = new File(diffJsonFilePath)
+                if (!file.parentFile.exists()) file.parentFile.mkdirs()
+                JsonFactory jfactory = new JsonFactory()
+
+                /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
+                so that they are automatically closed regardless of whether the try statement completes normally or abruptly. */
+                try (PrintWriter pw = new PrintWriter(StandardCharsets.UTF_8, file);
+                JsonGenerator jGenerator = jfactory.createGenerator(pw)) {
+                jGenerator.writeStartArray()
+            </script>
+
             <if condition="!payload.productId">
 
                 <!-- Call create#VirtualProduct service -->
@@ -303,15 +326,34 @@ under the License.
                     <!-- Call update#VirtualProduct service -->
                     <service-call name="co.hotwax.oms.product.ProductServices.update#VirtualProduct"
                                   in-map="[productJson:payload]" out-map="updateVirtualProductOut" transaction="force-new"/>
-
+<!--                    <log level="info" message="\n\n ================ ${updateVirtualProductOut} ================ \n\n"/>-->
                     <set field="parentProductId" from="updateVirtualProductOut.productId"/>
+                    <set field="parentProductKeywords" from="updateVirtualProductOut.keywords"/>
+                    <set field="parentProductFeatureAppls" from="updateVirtualProductOut.featureAppls"/>
+                    <set field="parentProductDeleteProductKeywords" from="updateVirtualProductOut.deleteProductKeywords"/>
+                    <set field="parentProductDeleteFeatureAppls" from="updateVirtualProductOut.deleteProductFeatureAppls"/>
+                    <set field="fileMapToWrite.parentProductId" from="parentProductId"/>
+                    <set field="fileMapToWrite.keywords" from="parentProductKeywords"/>
+                    <set field="fileMapToWrite.featureAppls" from="parentProductFeatureAppls"/>
+                    <set field="fileMapToWrite.deleteProductKeywords" from="parentProductDeleteProductKeywords"/>
+                    <set field="fileMapToWrite.deleteProductFeatureAppls" from="parentProductDeleteFeatureAppls"/>
                 </else>
+            </if>
+            <set field="isVirtualUpdated" from="true"/>
+            <!-- Check if there is any update in the virtual product -->
+            <if condition="!parentProductKeywords &amp;&amp; !parentProductFeatureAppls &amp;&amp; !parentProductDeleteProductKeywords &amp;&amp; !parentProductDeleteFeatureAppls">
+                <set field="isVirtualUpdated" from="false"/>
             </if>
 
             <!-- Set the variantErrors list to store the errors occurred while creating variant product -->
             <set field="variantErrors" from="[]"/>
             <set field="variantProductIds" from="[]"/>
-
+            <set field="variantProductFeatureAppls" from="[:]"/>
+            <set field="variantProductDeleteFeatureAppls" from="[:]"/>
+            <set field="variantProductIdentifications" from="[:]"/>
+            <set field="variantProductPrice" from="[:]"/>
+            <set field="variantProductAssocs" from="[:]"/>
+            <set field="fileMapToWrite.variants" from="[]"/>
             <iterate list="productVariants" entry="productVariant">
                 <script>
                     <![CDATA[
@@ -327,10 +369,61 @@ under the License.
                         ec.message.clearAll();
                     ]]>
                 </script>
+<!--                <log level="info" message="-&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; ${actionResult} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;SWATI&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;"/>-->
+                <set field="variant" from="[:]"/>
                 <if condition="actionResult.productId">
                     <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
+                    <set field="variant.productId" from="actionResult.productId"/>
+                    <if condition="actionResult.featureAppls">
+                        <set field="variantProductFeatureAppls[actionResult.productId]" from="actionResult.featureAppls"/>
+                        <set field="variant.featureAppls" from="actionResult.featureAppls"/>
+                    </if>
+                    <if condition="actionResult.deleteProductFeatureAppls">
+                        <set field="variantProductDeleteFeatureAppls[actionResult.productId]" from="actionResult.deleteProductFeatureAppls"/>
+                        <set field="variant.deleteProductFeatureAppls" from="actionResult.deleteProductFeatureAppls"/>
+                    </if>
+                    <if condition="actionResult.identifications">
+                        <set field="variantProductIdentifications[actionResult.productId]" from="actionResult.identifications"/>
+                        <set field="variant.identifications" from="actionResult.identifications"/>
+                    </if>
+                    <if condition="actionResult.prices">
+                        <set field="variantProductPrice[actionResult.productId]" from="actionResult.prices"/>
+                        <set field="variant.prices" from="actionResult.prices"/>
+                    </if>
+                    <if condition="actionResult.assocs">
+                        <set field="variantProductAssocs[actionResult.productId]" from="actionResult.assocs"/>
+                        <set field="variant.assocs" from="actionResult.assocs"/>
+                    </if>
+<!--                    <set field="isIdentificationOrPriceUpdated" from="actionResult.isIdentificationOrPriceUpdated"/>-->
+<!--                    <if condition="actionResult.isIdentificationOrPriceUpdated">-->
+<!--                        <set field="variantProductIdentificationsOrPriceUpdated[actionResult.productId]" from="actionResult.isIdentificationOrPriceUpdated"/>-->
+<!--                    </if>-->
+<!--                    <if condition="!actionResult.isVariantAssociated">-->
+<!--                        <set field="variantProductAssociated[actionResult.productId]" from="actionResult.isVariantAssociated"/>-->
+<!--                    </if>-->
+                <set field="fileMapToWrite.variants" from="fileMapToWrite.variants + variant"/>
                 </if>
             </iterate>
+            <script>
+                // write the jsonEntry to the Errorfile
+                new ObjectMapper()
+                .setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
+                .writerWithDefaultPrettyPrinter().writeValue(jGenerator,fileMapToWrite)
+                jGenerator.writeEndArray()
+                }
+                } catch (Exception e) {
+                logger.error("Error preparing OMS JSON Feed file", e)
+                }
+            </script>
+            <set field="anyVariantUpdated" from="true"/>
+            <set field="indexVariants" from="true"/>
+<!--            <log level="info" message="\n\n=CHIMII========= ${variantProductFeatureAppls}\n\n == ${variantProductDeleteFeatureAppls} =================\n\n"/>-->
+<!--            <log level="info" message="\n\n=CHIMII=========== ${variantProductIdentifications} == ${variantProductPrice} == ${variantProductAssocs} ========================\n\n"/>-->
+            <if condition="!variantProductFeatureAppls &amp;&amp; !variantProductDeleteFeatureAppls &amp;&amp; !variantProductIdentifications &amp;&amp; !variantProductPrice &amp;&amp; !variantProductAssocs">
+                <set field="anyVariantUpdated" from="false"/>
+                <set field="indexVariants" from="false"/>
+            </if>
+<!--            <log message="-&#45;&#45;&#45;&#45;&#45;&#45; Chinmay &#45;&#45;&#45;&#45;&#45;&#45; ${isVirtualUpdated} -&#45;&#45;&#45;&#45;&#45;&#45; ${anyVariantUpdated} &#45;&#45;&#45;&#45;&#45;&#45;"/>-->
             <if condition="variantProductIds">
                 <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
                     <econdition field-name="productId" from="parentProductId"/>
@@ -343,8 +436,10 @@ under the License.
                 </if>
             </if>
 
-            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:true]" ignore-error="true"/>
-            <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+            <if condition="isVirtualUpdated || anyVariantUpdated">
+                <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
+                <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+            </if>
 
             <if condition="variantErrors">
                 <script>
@@ -415,6 +510,7 @@ under the License.
                     </if>
                 </iterate>
                 <if condition="featureAppls">
+<!--                    <log level="info" message="Setting Feature Appl for product: ${productJson.productId}"/>-->
                     <set field="productJson.featureAppls" from="featureAppls"/>
                 </if>
             </if>
@@ -430,6 +526,7 @@ under the License.
                 <set field="toBeDeleted" value="true" type="Boolean"/>
                 <iterate list="validFeatureAppls" entry="validFeatureAppl">
                     <if condition="currentProductFeatureAppl.productFeatureId == validFeatureAppl.productFeatureId">
+<!--                        <log level="info" message="\n\n +++++++++ ${validFeatureAppl} ++++++++++ \n\n"/>-->
                         <set field="toBeDeleted" value="false" type="Boolean"/>
                     </if>
                 </iterate>
@@ -437,6 +534,7 @@ under the License.
                     <set field="deleteProductFeatureAppls" from="deleteProductFeatureAppls + currentProductFeatureAppl"/>
                 </if>
             </iterate>
+<!--            <log level="info" message="Deleting Product Feature Appl: ${deleteProductFeatureAppls}"/>-->
 
             <set field="keywords" from="productJson.remove('keywords')"/>
             <set field="validKeywords" from="[]"/>
@@ -456,6 +554,7 @@ under the License.
                     </if>
                 </iterate>
                 <if condition="keywordsToAdd">
+<!--                    <log level="info" message="Setting Keywords for product: ${productJson.productId}"/>-->
                     <set field="productJson.keywords" from="keywordsToAdd"/>
                 </if>
             </if>
@@ -481,6 +580,7 @@ under the License.
                     <set field="deleteProductKeywords" from="deleteProductKeywords + currentProductKeyword"/>
                 </if>
             </iterate>
+<!--            <log level="info" message="Deleting Product Keyword: ${deleteProductKeywords}"/>-->
 
             <!-- Set the identifications list -->
             <set field="productJson.identifications" from="[]"/>
@@ -502,8 +602,11 @@ under the License.
 
                     <!-- If goodIdentifications list then set the values from the list if not then set the values from the incoming goodIdentifications -->
                     <if condition="goodIdentificationList"><then>
-                        <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
+<!--                        <log level="info" message="\n\n ===GoodIdentification====${goodIdentificationList[0].idValue}=== ${goodIdentification.idValue} ========\n\n"/>-->
+                        <if condition="!goodIdentificationList[0].idValue.equalsIgnoreCase(goodIdentification.idValue)">
+                            <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
                              idValue:goodIdentification.idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                        </if>
                     </then>
                         <else>
                             <set field="identification" from="[goodIdentificationTypeId:goodIdentification.goodIdentificationTypeId,
@@ -511,7 +614,7 @@ under the License.
                         </else>
                     </if>
 
-                    <set field="productJson.identifications" from="productJson.identifications+identification"/>
+                    <set field="productJson.identifications" from="productJson.identifications+(identification ?: [])"/>
                 </iterate>
             </if>
 
@@ -533,9 +636,11 @@ under the License.
 
                 <!-- If productPriceList then set the values from the list if not then set the values from the incoming productPrices -->
                 <if condition="productPriceList"><then>
-                    <set field="productJson.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
+                    <if condition="productPriceList[0].price.compareTo(new BigDecimal(productPrices.price)) != 0">
+                        <set field="productJson.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
                         currencyUomId:productPrices.currencyUomId, price:productPrices.price, productStoreGroupId:productPrices.productStoreGroupId,
                         fromDate:ec.l10n.format(productPriceList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                    </if>
                 </then><else>
                     <set field="productJson.prices" from="productPrices"/>
                 </else>
@@ -551,6 +656,10 @@ under the License.
         </in-parameters>
         <out-parameters>
             <parameter name="productId"/>
+            <parameter name="keywords"/>
+            <parameter name="featureAppls"/>
+            <parameter name="deleteProductKeywords"/>
+            <parameter name="deleteProductFeatureAppls"/>
         </out-parameters>
         <actions>
 
@@ -561,8 +670,11 @@ under the License.
             <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
             <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
             <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
+            <set field="keywords" from="prepareProductUpdateOutput.productJson.get('keywords')"/>
+            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.get('featureAppls')"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
             <set field="productId" from="productJson.productId"/>
+<!--            <log level="info" message="Identification or price updated: ${productJson.productId} ${isIdentificationOrPriceUpdated}"/>-->
 
             <!-- Create/update the ShopifyShopProduct record -->
             <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
@@ -590,6 +702,13 @@ under the License.
         </in-parameters>
         <out-parameters>
             <parameter name="productId"/>
+            <parameter name="deleteProductFeatureAppls"/>
+            <parameter name="featureAppls"/>
+            <parameter name="identifications"/>
+            <parameter name="prices"/>
+            <parameter name="assocs"/>
+<!--            <parameter name="isIdentificationOrPriceUpdated"/>-->
+<!--            <parameter name="isVariantAssociated"/>-->
         </out-parameters>
         <actions>
 
@@ -619,6 +738,15 @@ under the License.
                 <else>
                     <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
+<!--                    <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;CHIMIII-&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; ${deleteProductFeatureAppls} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+<!--                    <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;CHIMI-&#45;&#45;PrepareProductOutput&#45;&#45;&#45;&#45;&#45;&#45; ${prepareProductUpdateOutput.productJson} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+                    <set field="featureAppls" from="prepareProductUpdateOutput.productJson.get('featureAppls')"/>
+<!--                    <set field="isIdentificationOrPriceUpdated" value="false" type="Boolean"/>-->
+                    <set field="identifications" from="prepareProductUpdateOutput.productJson.get('identifications')"/>
+                    <set field="prices" from="prepareProductUpdateOutput.productJson.get('prices')"/>
+<!--                    <if condition="prepareProductUpdateOutput.productJson.get('prices') || prepareProductUpdateOutput.productJson.get('identifications')">-->
+<!--                        <set field="isIdentificationOrPriceUpdated" value="true"/>-->
+<!--                    </if>-->
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
                     <set field="productId" from="productVariantJson.productId"/>
 
@@ -630,8 +758,12 @@ under the License.
                         <date-filter/>
                     </entity-find>
                     <!-- If not then create a new ProductAssoc record -->
+<!--                    <set field="isVariantAssociated" value="true" type="Boolean"/>-->
                     <if condition="!productAssocs">
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+<!--                        <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;Setting isVariantAssociated false&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+<!--                        <set field="isVariantAssociated" value="false"/>-->
+                        <set field="assocs" from="assocs + [productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                     </if>
                     <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId,shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
