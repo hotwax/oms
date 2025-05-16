@@ -45,4 +45,12 @@
             cronExpression="0 0 0 * * ?" paused="Y">
         <parameters parameterName="orderIds"/>
     </moqui.service.job.ServiceJob>
+
+    <!-- SystemMessageType data for consuming New Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"/>
+
+    <!-- SystemMessageType data for consuming Update Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"/>
 </entity-facade-xml>
