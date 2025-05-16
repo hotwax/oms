@@ -15,492 +15,899 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
-
-    <service verb="get" noun="OrderItemSalesTaxTotal">
-        <description>Get the sales tax total for an order item</description>
+    <service verb="create" noun="ProductAndVariants">
+        <description>Service to create the virtual and variant products.</description>
         <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="payload" type="Map" required="true">
+                <description>The payload containing product and its variants.</description>
+            </parameter>
         </in-parameters>
-        <out-parameters>
-            <parameter name="itemTaxTotal" required="true" type="BigDecimal"/>
-        </out-parameters>
         <actions>
-            <!-- Validate the order item -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-            </entity-find-one>
-            <if condition="!orderItem">
-                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
-            </if>
+            <!-- Set the productVariants field from the incoming payload map -->
+            <set field="productVariants" from="payload.remove('variants')"/>
 
-            <set field="itemTaxTotal" from="0.0"/>
+            <!-- Call the create#VirtualProduct service -->
+            <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
+                    in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
 
-            <!-- Get the sales tax total for order item using the OrderAdjustment entity -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderAdjustment" list="orderAdjustments">
-                <econdition field-name="orderId" from="orderId"/>
-                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
-                <econdition field-name="orderAdjustmentTypeId" value="SALES_TAX"/>
-                <select-field field-name="amount"/>
-            </entity-find>
-            <if condition="!orderAdjustments">
-                <!-- If no sales tax adjustments are found then return -->
-                <return type="info" message="Sales Tax OrderAdjustment [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
-            </if>
+            <!-- Set the parentProductId returned from the create#VirtualProduct service -->
+            <set field="parentProductId" from="createVirtualProductOut.productId"/>
 
-            <!-- Get the sales tax total amount by adding each adjustment's amount -->
-            <iterate list="orderAdjustments" entry="orderAdjustment">
-                <set field="itemTaxTotal" from="itemTaxTotal.add(orderAdjustment.amount)"/>
+            <!-- Set the variantErrors list to store the errors occurred while creating variant product -->
+            <set field="variantErrors" from="[]"/>
+            <set field="variantProductIds" from="[]"/>
+
+            <!-- Iterate the productVariants list -->
+            <iterate list="productVariants" entry="productVariant">
+                <!-- For each product variant call the create#ProductVariant service -->
+                <script>
+                    <![CDATA[
+                        actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.create#ProductVariant")
+                        .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                        .requireNewTransaction(true)
+                        .call()
+
+                        // If any errors then add the error to variantErrors list
+                        if (ec.message.hasError()) {
+                            variantErrors.add(ec.message.getErrorsString())
+                        }
+                        ec.message.clearAll();
+                    ]]>
+                </script>
+                <if condition="actionResult.productId">
+                    <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
+                </if>
             </iterate>
-        </actions>
-    </service>
-
-    <service verb="change" noun="OrderItemStatus">
-        <description>Change the status of a sales order item</description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="statusId" required="true"/>
-            <parameter name="changeReason"/>
-            <parameter name="statusDateTime"/>
-            <parameter name="checkCancelCompleteOrder" type="Boolean" default-value="true"/>
-        </in-parameters>
-        <actions>
-            <!-- Get the order item -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-            </entity-find-one>
-            <!-- Log and return with error if order item doesn't exist -->
-            <if condition="!orderItem">
-                <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
-            </if>
-
-            <!-- Update the status of the order item -->
-            <set field="orderItemMap" from="orderItem"/>
-            <set field="orderItemMap.statusId" from="statusId"/>
-            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="orderItemMap"/>
-
-            <if condition="!statusDateTime">
-                <set field="statusDateTime" from="ec.user.nowTimestamp"/>
-            </if>
-            <!-- Call create#OrderStatus to register the order item cancellation status change event-->
-            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                    statusId:statusId, changeReason:changeReason, statusDatetime:statusDateTime, statusUserLogin:ec.user.getUsername()]"/>
-
-            <!-- Check if the statusId is ITEM_CANCELLED or ITEM_COMPLETED when checkCancelCompleteOrder is true-->
-            <if condition="checkCancelCompleteOrder">
-                <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
-                    <!-- Call checkCancelComplete#Order service to confirm if we need to completely cancel or complete the sales order -->
-                    <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId, changeReason:changeReason]"/>
-                </if>
-            </if>
-        </actions>
-    </service>
-
-    <service verb="checkCancelComplete" noun="Order">
-        <description>This service checks if we need to completely cancel or complete a sales order.</description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="changeReason"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="oldStatusId"/>
-            <parameter name="statusChanged" type="Boolean"/>
-        </out-parameters>
-        <actions>
-            <set field="statusChanged" type="Boolean" value="false"/>
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
-                <econdition field-name="orderId"/>
-            </entity-find>
-            <if condition="!orderItemList">
-                <return type="warning" message="OrderItem [ID: ${orderId}] - Not found"/>
-            </if>
-
-            <set field="allCancelled" type="Boolean" value="true"/>
-            <set field="anyCompleted" type="Boolean" value="false"/>
-            <set field="allCancelledOrCompleted" type="Boolean" value="true"/>
-            <iterate list="orderItemList" entry="curOrderItem">
-                <if condition="curOrderItem.statusId in ['ITEM_REJECTED', 'ITEM_CANCELLED']"><continue/></if>
-                <if condition="curOrderItem.statusId == 'ITEM_COMPLETED'">
-                    <set field="allCancelled" type="Boolean" value="false"/>
-                    <set field="anyCompleted" type="Boolean" value="true"/>
-                    <continue/>
-                </if>
-                <set field="allCancelled" type="Boolean" value="false"/>
-                <set field="allCancelledOrCompleted" type="Boolean" value="false"/>
-            </iterate>
-            <if condition="allCancelled">
-                <then>
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
-                </then>
-                <else-if condition="anyCompleted &amp;&amp; allCancelledOrCompleted">
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
-                </else-if>
-            </if>
-        </actions>
-    </service>
-
-    <service verb="change" noun="OrderStatus">
-        <description>This service validates and then changes the status of a sales order</description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="statusId" required="true"/>
-            <parameter name="changeReason"/>
-            <parameter name="setItemStatus" type="Boolean" default-value="false"/>
-        </in-parameters>
-        <actions>
-            <!-- Validate the orderHeader record -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
-                <field-map field-name="orderId"/>
-            </entity-find-one>
-            <if condition="!orderHeader">
-                <return type="warning" message="OrderHeader [ID: ${orderId}] - Not found"/>
-            </if>
-
-            <!-- Update the status of the OrderHeader -->
-            <set field="orderHeader.statusId" from="statusId"/>
-            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="orderHeader" />
-
-            <!-- Create OrderStatus record to register the status change -->
-            <service-call name="create#org.apache.ofbiz.order.order.OrderStatus" in-map="[orderId:orderId, statusId:statusId, changeReason:changeReason, statusDatetime:ec.user.nowTimestamp, statusUserLogin:ec.user.getUsername()]"/>
-
-            <if condition="setItemStatus">
-                <set field="orderAndItemStatusMapping" from="[ORDER_CREATED:'ITEM_CREATED', ORDER_APPROVED:'ITEM_APPROVED', ORDER_COMPLETED:'ITEM_COMPLETED', ORDER_CANCELLED:'ITEM_CANCELLED', ORDER_EXPIRED:'ITEM_EXPIRED', ORDER_REJECTED:'ITEM_REJECTED', ORDER_HOLD:'ITEM_HOLD']"/>
-                <set field="itemStatusId" from="orderAndItemStatusMapping.get(statusId)"/>
-
-                <!-- If setItemStatus is true then get all the order items -->
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
-                    <econdition field-name="orderId"/>
+            <if condition="variantProductIds">
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" operator="not-in" from="variantProductIds"/>
                 </entity-find>
-                <!-- Iterate through the order items and call change#OrderItemStatus service to update their status as well -->
-                <iterate list="orderItemList" entry="orderItem">
-                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, statusId:itemStatusId, changeReason:changeReason, statusDateTime:ec.user.nowTimestamp]"/>
-                </iterate>
-            </if>
-        </actions>
-    </service>
-
-    <service verb="find" noun="OrderItemShipGroup">
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="facilityId" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="shipGroupSeqId"/>
-        </out-parameters>
-        <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
-            <!-- Since a new ShipGroup is created for each routing attempt,
-                 reuse the existing ShipGroup only if the facility type is "virtual".
-                Additionally, filtering based on the shipment method type may be required in future.
-            -->
-            <set field="hasParentType"
-                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
-            <if condition="hasParentType">
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
-                    <econdition field-name="orderId" from="orderId"/>
-                    <econdition field-name="facilityId" from="facilityId"/>
-                    <order-by field-name="shipGroupSeqId DESC"/>
-                </entity-find>
-                <if condition="orderItemShipGroups">
-                    <set field="orderItemShipGroup" from="orderItemShipGroups[0]"/>
-                    <set field="shipGroupSeqId" from="orderItemShipGroup.shipGroupSeqId"/>
-                    <return/>
-                </if>
-            </if>
-        </actions>
-    </service>
-
-    <service verb="reject" noun="OrderItems">
-        <description>
-            The rejectOrderItems service processes a rejection request for one or more items in an order.
-            The rejection logic is driven by two key flags: maySplit and cascadeRejectByProduct, which determine the scope of the rejection.
-            Rejection Logic:
-            - maySplit = Y, cascadeRejectByProduct = N
-              - Reject only the specific item included in the request.
-            - maySplit = N, cascadeRejectByProduct = N
-              - Reject all items in the same ship group as the specified item.
-            - maySplit = Y, cascadeRejectByProduct = Y
-              - Reject items with the same productId in the same facility and match the rejection criteria (e.g., shipment not yet packed or shipped).
-            - maySplit = N, cascadeRejectByProduct = Y
-              - Reject entire ship groups across all orders that contain the specified productId in the same facility, provided the shipment is not yet packed or shipped.
-        </description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="rejectToFacilityId"/>
-            <parameter name="items" type="List" required="true">
-                <parameter name="item" type="Map">
-                    <parameter name="orderItemSeqId"/>
-                    <parameter name="quantity" default-value="1"/>
-                    <parameter name="updateQOH"/>
-                    <parameter name="maySplit" default-value="N">
-                        <description>Whether to allow rejection of individual items or reject the entire ship group. Default is N.</description>
-                    </parameter>
-                    <parameter name="cascadeRejectByProduct" default-value="N">
-                        <description>Whether to reject other items in the order with the same product in the same facility. Default is N.</description>
-                    </parameter>
-                    <parameter name="comments"/>
-                    <parameter name="rejectionReasonId" required="true"/>
-                    <parameter name="kitComponents" type="List">
-                        <parameter name="kitProductId"/>
-                    </parameter>
-                </parameter>
-            </parameter>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="cancelledReservations" type="List">
-                <parameter name="cancelledReservation">
-                    <parameter name="orderId"/>
-                    <parameter name="orderItemSeqId"/>
-                    <parameter name="shipGroupSeqId"/>
-                    <parameter name="inventoryItemId"/>
-                    <parameter name="cancelledQuantity" type="BigDecimal"/>
-                </parameter>
-            </parameter>
-        </out-parameters>
-        <actions>
-            <set field="cancelledReservations" from="[]"/>
-            <set field="conditionFactory" from="ec.entity.getConditionFactory()"/>
-            <set field="shipmentCondition"
-                    from="conditionFactory.makeCondition(
-                            conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.IN, ['SHIPMENT_INPUT', 'SHIPMENT_APPROVED']),
-                                org.moqui.entity.EntityCondition.JoinOperator.OR,
-                            conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, null)
-                        )"/>
-            <iterate list="items" entry="item">
-                <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
-                    <field-map field-name="orderId" from="orderId"/>
-                    <field-map field-name="orderItemSeqId" from="item.orderItemSeqId"/>
-                </entity-find-one>
-                <if condition="!orderItem">
-                    <return error="true" message="Order item [${orderId}:${item.orderItemSeqId}] not found."/>
-                </if>
-                <set field="rejectItemCond" from="[]"/>
-                <set field="facilityId" from="orderItem.facilityId"/>
-                <script>rejectItemCond.add(conditionFactory.makeCondition([facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']))</script>
-                <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
-                <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
-                <set field="relatedRejectReasonId" from="item.rejectionReasonId"/>
-                <if condition="maySplit">
-                    <if condition="cascadeRejectByProduct">
-                        <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
-                        <!-- This query includes all order items in facility with status `ITEM_APPROVED`
-                            and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
-                        <script>
-                            rejectItemCond.add(conditionFactory.makeCondition([productId: orderItem.productId]))
-                            rejectItemCond.add(shipmentCondition)
-                        </script>
-                        <else>
-                            <!--maySplit = Y, cascadeRejectByProduct = N:  Reject only the single item. -->
-                            <!-- No shipment status filter -->
-                            <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, orderItemSeqId: item.orderItemSeqId]))</script>
-                        </else>
-                    </if>
-                    <else>
-                        <set field="relatedRejectReasonId" value="REJ_AVOID_ORD_SPLIT"/>
-                        <if condition="cascadeRejectByProduct">
-                            <!-- maySplit = N, cascadeRejectByProduct = Y: Reject entire ship groups for all orders containing the specified product. -->
-                            <!--  Utilized Moqui framework's support for subqueries in the WHERE clause.
-                                 There are two ways to retrieve all order items that contain a specified product at same facility:
-                                   1. Fetch eligible order IDs, then loop through them to get the items at the desired facility.
-                                   2. Use a subquery directly in the WHERE clause to filter orders containing the specified product.
-
-                                 Opted for approach #2 as it is more efficient and avoids additional looping logic.
-                             -->
-                            <!-- This query includes all order items in facility  with status `ITEM_APPROVED`
-                                and no shipment or an early-stage shipment (`SHIPMENT_INPUT` or `SHIPMENT_APPROVED`) -->
-                            <script>
-                                <![CDATA[
-                                    rejectItemCond.add(
-                                                conditionFactory.makeConditionWhere("""OI.order_ID in ( SELECT DISTINCT OI_INNER.ORDER_ID
-                                                    FROM ORDER_ITEM OI_INNER
-                                                    INNER JOIN ORDER_ITEM_SHIP_GROUP OISG_INNER ON OI_INNER.ORDER_ID = OISG_INNER.ORDER_ID AND OI_INNER.SHIP_GROUP_SEQ_ID = OISG_INNER.SHIP_GROUP_SEQ_ID
-                                                    WHERE  OI_INNER.PRODUCT_ID = '${orderItem.productId}'
-                                                    AND OISG_INNER.facility_id = '${facilityId}'
-                                                    AND OI_INNER.status_id = 'ITEM_APPROVED')""")
-                                            )
-                                    rejectItemCond.add(shipmentCondition)
-                                    ]]>
-                            </script>
-                            <else>
-                                <!-- maySplit = N, cascadeRejectByProduct = N: Reject all items in the specified ship group.-->
-                                <!-- No shipment status filter -->
-                                <script>rejectItemCond.add(conditionFactory.makeCondition([orderId: orderId, shipGroupSeqId: orderItem.shipGroupSeqId]))</script>
-                            </else>
-                        </if>
-                    </else>
-                </if>
-                <entity-find entity-name="co.hotwax.oms.order.OrderItemToRejectView" list="eligibleItems" distinct="true">
-                    <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
-                </entity-find>
-                <iterate list="eligibleItems" entry="eligibleItem">
-                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]"/>
-                    <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
-                        <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
-                        <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
-                            <set field="rejectOrderItemMap.rejectionReasonId" value="REJ_CASCADE_BY_PROD"/>
-                        </if>
-                        <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionReason" cache="true">
-                            <field-map field-name="enumId" from="rejectOrderItemMap.rejectionReasonId"/>
-                        </entity-find-one>
-                        <set field="rejectOrderItemMap.comments" from="rejectionReason?.description"/>
-                    </if>
-                    <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
-                                  in-map="rejectOrderItemMap" out-map="outResult"/>
-                    <if condition="outResult.cancelledReservations">
-                        <script>cancelledReservations.addAll(outResult.cancelledReservations)</script>
-                    </if>
-                </iterate>
-            </iterate>
-        </actions>
-    </service>
-    <service verb="reject" noun="OrderItem">
-        <description>Service to reject an order item with various identification methods and record variance details.</description>
-        <in-parameters>
-            <parameter name="orderId" required="true"/>
-            <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="rejectToFacilityId" default-value="REJECTED_ITM_PARKING"/>
-            <parameter name="updateQOH" default-value="false" type="Boolean"/>
-            <parameter name="rejectionReasonId" required="true"/>
-            <parameter name="comments" />
-            <parameter name="kitComponents" type="List">
-                <parameter name="kitProductId"/>
-            </parameter>
-        </in-parameters>
-        <out-parameters>
-            <!-- Returning a list, as in the case of a marketing package, we also perform reservation for its components.-->
-            <parameter name="cancelledReservations" type="List">
-                <parameter name="cancelledReservation">
-                    <parameter name="orderId"/>
-                    <parameter name="orderItemSeqId"/>
-                    <parameter name="shipGroupSeqId"/>
-                    <parameter name="inventoryItemId"/>
-                    <parameter name="cancelledQuantity" type="BigDecimal"/>
-                </parameter>
-            </parameter>
-        </out-parameters>
-        <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="rejectToFacility" cache="true">
-                <field-map field-name="facilityId" from="rejectToFacilityId"/>
-            </entity-find-one>
-            <set field="hasParentType"
-                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', rejectToFacility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
-            <if condition="!hasParentType">
-                <set field="facilityName" from="rejectToFacility != null ? rejectToFacility.facilityName : rejectToFacilityId"/>
-                <return error="true" message="Order item [${orderId}:${orderItemSeqId} can't be rejected to non virtual facility ${facilityName}"/>
-            </if>
-            <!--Fetch shipGroupSeqId of item before processing anything -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-            </entity-find-one>
-
-            <set field="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
-
-            <!--1. Cancel Inventory Reservation call cancel#OrderItemShipGrpInvRes -->
-            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
-                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,cancelQuantity:orderItem.quantity]" out-map="outResult"/>
-
-            <set field="cancelledReservations" from="outResult.cancelledReservations"/>
-            <!--2. Move to rejected facility-->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="currentShipGroup">
-                <field-map field-name="shipGroupSeqId"/>
-                <field-map field-name="orderId" />
-            </entity-find-one>
-            <set field="fromFacilityId" from="currentShipGroup.facilityId"/>
-            <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
-                          in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity,
-                          orderFacilityChange: [changeReasonEnumId: rejectionReasonId, comments: comments]]"
-                          out-map="outMap"/>
-
-            <!--4. createUpdateExternalFulfillmentOrderItem-->
-            <service-call name="store#co.hotwax.integration.order.ExternalFulfillmentOrderItem"
-                          in-map="context + [fulfillmentStatus: 'REJECT']"/>
-
-            <!--5. createOrderHistory-->
-            <service-call name="create#co.hotwax.customerservice.order.OrderHistory"
-                          in-map="context + [eventTypeEnumId: 'ITEM_BKD_REJECTED']"/>
-
-            <!-- TODO: Move this to SECA: Set the facility and fulfillment status in solr doc -->
-            <service-call name="co.hotwax.poorti.FulfillmentServices.update#OrderItemFulfillmentStatus"
-                          in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,facilityId:rejectToFacilityId,fulfillmentStatus:'Rejected']"/>
-            <!--6. Record inventory variance-->
-            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionEnum" cache="true">
-                <field-map field-name="enumId" from="rejectionReasonId"/>
-            </entity-find-one>
-
-            <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_NO_VAR')">
-                <return message="Order Item [${orderId}: ${orderItemSeqId}] rejected successfully to facility: $rejectToFacilityId}" type="success"/>
-            </if>
-
-            <set field="products" from="[[productId: orderItem.productId, quantity: orderItem.quantity]]"/>
-
-            <!-- Check if item is marketing package then we will need to create variance for its components as well -->
-            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
-                <field-map field-name="productId" from="orderItem.productId"/>
-            </entity-find-one>
-            <set field="hasParentType"
-                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.product.ProductType', 'productTypeId', product?.productTypeId, 'parentTypeId', 'MARKETING_PKG_PICK')" type="Boolean"/>
-            <if condition="hasParentType">
-                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
-                    <econdition field-name="productId" from="orderItem.productId"/>
-                    <econdition field-name="productAssocTypeId" value="PRODUCT_COMPONENT"/>
-                    <date-filter/>
-                </entity-find>
-                <if condition="components">
-                    <iterate list="components" entry="component">
-                        <if condition="kitComponents &amp;&amp; !kitComponents.contains(component.productIdTo)">
-                            <continue/>
-                        </if>
-                        <set field="componentQty" from="(component.quantity?:1) * orderItem.quantity" type="BigDecimal"/>
-                        <script>
-                            products.add([productId: component.productIdTo, quantity: componentQty])
-                        </script>
+                <if condition="productAssocs">
+                    <iterate list="productAssocs" entry="productAssoc">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new" ignore-error="true"/>
                     </iterate>
                 </if>
             </if>
-            <iterate list="products" entry="product">
-                <entity-find-one entity-name="co.hotwax.oms.product.inventory.ProductFacilityInventoryItemView"
-                                 value-field="productFacility">
-                    <field-map field-name="productId" from="product.productId"/>
-                    <field-map field-name="facilityId" from="fromFacilityId"/>
-                </entity-find-one>
-                <set field="varianceQuantity" value="0" type="BigDecimal"/>
 
-                <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_VAR')">
-                    <set field="varianceQuantity" from="product.quantity" type="BigDecimal"/>
-                    <else-if
-                            condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_ALL_VAR')">
-                        <set field="varianceQuantity" from="productFacility.lastInventoryCount" type="BigDecimal"/>
-                    </else-if>
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:true]" ignore-error="true"/>
+            <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+
+            <if condition="variantErrors">
+                <script>
+                    ec.message.addError(variantErrors.toString())
+                </script>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="create" noun="VirtualProduct">
+        <description>Service to create virtual product and its shopify shop product record.</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true">
+                <description>Product json to create the virtual product.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId">
+                <description>The productId of the created virtual product.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productJson.internalName"/>
+            </entity-find>
+
+            <set field="productJson.productId" from="productsList?.first?.productId"/>
+
+            <!-- Check if the productId is not null then only create ShopifyShopProduct record -->
+            <if condition="productJson.productId">
+                <!-- Create ShopifyShopProduct record -->
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productJson.shopifyShopProduct.shopId,
+                        productId:productJson.productId,shopifyProductId:productJson.shopifyShopProduct.shopifyProductId]"/>
+                <set field="productId" from="productJson.productId"/>
+                <return/>
+            </if>
+
+            <!-- Get the ShopifyShopProduct record and remove it from productJson -->
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+
+            <!-- Call prepare#ProductCreate service to get the json for creating product -->
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
+                          out-map="prepareProductCreateOut"/>
+
+            <!-- Call create service for Virtual Product -->
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                    out-map="createProductOut"/>
+
+            <!-- Set the parentProductId -->
+            <set field="productId" from="createProductOut.productId"/>
+
+            <!-- Create ShopifyShopProduct record -->
+            <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+        </actions>
+    </service>
+
+    <service verb="create" noun="ProductVariant">
+        <description>Service to create Product Variant.</description>
+        <in-parameters>
+            <parameter name="productVariantJson" type="Map" required="true">
+                <description>The product variant json to be created.</description>
+            </parameter>
+            <parameter name="parentProductId" required="true">
+                <description>The parent product id for the variants.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+        </out-parameters>
+        <actions>
+
+            <!-- Check if internalName is present, if no return as for variant the internalName is used to
+                 uniquely identify the product and if missing then product should not be created. -->
+            <if condition="!productVariantJson.internalName">
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
+            </if>
+
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productVariantJson.internalName"/>
+            </entity-find>
+
+            <!-- Set productId in the productVariantMap if the productId exists -->
+            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+
+            <!-- Check if productId is not null -->
+            <if condition="productVariantJson.productId">
+                <set field="productId" from="productVariantJson.productId"/>
+                <!-- Create ShopifyShopProduct record -->
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
+                        productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
+                        shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+
+                <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" from="productVariantJson.productId"/>
+                    <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                    <date-filter/>
+                </entity-find>
+                <!-- If not then create a new ProductAssoc record -->
+                <if condition="!productAssocs">
+                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                 </if>
-                <!--Run the code to record variance -->
-                <if condition="varianceQuantity>0">
-                    <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
-                    <set field="inventoryItemVarianceMap"
-                         from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
-                        comments: comments, availableToPromiseVar: varianceQuantity.negate()]"/>
+                <return/>
+            </if>
 
-                    <if condition="updateQOH">
-                        <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
+            <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
+            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
+
+            <!-- Call prepare#ProductCreate for the productVariantJson map -->
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
+                    out-map="prepareProductCreateOut"/>
+
+            <!-- Create Product record for the variant product -->
+            <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
+                    out-map="createProductOut"/>
+            <set field="productId" from="createProductOut.productId"/>
+
+            <!-- Create ProductAssoc record for the variant product -->
+            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+
+            <!-- Create ShopifyShopProduct record for the variant product -->
+            <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
+                    shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+        </actions>
+    </service>
+
+    <service verb="prepare" noun="ProductCreate">
+        <description>Service to create the json map required for creating the product and its related records.</description>
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true">
+                <description>The input json map for product.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productJson" type="Map">
+                <description>The output json map for the product.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <!--<log message="productJson BEFORE prepare create: ${productJson}"/>-->
+            <!-- Set the features list and remove it from productJson -->
+            <set field="features" from="productJson.remove('features')"/>
+
+            <!-- Check if features list is not null -->
+            <if condition="features">
+                <!-- Initialize the featureAppls list -->
+                <set field="featureAppls" from="[]"/>
+
+                <!-- Iterate through the features list -->
+                <iterate list="features" entry="feature">
+                    <!-- Fetch productFeatureType record for productFeatureTypeId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
+                    </entity-find>
+
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
+                                          out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                        </else>
                     </if>
-                    <set field="inventoryItemVarianceMap.inventoryItemDetail"
-                         from="[orderId: orderId, orderItemSeqId: orderItemSeqId, rejectionReasonId: rejectionReasonId,
-                     availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
-                    <!--  These go in top level Map - createPhysicalInventoryMap -->
-                    <set field="createPhysicalInventoryMap"
-                         from="[partyId:ec.user.getUserAccount()?.partyId, inventoryItemVariances: [inventoryItemVarianceMap]]"/>
-                    <!--  Call create Physical Inventory -->
-                    <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory"
-                                  in-map="createPhysicalInventoryMap" out-map="result"/>
+                    <!-- Fetch feature record for the productFeatureId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="feature.featureDesc.trim()"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                    </entity-find>
 
+                    <if condition="productFeatures">
+                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
+                                          out-map="createProductFeatureOutput" transaction="force-new"/>
+                            <set field="productFeatureId" from="createProductFeatureOutput.productFeatureId"/>
+                        </else>
+                    </if>
+
+                    <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
+                </iterate>
+                <set field="productJson.featureAppls" from="featureAppls"/>
+            </if>
+
+            <!-- Set the goodIdentifications from the incoming productJson -->
+            <if condition="productJson.goodIdentifications">
+                <set field="productJson.identifications" from="productJson.remove('goodIdentifications')"/>
+            </if>
+
+            <!-- Set the product prices from the incoming productJson -->
+            <if condition="productJson.productPrices">
+                <set field="productJson.prices" from="productJson.remove('productPrices')"/>
+            </if>
+
+            <!-- Set the createdDate as nowDate for the product -->
+            <set field="productJson.createdDate" from="ec.user.nowTimestamp"/>
+
+            <!-- Adding log for testing -->
+            <!--<log message="productJson AFTER prepare create: ${productJson}"/>-->
+        </actions>
+    </service>
+    <service verb="update" noun="ProductAndVariants">
+        <description>This service will update product and create new variants</description>
+        <in-parameters>
+            <parameter name="payload" type="Map" required="true"/>
+        </in-parameters>
+        <actions>
+            <set field="productVariants" from="payload.remove('variants')"/>
+
+            <!-- If the productId is null, then create a new product and create a new ShopifyShopProduct record-->
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <set field="diffJsonFilePathRef" from="ec.resource.expand('${contentRoot}/sob/OMSUpdateProductsFeed/Diff-${dateTime}.json', null,
+                    [contentRoot: ec.user.getPreference('mantle.content.root') ?: 'dbresource://datamanager', dateTime:ec.l10n.format(nowDate, 'yyyy-MM-dd-HH-mm-ss-SSS')], false)"/>
+            <set field="diffJsonFilePath" from="ec.resource.getLocationReference(diffJsonFilePathRef).getUri().getPath()"/>
+            <set field="fileMapToWrite" from="[:]"/>
+            <script>
+                import com.fasterxml.jackson.core.JsonGenerator
+                import com.fasterxml.jackson.core.JsonFactory
+                import com.fasterxml.jackson.databind.ObjectMapper
+                import java.nio.charset.StandardCharsets
+
+                try {
+                File file = new File(diffJsonFilePath)
+                if (!file.parentFile.exists()) file.parentFile.mkdirs()
+                JsonFactory jfactory = new JsonFactory()
+
+                /* Declaring the PrintWriter and JsonGenerator resources in the try statement,
+                so that they are automatically closed regardless of whether the try statement completes normally or abruptly. */
+                try (PrintWriter pw = new PrintWriter(StandardCharsets.UTF_8, file);
+                JsonGenerator jGenerator = jfactory.createGenerator(pw)) {
+                jGenerator.writeStartArray()
+            </script>
+
+            <if condition="!payload.productId">
+
+                <!-- Call create#VirtualProduct service -->
+                <service-call name="co.hotwax.oms.product.ProductServices.create#VirtualProduct"
+                        in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
+
+                <!-- Set the parentProductId returned from create#VirtualProduct service -->
+                <set field="parentProductId" from="createVirtualProductOut.productId"/>
+                <else>
+                    <!-- Call update#VirtualProduct service -->
+                    <service-call name="co.hotwax.oms.product.ProductServices.update#VirtualProduct"
+                                  in-map="[productJson:payload]" out-map="updateVirtualProductOut" transaction="force-new"/>
+<!--                    <log level="info" message="\n\n ================ ${updateVirtualProductOut} ================ \n\n"/>-->
+                    <set field="parentProductId" from="updateVirtualProductOut.productId"/>
+                    <set field="parentProductKeywords" from="updateVirtualProductOut.keywords"/>
+                    <set field="parentProductFeatureAppls" from="updateVirtualProductOut.featureAppls"/>
+                    <set field="parentProductDeleteProductKeywords" from="updateVirtualProductOut.deleteProductKeywords"/>
+                    <set field="parentProductDeleteFeatureAppls" from="updateVirtualProductOut.deleteProductFeatureAppls"/>
+                    <set field="fileMapToWrite.parentProductId" from="parentProductId"/>
+                    <set field="fileMapToWrite.keywords" from="parentProductKeywords"/>
+                    <set field="fileMapToWrite.featureAppls" from="parentProductFeatureAppls"/>
+                    <set field="fileMapToWrite.deleteProductKeywords" from="parentProductDeleteProductKeywords"/>
+                    <set field="fileMapToWrite.deleteProductFeatureAppls" from="parentProductDeleteFeatureAppls"/>
+                </else>
+            </if>
+            <set field="isVirtualUpdated" from="true"/>
+            <!-- Check if there is any update in the virtual product -->
+            <if condition="!parentProductKeywords &amp;&amp; !parentProductFeatureAppls &amp;&amp; !parentProductDeleteProductKeywords &amp;&amp; !parentProductDeleteFeatureAppls">
+                <set field="isVirtualUpdated" from="false"/>
+            </if>
+
+            <!-- Set the variantErrors list to store the errors occurred while creating variant product -->
+            <set field="variantErrors" from="[]"/>
+            <set field="variantProductIds" from="[]"/>
+            <set field="variantProductFeatureAppls" from="[:]"/>
+            <set field="variantProductDeleteFeatureAppls" from="[:]"/>
+            <set field="variantProductIdentifications" from="[:]"/>
+            <set field="variantProductPrice" from="[:]"/>
+            <set field="variantProductAssocs" from="[:]"/>
+            <set field="fileMapToWrite.variants" from="[]"/>
+            <iterate list="productVariants" entry="productVariant">
+                <script>
+                    <![CDATA[
+                        actionResult = ec.service.sync().name("co.hotwax.oms.product.ProductServices.update#ProductVariant")
+                        .parameters([productVariantJson:productVariant,parentProductId:parentProductId])
+                        .requireNewTransaction(true)
+                        .call()
+
+                        // If any errors then add the error to variantErrors list
+                        if (ec.message.hasError()) {
+                            variantErrors.add(ec.message.getErrorsString())
+                        }
+                        ec.message.clearAll();
+                    ]]>
+                </script>
+<!--                <log level="info" message="-&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; ${actionResult} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;SWATI&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;"/>-->
+                <set field="variant" from="[:]"/>
+                <if condition="actionResult.productId">
+                    <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
+                    <set field="variant.productId" from="actionResult.productId"/>
+                    <if condition="actionResult.featureAppls">
+                        <set field="variantProductFeatureAppls[actionResult.productId]" from="actionResult.featureAppls"/>
+                        <set field="variant.featureAppls" from="actionResult.featureAppls"/>
+                    </if>
+                    <if condition="actionResult.deleteProductFeatureAppls">
+                        <set field="variantProductDeleteFeatureAppls[actionResult.productId]" from="actionResult.deleteProductFeatureAppls"/>
+                        <set field="variant.deleteProductFeatureAppls" from="actionResult.deleteProductFeatureAppls"/>
+                    </if>
+                    <if condition="actionResult.identifications">
+                        <set field="variantProductIdentifications[actionResult.productId]" from="actionResult.identifications"/>
+                        <set field="variant.identifications" from="actionResult.identifications"/>
+                    </if>
+                    <if condition="actionResult.prices">
+                        <set field="variantProductPrice[actionResult.productId]" from="actionResult.prices"/>
+                        <set field="variant.prices" from="actionResult.prices"/>
+                    </if>
+                    <if condition="actionResult.assocs">
+                        <set field="variantProductAssocs[actionResult.productId]" from="actionResult.assocs"/>
+                        <set field="variant.assocs" from="actionResult.assocs"/>
+                    </if>
+<!--                    <set field="isIdentificationOrPriceUpdated" from="actionResult.isIdentificationOrPriceUpdated"/>-->
+<!--                    <if condition="actionResult.isIdentificationOrPriceUpdated">-->
+<!--                        <set field="variantProductIdentificationsOrPriceUpdated[actionResult.productId]" from="actionResult.isIdentificationOrPriceUpdated"/>-->
+<!--                    </if>-->
+<!--                    <if condition="!actionResult.isVariantAssociated">-->
+<!--                        <set field="variantProductAssociated[actionResult.productId]" from="actionResult.isVariantAssociated"/>-->
+<!--                    </if>-->
+                <set field="fileMapToWrite.variants" from="fileMapToWrite.variants + variant"/>
                 </if>
             </iterate>
+            <script>
+                // write the jsonEntry to the Errorfile
+                new ObjectMapper()
+                .setDateFormat(new java.text.SimpleDateFormat(System.getProperty("default_date_time_format")))
+                .writerWithDefaultPrettyPrinter().writeValue(jGenerator,fileMapToWrite)
+                jGenerator.writeEndArray()
+                }
+                } catch (Exception e) {
+                logger.error("Error preparing OMS JSON Feed file", e)
+                }
+            </script>
+            <set field="anyVariantUpdated" from="true"/>
+            <set field="indexVariants" from="true"/>
+<!--            <log level="info" message="\n\n=CHIMII========= ${variantProductFeatureAppls}\n\n == ${variantProductDeleteFeatureAppls} =================\n\n"/>-->
+<!--            <log level="info" message="\n\n=CHIMII=========== ${variantProductIdentifications} == ${variantProductPrice} == ${variantProductAssocs} ========================\n\n"/>-->
+            <if condition="!variantProductFeatureAppls &amp;&amp; !variantProductDeleteFeatureAppls &amp;&amp; !variantProductIdentifications &amp;&amp; !variantProductPrice &amp;&amp; !variantProductAssocs">
+                <set field="anyVariantUpdated" from="false"/>
+                <set field="indexVariants" from="false"/>
+            </if>
+<!--            <log message="-&#45;&#45;&#45;&#45;&#45;&#45; Chinmay &#45;&#45;&#45;&#45;&#45;&#45; ${isVirtualUpdated} -&#45;&#45;&#45;&#45;&#45;&#45; ${anyVariantUpdated} &#45;&#45;&#45;&#45;&#45;&#45;"/>-->
+            <if condition="variantProductIds">
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                    <econdition field-name="productId" from="parentProductId"/>
+                    <econdition field-name="productIdTo" operator="not-in" from="variantProductIds"/>
+                </entity-find>
+                <if condition="productAssocs">
+                    <iterate list="productAssocs" entry="productAssoc">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new" ignore-error="true"/>
+                    </iterate>
+                </if>
+            </if>
+
+            <if condition="isVirtualUpdated || anyVariantUpdated">
+                <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
+                <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
+            </if>
+
+            <if condition="variantErrors">
+                <script>
+                    ec.message.addError(variantErrors.toString())
+                </script>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="prepare" noun="ProductUpdate">
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+            <parameter name="deleteProductFeatureAppls" type="List"/>
+            <parameter name="deleteProductKeywords" type="List"/>
+        </out-parameters>
+        <actions>
+            <!--<log message="productJson BEFORE prepare update: ${productJson}"/>-->
+            <!-- Prepare the product features -->
+            <set field="features" from="productJson.remove('features')"/>
+            <set field="validFeatureAppls" from="[]"/>
+            <if condition="features">
+                <!-- Initialize the featureAppls list -->
+                <set field="featureAppls" from="[]"/>
+
+                <!-- Iterate through the features list -->
+                <iterate list="features" entry="feature">
+                    <!-- Fetch productFeatureType record for productFeatureTypeId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
+                    </entity-find>
+
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
+                                    out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
+                        </else>
+                    </if>
+
+                    <!-- Fetch feature record for the productFeatureId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="feature.featureDesc.trim()"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                    </entity-find>
+
+                    <if condition="productFeatures">
+                        <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" list="productFeatureAppls" limit="1">
+                            <econdition field-name="productId" from="productJson.productId"/>
+                            <econdition field-name="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                            <econdition field-name="productFeatureApplTypeId" from="feature.productFeatureApplTypeId"/>
+                            <date-filter/>
+                        </entity-find>
+                        <if condition="productFeatureAppls">
+                            <set field="validFeatureAppls" from="validFeatureAppls + productFeatureAppls[0]"/>
+                            <else>
+                                <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatures[0].productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
+                            </else>
+                        </if>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
+                                    out-map="createProductFeatureOutput" transaction="force-new"/>
+                            <set field="featureAppls" from="featureAppls + [productFeatureId:createProductFeatureOutput.productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
+                        </else>
+                    </if>
+                </iterate>
+                <if condition="featureAppls">
+<!--                    <log level="info" message="Setting Feature Appl for product: ${productJson.productId}"/>-->
+                    <set field="productJson.featureAppls" from="featureAppls"/>
+                </if>
+            </if>
+
+            <!-- TODO: Add more comments -->
+            <!-- Get the current active ProductFeatureAppl list for the product -->
+            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" list="currentProductFeatureAppls">
+                <econdition field-name="productId" from="productJson.productId"/>
+                <date-filter/>
+            </entity-find>
+            <set field="deleteProductFeatureAppls" from="[]"/>
+            <iterate list="currentProductFeatureAppls" entry="currentProductFeatureAppl">
+                <set field="toBeDeleted" value="true" type="Boolean"/>
+                <iterate list="validFeatureAppls" entry="validFeatureAppl">
+                    <if condition="currentProductFeatureAppl.productFeatureId == validFeatureAppl.productFeatureId">
+<!--                        <log level="info" message="\n\n +++++++++ ${validFeatureAppl} ++++++++++ \n\n"/>-->
+                        <set field="toBeDeleted" value="false" type="Boolean"/>
+                    </if>
+                </iterate>
+                <if condition="toBeDeleted">
+                    <set field="deleteProductFeatureAppls" from="deleteProductFeatureAppls + currentProductFeatureAppl"/>
+                </if>
+            </iterate>
+<!--            <log level="info" message="Deleting Product Feature Appl: ${deleteProductFeatureAppls}"/>-->
+
+            <set field="keywords" from="productJson.remove('keywords')"/>
+            <set field="validKeywords" from="[]"/>
+            <if condition="keywords">
+                <set field="keywordsToAdd" from="[]"/>
+                <iterate list="keywords" entry="keyword">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.product.ProductKeyword" value-field="productKeyword">
+                        <field-map field-name="productId" from="productJson.productId"/>
+                        <field-map field-name="keywordTypeId" from="keyword.keywordTypeId"/>
+                        <field-map field-name="keyword" from="keyword.keyword"/>
+                    </entity-find-one>
+                    <if condition="productKeyword">
+                        <set field="validKeywords" from="validKeywords + productKeyword"/>
+                        <else>
+                            <set field="keywordsToAdd" from="keywordsToAdd + keyword"/>
+                        </else>
+                    </if>
+                </iterate>
+                <if condition="keywordsToAdd">
+<!--                    <log level="info" message="Setting Keywords for product: ${productJson.productId}"/>-->
+                    <set field="productJson.keywords" from="keywordsToAdd"/>
+                </if>
+            </if>
+
+            <!-- Fetch the current Product Keywords for the productId -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.ProductKeyword" list="currentProductKeywords">
+                <econdition field-name="productId" from="productJson.productId"/>
+            </entity-find>
+            <!-- Initialize the deleteProductKeywords list -->
+            <set field="deleteProductKeywords" from="[]"/>
+            <!-- Iterate the currentProductKeywords list -->
+            <iterate list="currentProductKeywords" entry="currentProductKeyword">
+                <!-- Initialize toBeDeleted to true -->
+                <set field="toBeDeleted" value="true" type="Boolean"/>
+                <!-- Iterate the keywords list in the productJson -->
+                <iterate list="validKeywords" entry="validKeyword">
+                    <if condition="currentProductKeyword.keyword == validKeyword.keyword">
+                        <set field="toBeDeleted" value="false" type="Boolean"/>
+                    </if>
+                </iterate>
+                <!-- If toBeDeleted is true then add that keyword map to the deleteProductKeywords list -->
+                <if condition="toBeDeleted">
+                    <set field="deleteProductKeywords" from="deleteProductKeywords + currentProductKeyword"/>
+                </if>
+            </iterate>
+<!--            <log level="info" message="Deleting Product Keyword: ${deleteProductKeywords}"/>-->
+
+            <!-- Set the identifications list -->
+            <set field="productJson.identifications" from="[]"/>
+
+            <!-- Set the goodIdentifications from the incoming productJson -->
+            <set field="goodIdentifications" from="productJson.remove('goodIdentifications')"/>
+
+            <!-- If goodIdentifications then iterate the goodIdentifications list and check in GoodIdentification entity
+                 if the goodIdentificationType is already present -->
+            <if condition="goodIdentifications">
+                <iterate list="goodIdentifications" entry="goodIdentification">
+
+                    <!-- Fetch the goodIdentifications for the productId -->
+                    <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentificationList">
+                        <econdition field-name="productId" from="productJson?.productId"/>
+                        <econdition field-name="goodIdentificationTypeId" from="goodIdentification.goodIdentificationTypeId"/>
+                        <date-filter/>
+                    </entity-find>
+
+                    <!-- If goodIdentifications list then set the values from the list if not then set the values from the incoming goodIdentifications -->
+                    <if condition="goodIdentificationList"><then>
+<!--                        <log level="info" message="\n\n ===GoodIdentification====${goodIdentificationList[0].idValue}=== ${goodIdentification.idValue} ========\n\n"/>-->
+                        <if condition="!goodIdentificationList[0].idValue.equalsIgnoreCase(goodIdentification.idValue)">
+                            <set field="identification" from="[goodIdentificationTypeId:goodIdentificationList[0].goodIdentificationTypeId,
+                             idValue:goodIdentification.idValue, fromDate:ec.l10n.format(goodIdentificationList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                        </if>
+                    </then>
+                        <else>
+                            <set field="identification" from="[goodIdentificationTypeId:goodIdentification.goodIdentificationTypeId,
+                                 idValue:goodIdentification.idValue]"/>
+                        </else>
+                    </if>
+
+                    <set field="productJson.identifications" from="productJson.identifications+(identification ?: [])"/>
+                </iterate>
+            </if>
+
+            <!-- Set the productPrices map from the incoming productJson -->
+            <set field="productPrices" from="productJson.remove('productPrices')"/>
+
+            <!-- If productPrices then check in ProductPrice entity if the product price record is already present -->
+            <if condition="productPrices">
+
+                <!-- Fetch the productPrice for the product -->
+                <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPriceList">
+                    <econdition field-name="productId" from="productJson?.productId"/>
+                    <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
+                    <econdition field-name="productPricePurposeId" value="PURCHASE"/>
+                    <econdition field-name="currencyUomId" from="productPrices.currencyUomId"/>
+                    <econdition field-name="productStoreGroupId" from="productPrices.productStoreGroupId"/>
+                    <date-filter/>
+                </entity-find>
+
+                <!-- If productPriceList then set the values from the list if not then set the values from the incoming productPrices -->
+                <if condition="productPriceList"><then>
+                    <if condition="productPriceList[0].price.compareTo(new BigDecimal(productPrices.price)) != 0">
+                        <set field="productJson.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
+                        currencyUomId:productPrices.currencyUomId, price:productPrices.price, productStoreGroupId:productPrices.productStoreGroupId,
+                        fromDate:ec.l10n.format(productPriceList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                    </if>
+                </then><else>
+                    <set field="productJson.prices" from="productPrices"/>
+                </else>
+                </if>
+            </if>
+            <!--<log message="productJson AFTER prepare update: ${productJson}"/>-->
+        </actions>
+    </service>
+
+    <service verb="update" noun="VirtualProduct">
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+            <parameter name="keywords"/>
+            <parameter name="featureAppls"/>
+            <parameter name="deleteProductKeywords"/>
+            <parameter name="deleteProductFeatureAppls"/>
+        </out-parameters>
+        <actions>
+
+            <!-- Set the shopifyShopProduct record form the productJson -->
+            <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+
+            <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
+            <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
+            <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
+            <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
+            <set field="keywords" from="prepareProductUpdateOutput.productJson.get('keywords')"/>
+            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.get('featureAppls')"/>
+            <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
+            <set field="productId" from="productJson.productId"/>
+<!--            <log level="info" message="Identification or price updated: ${productJson.productId} ${isIdentificationOrPriceUpdated}"/>-->
+
+            <!-- Create/update the ShopifyShopProduct record -->
+            <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]"/>
+
+            <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
+            <if condition="deleteProductFeatureAppls">
+                <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
+                    <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                </iterate>
+            </if>
+            <if condition="deleteProductKeywords">
+                <iterate list="deleteProductKeywords" entry="productKeyword">
+                    <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword" in-map="productKeyword"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="update" noun="ProductVariant">
+        <description>This service will update a product variant</description>
+        <in-parameters>
+            <parameter name="productVariantJson" type="Map" required="true"/>
+            <parameter name="parentProductId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+            <parameter name="deleteProductFeatureAppls"/>
+            <parameter name="featureAppls"/>
+            <parameter name="identifications"/>
+            <parameter name="prices"/>
+            <parameter name="assocs"/>
+<!--            <parameter name="isIdentificationOrPriceUpdated"/>-->
+<!--            <parameter name="isVariantAssociated"/>-->
+        </out-parameters>
+        <actions>
+
+            <!-- Check if internalName is present, if no return as for variant the internalName is used to
+                 uniquely identify the product and if missing then product should not be created. -->
+            <if condition="!productVariantJson.internalName">
+                <return error="true" message="Error for ShopifyProductId [${productVariantJson.shopifyShopProduct.shopifyProductId}], either Shopify Product Id or Shopify Product SKU or Barcode is required to create product."/>
+            </if>
+
+            <!-- Check if the product already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
+                <econdition field-name="internalName" from="productVariantJson.internalName"/>
+            </entity-find>
+
+            <!-- Set productId in the productVariantMap if the productId exists -->
+            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+
+            <!-- Set the shopifyShopProduct record from the productJson -->
+            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
+
+            <if condition="!productVariantJson.productId">
+                <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
+                <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
+                <set field="productId" from="createProductOutput.productId"/>
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                <else>
+                    <service-call name="co.hotwax.oms.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
+                    <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
+<!--                    <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;CHIMIII-&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; ${deleteProductFeatureAppls} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+<!--                    <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;CHIMI-&#45;&#45;PrepareProductOutput&#45;&#45;&#45;&#45;&#45;&#45; ${prepareProductUpdateOutput.productJson} -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+                    <set field="featureAppls" from="prepareProductUpdateOutput.productJson.get('featureAppls')"/>
+<!--                    <set field="isIdentificationOrPriceUpdated" value="false" type="Boolean"/>-->
+                    <set field="identifications" from="prepareProductUpdateOutput.productJson.get('identifications')"/>
+                    <set field="prices" from="prepareProductUpdateOutput.productJson.get('prices')"/>
+<!--                    <if condition="prepareProductUpdateOutput.productJson.get('prices') || prepareProductUpdateOutput.productJson.get('identifications')">-->
+<!--                        <set field="isIdentificationOrPriceUpdated" value="true"/>-->
+<!--                    </if>-->
+                    <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
+                    <set field="productId" from="productVariantJson.productId"/>
+
+                    <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
+                        <econdition field-name="productId" from="parentProductId"/>
+                        <econdition field-name="productIdTo" from="productVariantJson.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <!-- If not then create a new ProductAssoc record -->
+<!--                    <set field="isVariantAssociated" value="true" type="Boolean"/>-->
+                    <if condition="!productAssocs">
+                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+<!--                        <log level="info" message="\n\n &#45;&#45;&#45;&#45;&#45;&#45;Setting isVariantAssociated false&#45;&#45;&#45;&#45;&#45;&#45; \n\n"/>-->
+<!--                        <set field="isVariantAssociated" value="false"/>-->
+                        <set field="assocs" from="assocs + [productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                    </if>
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId,shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                    <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
+                    <if condition="deleteProductFeatureAppls">
+                        <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
+                            <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl" in-map="productFeatureAppl"/>
+                        </iterate>
+                    </if>
+                </else>
+            </if>
+        </actions>
+    </service>
+    <!--I don't like the findOrCreate pattern, but don't have better suggestion -->
+    <!--The service noun should be ProductInventoryItem, as we are fetching product inventory item at facility  -->
+    <service verb="findOrCreate" noun="FacilityInventoryItem">
+        <description>
+            This service finds or creates an inventory item for a given product and facility.
+            It ensures that the ProductFacility record exist before associating them with an inventory item.
+        </description>
+        <in-parameters>
+            <parameter name="facilityId">
+                <description>
+                    The internal identifier of the facility.
+                    If not provided, externalFacilityId is used to find the facility.
+                </description>
+            </parameter>
+            <parameter name="externalFacilityId">
+                <description>
+                    The external identifier of the facility.
+                    Used to find the facility when facilityId is not provided.
+                </description>
+            </parameter>
+            <parameter name="productId">
+                <description>
+                    The internal identifier of the product.
+                    If not provided, productIdentType and productIdentValue are used to find the product.
+                </description>
+            </parameter>
+            <parameter name="productIdentType">
+                <description>
+                    The identification type (e.g., SKU, UPCA) for the product.
+                    Required if productId is not provided.
+                </description>
+            </parameter>
+            <parameter name="productIdentValue">
+                <description>
+                    The identification value corresponding to productIdentType.
+                    Required if productId is not provided.
+                </description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+            <parameter name="facilityId"/>
+            <parameter name="inventoryItemId"/>
+        </out-parameters>
+        <actions>
+            <if condition="!productId">
+                <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentifications" cache="true">
+                    <econdition field-name="goodIdentificationTypeId" from="productIdentType"/>
+                    <econdition field-name="idValue" from="productIdentValue"/>
+                    <date-filter/>
+                </entity-find>
+                <if condition="!goodIdentifications">
+                    <return error="true" message="Could not find product with ident type ${productIdentType} and value ${productIdentValue}"/>
+                </if>
+                <set field="productId" from="goodIdentifications?goodIdentifications[0].productId:null"/>
+            </if>
+            <if condition="!facilityId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilities" cache="true">
+                    <econdition field-name="externalId" from="externalFacilityId"/>
+                </entity-find>
+                <if condition="!facilities">
+                    <return error="true" message="Could not find facility with external ID ${externalFacilityId}"/>
+                </if>
+                <set field="facilityId" from="facilities?facilities[0].facilityId:null"/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
+            <set field="hasParentType"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
+            <if condition="hasParentType">
+                <return error="true" message="Facility [ID: ${facilityId} is virtual facility."/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="productFacility">
+                <field-map field-name="productId" from="productId"/>
+                <field-map field-name="facilityId" from="facilityId"/>
+            </entity-find-one>
+
+            <if condition="productFacility &amp;&amp; productFacility.inventoryItemId">
+                <set field="inventoryItemId" from="productFacility.inventoryItemId"/>
+                <else>
+                    <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityLocation" list="facilityLocations" cache="true">
+                        <econdition field-name="facilityId" from="facilityId"/>
+                        <econdition field-name="locationTypeEnumId" value="FLT_PICKLOC"/>
+                    </entity-find>
+                    <set field="inventoryItemMap" from="[
+                            productId: productId,
+                            availableToPromiseTotal: 0,
+                            quantityOnHandTotal: 0,
+                            facilityId: facilityId,
+                            inventoryItemTypeId: 'NON_SERIAL_INV_ITEM'
+                        ]"/>
+                    <if condition="facilityLocations">
+                        <set field="inventoryItemMap.locationSeqId" from="facilityLocations[0].locationSeqId"/>
+                        <else>
+                            <set field="inventoryItemMap.locationSeqId" value="TLTLTLLL01"/>
+                        </else>
+                    </if>
+                    <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItemMap" out-map="inventoryItemOut"/>
+                    <set field="inventoryItemId" from="inventoryItemOut.inventoryItemId"/>
+                    <if condition="!productFacility">
+                        <set field="productFacilityMap" from="[productId: productId, facilityId: facilityId, inventoryItemId: inventoryItemId]"/>
+                        <service-call name="create#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacilityMap" out-map="productFacilityOut"/>
+                        <set field="productFacility" from="productFacilityOut"/>
+                        <else>
+                            <set field="productFacility.inventoryItemId" from="inventoryItemId"/>
+                            <service-call name="update#org.apache.ofbiz.product.facility.ProductFacility" in-map="productFacility"/>
+                        </else>
+                    </if>
+                </else>
+            </if>
+        </actions>
+    </service>
+    <service verb="update" noun="ProductFacility">
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.product.facility.ProductFacility" include="pk" required="true"/>
+            <auto-parameters entity-name="org.apache.ofbiz.product.facility.ProductFacility" include="nonpk"/>
+        </in-parameters>
+        <out-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.product.facility.ProductFacility" include="pk"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.ProductFacility" value-field="lookedUpValue" for-update="true"/>
+            <if condition="lookedUpValue">
+                <entity-set value-field="lookedUpValue"/>
+                <set field="computedLastInventoryCount" value="0" type="BigDecimal"/>
+                <set field="lastInventoryCount" from="lookedUpValue.lastInventoryCount" type="BigDecimal" default-value="0"/>
+                <set field="minimumStock" from="lookedUpValue.minimumStock" type="BigDecimal" default-value="0"/>
+                <if condition="lastInventoryCount >= minimumStock">
+                    <set field="computedLastInventoryCount" from="lastInventoryCount - minimumStock" type="BigDecimal"/>
+                </if>
+                <set field="lookedUpValue.computedLastInventoryCount" from="computedLastInventoryCount"/>
+                <entity-update value-field="lookedUpValue"/>
+            </if>
         </actions>
     </service>
 </services>
