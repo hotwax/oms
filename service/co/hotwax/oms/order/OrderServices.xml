@@ -284,6 +284,7 @@ under the License.
                 <script>rejectItemCond.add(conditionFactory.makeCondition([facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']))</script>
                 <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
                 <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
+                <set field="relatedRejectReasonId" from="item.rejectionReasonId"/>
                 <if condition="maySplit">
                     <if condition="cascadeRejectByProduct">
                         <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
@@ -300,6 +301,7 @@ under the License.
                         </else>
                     </if>
                     <else>
+                        <set field="relatedRejectReasonId" value="REJ_AVOID_ORD_SPLIT"/>
                         <if condition="cascadeRejectByProduct">
                             <!-- maySplit = N, cascadeRejectByProduct = Y: Reject entire ship groups for all orders containing the specified product. -->
                             <!--  Utilized Moqui framework's support for subqueries in the WHERE clause.
@@ -336,8 +338,19 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]"/>
+                    <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
+                        <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
+                        <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
+                            <set field="rejectOrderItemMap.rejectionReasonId" value="REJ_CASCADE_BY_PROD"/>
+                        </if>
+                        <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionReason" cache="true">
+                            <field-map field-name="enumId" from="rejectOrderItemMap.rejectionReasonId"/>
+                        </entity-find-one>
+                        <set field="rejectOrderItemMap.comments" from="rejectionReason?.description"/>
+                    </if>
                     <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
-                                  in-map="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]" out-map="outResult"/>
+                                  in-map="rejectOrderItemMap" out-map="outResult"/>
                     <if condition="outResult.cancelledReservations">
                         <script>cancelledReservations.addAll(outResult.cancelledReservations)</script>
                     </if>
