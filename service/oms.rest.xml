@@ -534,7 +534,7 @@ under the License.
         </id>
     </resource>
     <resource name="transferOrders">
-        <method type="get"><service name="co.hotwax.oms.order.TransferOrderServices.get#TransferOrders"/></method>
+        <method type="get"><service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrders"/></method>
         <id name="orderId">
             <method type="get">
                 <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrder"/>
