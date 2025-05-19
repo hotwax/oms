@@ -221,13 +221,13 @@ under the License.
             The rejection logic is driven by two key flags: maySplit and cascadeRejectByProduct, which determine the scope of the rejection.
             Rejection Logic:
             - maySplit = Y, cascadeRejectByProduct = N
-            - Reject only the specific item included in the request.
+             - Reject only the specific item included in the request.
             - maySplit = N, cascadeRejectByProduct = N
-            - Reject all items in the same ship group as the specified item.
+             - Reject all items in the same ship group as the specified item.
             - maySplit = Y, cascadeRejectByProduct = Y
-            - Reject items with the same productId in the same facility and match the rejection criteria (e.g., shipment not yet packed or shipped).
+             - Reject items with the same productId in the same facility and match the rejection criteria (e.g., shipment not yet packed or shipped).
             - maySplit = N, cascadeRejectByProduct = Y
-            - Reject entire ship groups across all orders that contain the specified productId in the same facility, provided the shipment is not yet packed or shipped.
+             - Reject entire ship groups across all orders that contain the specified productId in the same facility, provided the shipment is not yet packed or shipped.
         </description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
@@ -266,7 +266,7 @@ under the License.
             <set field="cancelledReservations" from="[]"/>
             <set field="conditionFactory" from="ec.entity.getConditionFactory()"/>
             <set field="shipmentCondition"
-                 from="conditionFactory.makeCondition(
+                    from="conditionFactory.makeCondition(
                             conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.IN, ['SHIPMENT_INPUT', 'SHIPMENT_APPROVED']),
                                 org.moqui.entity.EntityCondition.JoinOperator.OR,
                             conditionFactory.makeCondition('shipmentStatusId', org.moqui.entity.EntityCondition.ComparisonOperator.EQUALS, null)
