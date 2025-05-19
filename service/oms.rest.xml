@@ -541,4 +541,10 @@ under the License.
             </method>
         </id>
     </resource>
+
+    <resource name="entityData">
+        <method type="get">
+            <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
+        </method>
+    </resource>
 </resource>
