@@ -97,17 +97,17 @@ along with this software (see the LICENSE.md file). If not, see
                             Map orderOut = ec.service.sync().name("co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder").parameters([payload:orderMap]).call()
                             String orderId = orderOut.orderId
                             orderIds.add(orderId)
-                            ec.logger.warn("Creating order ${orderId} date ${orderTs}")
+                            ec.logger.warn("Creating transfer order ${orderId} date ${orderTs}")
                         } catch (Throwable t) {
                             ec.transaction.rollback(beganTransaction, "Error generating order", t)
-                            ec.logger.log(200, "Generate order error", t)
+                            ec.logger.log(200, "Generate transfer order error", t)
                         } finally {
                             if (ec.transaction.isTransactionInPlace()) ec.transaction.commit(beganTransaction)
                         }
                         ec.message.clearAll()
                     }
                 } catch (Exception e) {
-                    ec.logger.log(200, "Generate order TX error", e)
+                    ec.logger.log(200, "Generate transfer order TX error", e)
                 } finally {
                     if (suspendedTransaction) ec.transaction.resume()
                 }
