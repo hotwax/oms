@@ -43,7 +43,7 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- products to select from for order item -->
-            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="20">
+            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
                 <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
                 <select-field field-name="productId"/>
                 <order-by field-name="-lastUpdatedStamp"/>
@@ -52,6 +52,7 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="productIdList" from="productFacilityList*.productId"/>
             <set field="productIdListCount" from="productIdList.size()"/>
 
+            <!-- check to have order items equal to eligible products found -->
             <if condition="productIdListCount &lt; maxItems">
                 <set field="maxItems" from="productIdListCount"/>
             </if>
