@@ -15,22 +15,21 @@ along with this software (see the LICENSE.md file). If not, see
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
     <service verb="generate" noun="TestTransferOrdersWhToStore" transaction="ignore">
+        <description>
+            Service to generate Test Transfer Orders for Warehouse to Store type transfers.
+        </description>
         <in-parameters>
             <parameter name="productStoreId" default-value="STORE"/>
             <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
             <parameter name="carrierPartyId" default-value="_NA_"/>
             <parameter name="sourceFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
             <parameter name="destinationFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
-            
-
-            <!-- TODO check if can be used and update default-value -->
             <parameter name="orderCount" type="Integer" default-value="3"/>
             <parameter name="maxItems" type="Integer" default-value="10"/>
             <parameter name="maxQuantity" type="Integer" default-value="20"/>
             <parameter name="maxDaysPast" type="Integer" default-value="30"/>
             <parameter name="thruDate" type="Date" default="ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd')"/>
         </in-parameters>
-        <!-- TODO should this return orderIds list or a map of orderId:orderItemsCount -->
         <out-parameters>
             <parameter name="orderIds" type="List"/>
         </out-parameters>
@@ -43,6 +42,7 @@ along with this software (see the LICENSE.md file). If not, see
             <log level="info" message="productIdList ${productIdList}"/>
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
+            <!-- products to select from for order item -->
             <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="20">
                 <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
                 <select-field field-name="productId"/>
@@ -58,7 +58,6 @@ along with this software (see the LICENSE.md file). If not, see
 
             <!-- create transfer orders -->
             <script><![CDATA[
-
                 Random rand = new Random()
                 boolean suspendedTransaction = false
                 try {
@@ -94,9 +93,6 @@ along with this software (see the LICENSE.md file). If not, see
                             shipGroupList = []
                             shipGroupList.add(shipGroupMap)
                             orderMap.shipGroups = shipGroupList
-                            ec.logger.info("orderMap =============")
-                            ec.logger.info("${orderMap}")
-
                             Map orderOut = ec.service.sync().name("co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder").parameters([payload:orderMap]).call()
                             String orderId = orderOut.orderId
                             orderIds.add(orderId)
