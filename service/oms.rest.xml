@@ -543,7 +543,7 @@ under the License.
     </resource>
 
     <resource name="entityData">
-        <method type="get">
+        <method type="post">
             <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
         </method>
     </resource>
