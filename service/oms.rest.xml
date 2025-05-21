@@ -547,4 +547,9 @@ under the License.
             <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
         </method>
     </resource>
+    <resource name="dataDocumentView">
+        <method type="post">
+            <service name="co.hotwax.oms.common.CommonServices.get#DataDocumentView"/>
+        </method>
+    </resource>
 </resource>

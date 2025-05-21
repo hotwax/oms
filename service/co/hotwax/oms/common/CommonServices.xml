@@ -90,7 +90,7 @@ under the License.
             </parameter>
             <parameter name="pageLimit" default-value="20" type="Integer"/>
             <parameter name="pageIndex" type="Integer" default="0"/>
-            <parameter name="filterByDate" type="Boolean" default-value="true"/>
+            <parameter name="filterByDate" type="Boolean" default-value="false"/>
             <parameter name="customParametersMap" type="Map">
                 <description>
                     This map defines custom conditions to fetch data from given entity.Refer EntityFindData request for more details.
@@ -109,6 +109,44 @@ under the License.
             <else>
                 <entity-find entity-name="${selectedEntity}" list="entityValueList" offset="pageIndex" limit="pageLimit">
                     <search-form-inputs input-fields-map="customParametersMap"/>
+                </entity-find>
+            </else>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="get" noun="DataDocumentView">
+        <description>
+            Service to fetch data from the Data Document View from existing DataDocument.
+            Example payload:
+            {
+            "dataDocumentId": "TEST",
+            "pageIndex": 0,
+            "pageSize": 20,
+            "customParametersMap": {"orderByField":"-^orderId"},
+            "filterByDate": false
+            }
+        </description>
+        <in-parameters>
+            <parameter name="dataDocumentId" required="true"/>
+            <parameter name="pageIndex" type="Integer" default-value="0"/>
+            <parameter name="pageSize" type="Integer" default-value="20"/>
+            <parameter name="customParametersMap" type="Map"/>
+            <parameter name="filterByDate" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="entityValueList" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="entityName" from="'DataDocument.' + dataDocumentId"/>
+            <if condition="filterByDate">
+                <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
+                    <search-form-inputs input-fields-map="context + customParametersMap"/>
+                    <date-filter/>
+                </entity-find>
+            <else>
+                <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
+                    <search-form-inputs input-fields-map="context + customParametersMap"/>
                 </entity-find>
             </else>
             </if>
