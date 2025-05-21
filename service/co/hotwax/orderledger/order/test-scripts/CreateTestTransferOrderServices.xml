@@ -39,7 +39,6 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="sourceFacilityIdListSize" from="sourceFacilityIdList.size()"/>
             <set field="destinationFacilityIdListSize" from="destinationFacilityIdList.size()"/>
 
-            <log level="info" message="productIdList ${productIdList}"/>
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- products to select from for order item -->
@@ -79,6 +78,210 @@ along with this software (see the LICENSE.md file). If not, see
                             sourceFacilityId = sourceFacilityIdList.get(rand.nextInt(sourceFacilityIdListSize))
                             Map orderMap = [externalId:externalId, orderName:externalId, productStoreId:productStoreId, statusId:'ORDER_CREATED',
                                 orderTypeId:'TRANSFER_ORDER', orderDate:orderTs, entryDate:orderTs, statusFlowId:'TO_Receive_Only',
+                                originFacilityId:sourceFacilityId]
+                            Map shipGroupMap = [shipmentMethodTypeId:shipmentMethodTypeId, carrierPartyId:carrierPartyId,
+                                    facilityId:sourceFacilityId, orderFacilityId:destinationFacilityIdList.get(rand.nextInt(destinationFacilityIdListSize))]
+                            items = []
+                            int itemCount = rand.nextInt(maxItems) + 1
+                            ec.logger.info("itemCount for order ${idx}: ${itemCount}")
+                            for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
+                                String productId = productIdList.get(itemIdx)
+                                int itemQuantity = rand.nextInt(maxQuantity) + 1
+                                itemMap = [externalId:itemIdx + 1, orderItemTypeId:'PRODUCT_ORDER_ITEM', quantity:itemQuantity,
+                                    statusId:'ITEM_CREATED', productId:productId]
+                                items.add(itemMap)
+                            }
+                            shipGroupMap.items = items
+                            shipGroupList = []
+                            shipGroupList.add(shipGroupMap)
+                            orderMap.shipGroups = shipGroupList
+                            Map orderOut = ec.service.sync().name("co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder").parameters([payload:orderMap]).call()
+                            String orderId = orderOut.orderId
+                            orderIds.add(orderId)
+                            ec.logger.warn("Creating transfer order ${orderId} date ${orderTs}")
+                        } catch (Throwable t) {
+                            ec.transaction.rollback(beganTransaction, "Error generating order", t)
+                            ec.logger.log(200, "Generate transfer order error", t)
+                        } finally {
+                            if (ec.transaction.isTransactionInPlace()) ec.transaction.commit(beganTransaction)
+                        }
+                        ec.message.clearAll()
+                    }
+                } catch (Exception e) {
+                    ec.logger.log(200, "Generate transfer order TX error", e)
+                } finally {
+                    if (suspendedTransaction) ec.transaction.resume()
+                }
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="generate" noun="TestTransferOrdersStoreToWh" transaction="ignore">
+        <description>
+            Service to generate Test Transfer Orders for Store to Warehouse type transfers.
+        </description>
+        <in-parameters>
+            <parameter name="productStoreId" default-value="STORE"/>
+            <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
+            <parameter name="carrierPartyId" default-value="_NA_"/>
+            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
+            <parameter name="destinationFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
+            <parameter name="orderCount" type="Integer" default-value="3"/>
+            <parameter name="maxItems" type="Integer" default-value="10"/>
+            <parameter name="maxQuantity" type="Integer" default-value="20"/>
+            <parameter name="maxDaysPast" type="Integer" default-value="30"/>
+            <parameter name="thruDate" type="Date" default="ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd')"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderIds" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="orderIds" from="[]"/>
+
+            <set field="sourceFacilityIdListSize" from="sourceFacilityIdList.size()"/>
+            <set field="destinationFacilityIdListSize" from="destinationFacilityIdList.size()"/>
+
+            <set field="entryDate" from="ec.user.nowTimestamp"/>
+
+            <!-- products to select from for order item -->
+            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
+                <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
+                <!-- this will also not fetch _NA_ productId -->
+                <econdition field-name="computedLastInventoryCount" operator="greater" value="0"/>
+                <select-field field-name="productId"/>
+                <order-by field-name="-lastUpdatedStamp"/>
+            </entity-find>
+            <if condition="!productFacilityList"><return message="No products found to order for facility ${sourceFacilityIdList})"/></if>
+            <set field="productIdList" from="productFacilityList*.productId"/>
+            <set field="productIdListCount" from="productIdList.size()"/>
+
+            <!-- check to have order items equal to eligible products found -->
+            <if condition="productIdListCount &lt; maxItems">
+                <set field="maxItems" from="productIdListCount"/>
+            </if>
+
+            <!-- create transfer orders -->
+            <script><![CDATA[
+                Random rand = new Random()
+                boolean suspendedTransaction = false
+                try {
+                    if (ec.transaction.isTransactionInPlace()) suspendedTransaction = ec.transaction.suspend()
+
+                    for (int idx = 0; idx < orderCount; idx++) {
+                        // run each in separate TX, then clear errors and other messages
+                        boolean beganTransaction = ec.transaction.begin(timeout)
+                        try {
+                            java.sql.Date orderDate = thruDate - rand.nextInt(maxDaysPast)
+                            Timestamp orderTs = ec.l10n.parseTimestamp(orderDate.toString() + " " + (rand.nextInt(12) + 8).toString().padLeft(2, '0') + ":00:00.000", null)
+
+                            def timestamp = System.currentTimeMillis()
+                            def randomSuffix = (1000 + rand.nextInt(9000)) // random 4-digit number
+                            externalId = "TEST_TO_STW_${timestamp}_${randomSuffix}"
+                            sourceFacilityId = sourceFacilityIdList.get(rand.nextInt(sourceFacilityIdListSize))
+                            Map orderMap = [externalId:externalId, orderName:externalId, productStoreId:productStoreId, statusId:'ORDER_CREATED',
+                                orderTypeId:'TRANSFER_ORDER', orderDate:orderTs, entryDate:orderTs, statusFlowId:'TO_Fulfill_Only',
+                                originFacilityId:sourceFacilityId]
+                            Map shipGroupMap = [shipmentMethodTypeId:shipmentMethodTypeId, carrierPartyId:carrierPartyId,
+                                    facilityId:sourceFacilityId, orderFacilityId:destinationFacilityIdList.get(rand.nextInt(destinationFacilityIdListSize))]
+                            items = []
+                            int itemCount = rand.nextInt(maxItems) + 1
+                            ec.logger.info("itemCount for order ${idx}: ${itemCount}")
+                            for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
+                                String productId = productIdList.get(itemIdx)
+                                int itemQuantity = rand.nextInt(maxQuantity) + 1
+                                itemMap = [externalId:itemIdx + 1, orderItemTypeId:'PRODUCT_ORDER_ITEM', quantity:itemQuantity,
+                                    statusId:'ITEM_CREATED', productId:productId]
+                                items.add(itemMap)
+                            }
+                            shipGroupMap.items = items
+                            shipGroupList = []
+                            shipGroupList.add(shipGroupMap)
+                            orderMap.shipGroups = shipGroupList
+                            Map orderOut = ec.service.sync().name("co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder").parameters([payload:orderMap]).call()
+                            String orderId = orderOut.orderId
+                            orderIds.add(orderId)
+                            ec.logger.warn("Creating transfer order ${orderId} date ${orderTs}")
+                        } catch (Throwable t) {
+                            ec.transaction.rollback(beganTransaction, "Error generating order", t)
+                            ec.logger.log(200, "Generate transfer order error", t)
+                        } finally {
+                            if (ec.transaction.isTransactionInPlace()) ec.transaction.commit(beganTransaction)
+                        }
+                        ec.message.clearAll()
+                    }
+                } catch (Exception e) {
+                    ec.logger.log(200, "Generate transfer order TX error", e)
+                } finally {
+                    if (suspendedTransaction) ec.transaction.resume()
+                }
+            ]]></script>
+        </actions>
+    </service>
+
+    <service verb="generate" noun="TestTransferOrdersStoreToStore" transaction="ignore">
+        <description>
+            Service to generate Test Transfer Orders for Store to Store type transfers.
+        </description>
+        <in-parameters>
+            <parameter name="productStoreId" default-value="STORE"/>
+            <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
+            <parameter name="carrierPartyId" default-value="_NA_"/>
+            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY"/>
+            <parameter name="destinationFacilityIdList" type="List" default-value="BROOKLYN"/>
+            <parameter name="orderCount" type="Integer" default-value="3"/>
+            <parameter name="maxItems" type="Integer" default-value="10"/>
+            <parameter name="maxQuantity" type="Integer" default-value="20"/>
+            <parameter name="maxDaysPast" type="Integer" default-value="30"/>
+            <parameter name="thruDate" type="Date" default="ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd')"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderIds" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="orderIds" from="[]"/>
+
+            <set field="sourceFacilityIdListSize" from="sourceFacilityIdList.size()"/>
+            <set field="destinationFacilityIdListSize" from="destinationFacilityIdList.size()"/>
+
+            <set field="entryDate" from="ec.user.nowTimestamp"/>
+
+            <!-- products to select from for order item -->
+            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
+                <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
+                <!-- this will also not fetch _NA_ productId -->
+                <econdition field-name="computedLastInventoryCount" operator="greater" value="0"/>
+                <select-field field-name="productId"/>
+                <order-by field-name="-lastUpdatedStamp"/>
+            </entity-find>
+            <if condition="!productFacilityList"><return message="No products found to order for facility ${sourceFacilityIdList})"/></if>
+            <set field="productIdList" from="productFacilityList*.productId"/>
+            <set field="productIdListCount" from="productIdList.size()"/>
+
+            <!-- check to have order items equal to eligible products found -->
+            <if condition="productIdListCount &lt; maxItems">
+                <set field="maxItems" from="productIdListCount"/>
+            </if>
+
+            <!-- create transfer orders -->
+            <script><![CDATA[
+                Random rand = new Random()
+                boolean suspendedTransaction = false
+                try {
+                    if (ec.transaction.isTransactionInPlace()) suspendedTransaction = ec.transaction.suspend()
+
+                    for (int idx = 0; idx < orderCount; idx++) {
+                        // run each in separate TX, then clear errors and other messages
+                        boolean beganTransaction = ec.transaction.begin(timeout)
+                        try {
+                            java.sql.Date orderDate = thruDate - rand.nextInt(maxDaysPast)
+                            Timestamp orderTs = ec.l10n.parseTimestamp(orderDate.toString() + " " + (rand.nextInt(12) + 8).toString().padLeft(2, '0') + ":00:00.000", null)
+
+                            def timestamp = System.currentTimeMillis()
+                            def randomSuffix = (1000 + rand.nextInt(9000)) // random 4-digit number
+                            externalId = "TEST_TO_STS_${timestamp}_${randomSuffix}"
+                            sourceFacilityId = sourceFacilityIdList.get(rand.nextInt(sourceFacilityIdListSize))
+                            Map orderMap = [externalId:externalId, orderName:externalId, productStoreId:productStoreId, statusId:'ORDER_CREATED',
+                                orderTypeId:'TRANSFER_ORDER', orderDate:orderTs, entryDate:orderTs, statusFlowId:'TO_Fulfill_And_Receive',
                                 originFacilityId:sourceFacilityId]
                             Map shipGroupMap = [shipmentMethodTypeId:shipmentMethodTypeId, carrierPartyId:carrierPartyId,
                                     facilityId:sourceFacilityId, orderFacilityId:destinationFacilityIdList.get(rand.nextInt(destinationFacilityIdListSize))]
