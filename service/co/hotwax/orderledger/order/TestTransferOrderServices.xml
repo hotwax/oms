@@ -42,10 +42,14 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- products to select from for order item -->
-            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
+            <entity-find entity-name="co.hotwax.facility.ProductFacilityView" list="productFacilityList" limit="maxItems">
                 <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
+                <!-- so that MARKETING_PKG_PICK products are not included - no kit products scenario for TOs -->
+                <econdition field-name="productTypeId" value="FINISHED_GOOD"/>
                 <!-- this will also not fetch _NA_ productId -->
-                <econdition field-name="computedLastInventoryCount" operator="greater" value="0"/>
+                <having-econditions>
+                    <econdition field-name="totalComputedLastInventoryCount" operator="greater" value="0"/>
+                </having-econditions>
                 <select-field field-name="productId"/>
                 <order-by field-name="-lastUpdatedStamp"/>
             </entity-find>
@@ -144,10 +148,14 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- products to select from for order item -->
-            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
+            <entity-find entity-name="co.hotwax.facility.ProductFacilityView" list="productFacilityList" limit="maxItems">
                 <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
+                <!-- so that MARKETING_PKG_PICK products are not included - no kit products scenario for TOs -->
+                <econdition field-name="productTypeId" value="FINISHED_GOOD"/>
                 <!-- this will also not fetch _NA_ productId -->
-                <econdition field-name="computedLastInventoryCount" operator="greater" value="0"/>
+                <having-econditions>
+                    <econdition field-name="totalComputedLastInventoryCount" operator="greater" value="0"/>
+                </having-econditions>
                 <select-field field-name="productId"/>
                 <order-by field-name="-lastUpdatedStamp"/>
             </entity-find>
@@ -246,10 +254,14 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="entryDate" from="ec.user.nowTimestamp"/>
 
             <!-- products to select from for order item -->
-            <entity-find entity-name="org.apache.ofbiz.product.facility.ProductFacility" list="productFacilityList" limit="maxItems">
+            <entity-find entity-name="co.hotwax.facility.ProductFacilityView" list="productFacilityList" limit="maxItems">
                 <econdition field-name="facilityId" operator="in" from="sourceFacilityIdList"/>
+                <!-- so that MARKETING_PKG_PICK products are not included - no kit products scenario for TOs -->
+                <econdition field-name="productTypeId" value="FINISHED_GOOD"/>
                 <!-- this will also not fetch _NA_ productId -->
-                <econdition field-name="computedLastInventoryCount" operator="greater" value="0"/>
+                <having-econditions>
+                    <econdition field-name="totalComputedLastInventoryCount" operator="greater" value="0"/>
+                </having-econditions>
                 <select-field field-name="productId"/>
                 <order-by field-name="-lastUpdatedStamp"/>
             </entity-find>
@@ -317,6 +329,139 @@ along with this software (see the LICENSE.md file). If not, see
                     if (suspendedTransaction) ec.transaction.resume()
                 }
             ]]></script>
+        </actions>
+    </service>
+
+    <service verb="test" noun="BulkApproveWhFulfillTransferOrders" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="orderIds" type="List" required="true">
+                <description>List of order Ids to test the bulk approve of Wh Fulfill Transfer Orders.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="isPassed" type="Boolean" default-value="false"/>
+            <parameter name="passCriteriaList" type="List"/>
+            <parameter name="failCriteriaList" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="passCriteriaList" from="[]"/>
+            <set field="failCriteriaList" from="[]"/>
+
+            <!-- Fetch the total item count to verify the item status change -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItem" count-field="itemCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+            </entity-find-count>
+
+            <!-- Set the total order count to verify the order status change -->
+            <set field="orderCount" from="orderIds.size()"/>
+
+            <!-- Actual Action - Run Bulk Approve Service for Wh Fulfill TOs -->
+            <service-call name="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#WhFulfillTransferOrders"
+                    in-map="[orderIds:orderIds]"/>
+
+            <!-- Assertions -->
+            <!-- 1. Validate Approved Order Count -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="approvedOrderCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+                <econdition field-name="statusId" value="ORDER_APPROVED"/>
+            </entity-find-count>
+            <if condition="approvedOrderCount == orderCount"><then>
+                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_MATCH")</script>
+            </then><else>
+                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_MISMATCH")</script>
+            </else></if>
+
+            <!-- 2. Validate Pending Receipt Order Item Count -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItem" count-field="approvedOrderItemCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+                <econdition field-name="statusId" value="ITEM_PENDING_RECEIPT"/>
+            </entity-find-count>
+            <if condition="approvedOrderItemCount == itemCount"><then>
+                <script>passCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_COUNT_MATCH")</script>
+            </then><else>
+                <script>failCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_COUNT_MISMATCH")</script>
+            </else>
+            </if>
+            <!-- Return result -->
+            <if condition="failCriteriaList.size() > 0"><then>
+                <set field="isPassed" from="false"/>
+                <set field="passCriteriaList" from="[]"/>
+            </then><else>
+                <set field="isPassed" from="true"/>
+            </else></if>
+        </actions>
+    </service>
+
+    <service verb="test" noun="BulkApproveStoreFulfillTransferOrders" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="orderIds" type="List" required="true">
+                <description>List of order Ids to test the bulk approve of Store Fulfill Transfer Orders.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="isPassed" type="Boolean" default-value="false"/>
+            <parameter name="passCriteriaList" type="List"/>
+            <parameter name="failCriteriaList" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="passCriteriaList" from="[]"/>
+            <set field="failCriteriaList" from="[]"/>
+
+            <!-- Fetch the total item count to verify the item status change -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItem" count-field="itemCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+            </entity-find-count>
+
+            <!-- Set the total order count to verify the order status change -->
+            <set field="orderCount" from="orderIds.size()"/>
+
+            <!-- Actual Action - Run Bulk Approve Service for Store Fulfill TOs -->
+            <service-call name="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#StoreFulfillTransferOrders"
+                    in-map="[orderIds:orderIds]"/>
+
+            <!-- Assertions -->
+            <!-- 1. Validate Approved Order Count -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="approvedOrderCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+                <econdition field-name="statusId" value="ORDER_APPROVED"/>
+            </entity-find-count>
+            <if condition="approvedOrderCount == orderCount"><then>
+                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_MATCH")</script>
+            </then><else>
+                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_MISMATCH")</script>
+            </else></if>
+
+            <!-- 2. Validate Pending Fulfill Order Item Count -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItem" count-field="approvedOrderItemCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+                <econdition field-name="statusId" value="ITEM_PENDING_FULFILL"/>
+            </entity-find-count>
+            <if condition="approvedOrderItemCount == itemCount"><then>
+                <script>passCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_MATCH")</script>
+            </then><else>
+                <script>failCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_MISMATCH")</script>
+            </else>
+            </if>
+
+            <!-- 2. Validate OISGIR Count with quantity field -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" count-field="reservedItemCount">
+                <econdition field-name="orderId" operator="in" from="orderIds"/>
+                <econdition field-name="quantity" operator="is-not-null"/>
+            </entity-find-count>
+            <if condition="reservedItemCount == itemCount"><then>
+                <script>passCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_MATCH")</script>
+            </then><else>
+                <script>failCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_MISMATCH")</script>
+            </else>
+            </if>
+
+            <!-- Return result -->
+            <if condition="failCriteriaList.size() > 0"><then>
+                <set field="isPassed" from="false"/>
+                <set field="passCriteriaList" from="[]"/>
+            </then><else>
+                <set field="isPassed" from="true"/>
+            </else></if>
         </actions>
     </service>
 </services>
