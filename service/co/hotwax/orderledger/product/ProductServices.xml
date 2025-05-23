@@ -140,7 +140,7 @@ under the License.
             <parameter name="productVariantJson" type="Map" required="true">
                 <description>The product variant json to be created.</description>
             </parameter>
-            <parameter name="parentProductId" required="true">
+            <parameter name="parentProductId">
                 <description>The parent product id for the variants.</description>
             </parameter>
         </in-parameters>
@@ -163,30 +163,42 @@ under the License.
             <!-- Set productId in the productVariantMap if the productId exists -->
             <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
 
+            <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
+            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
+
             <!-- Check if productId is not null -->
             <if condition="productVariantJson.productId">
                 <set field="productId" from="productVariantJson.productId"/>
-                <!-- Create ShopifyShopProduct record -->
-                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:productVariantJson.shopifyShopProduct.shopId,
-                        productId:productVariantJson.productId,shopifyProductId:productVariantJson.shopifyShopProduct.shopifyProductId,
-                        shopifyInventoryItemId:productVariantJson.shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
 
-                <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
-                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
-                    <econdition field-name="productId" from="parentProductId"/>
-                    <econdition field-name="productIdTo" from="productVariantJson.productId"/>
-                    <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
-                    <date-filter/>
-                </entity-find>
-                <!-- If not then create a new ProductAssoc record -->
-                <if condition="!productAssocs">
-                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                <if condition="shopifyShopProduct"><then>
+                    <!-- Create ShopifyShopProduct record -->
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                            productId:productVariantJson.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
+                            shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+                </then><else>
+                    <log message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${productVariantJson.productId}]"/>
+                </else>
                 </if>
-                <return/>
-            </if>
+                <if condition="parentProductId"><then>
 
-            <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
-            <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
+                    <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
+                        <econdition field-name="productId" from="parentProductId"/>
+                        <econdition field-name="productIdTo" from="productVariantJson.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <!-- If not then create a new ProductAssoc record -->
+                    <if condition="!productAssocs">
+                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                    </if>
+                    <return/>
+                </then>
+                    <else>
+                        <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${productVariantJson.productId}]"/>
+                    </else>
+                </if>
+            </if>
 
             <!-- Call prepare#ProductCreate for the productVariantJson map -->
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
@@ -197,13 +209,22 @@ under the License.
                     out-map="createProductOut"/>
             <set field="productId" from="createProductOut.productId"/>
 
-            <!-- Create ProductAssoc record for the variant product -->
-            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
-
-            <!-- Create ShopifyShopProduct record for the variant product -->
-            <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
-                    productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
-                    shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+            <if condition="parentProductId"><then>
+                <!-- Create ProductAssoc record for the variant product -->
+                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productId:parentProductId,productIdTo:createProductOut.productId,productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+            </then><else>
+                <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${createProductOut.productId}]"/>
+            </else>
+            </if>
+            <if condition="shopifyShopProduct"><then>
+                <!-- Create ShopifyShopProduct record for the variant product -->
+                <service-call name="create#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                        productId:createProductOut.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
+                        shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
+            </then><else>
+                <log message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${createProductOut.productId}]"/>
+            </else>
+            </if>
         </actions>
     </service>
 
@@ -585,8 +606,12 @@ under the License.
     <service verb="update" noun="ProductVariant">
         <description>This service will update a product variant</description>
         <in-parameters>
-            <parameter name="productVariantJson" type="Map" required="true"/>
-            <parameter name="parentProductId" required="true"/>
+            <parameter name="productVariantJson" type="Map" required="true">
+                <description>The product variant json to be updated.</description>
+            </parameter>
+            <parameter name="parentProductId">
+                <description>The parent product id for the variants.</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="productId"/>
@@ -614,26 +639,46 @@ under the License.
                 <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]" out-map="prepareProductCreateOutput"/>
                 <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOutput.productJson" out-map="createProductOutput"/>
                 <set field="productId" from="createProductOutput.productId"/>
-                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
-                <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                <if condition="parentProductId"><then>
+                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:createProductOutput.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                </then><else>
+                    <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${createProductOutput.productId}]"/>
+                </else>
+                </if>
+                <if condition="shopifyShopProduct"><then>
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:createProductOutput.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId, shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                </then><else>
+                    <log level="warn" message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${createProductOutput.productId}]"/>
+                </else>
+                </if>
                 <else>
                     <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
                     <set field="productId" from="productVariantJson.productId"/>
 
-                    <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
-                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
-                        <econdition field-name="productId" from="parentProductId"/>
-                        <econdition field-name="productIdTo" from="productVariantJson.productId"/>
-                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
-                        <date-filter/>
-                    </entity-find>
-                    <!-- If not then create a new ProductAssoc record -->
-                    <if condition="!productAssocs">
-                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                    <if condition="parentProductId"><then>
+                        <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
+                        <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
+                            <econdition field-name="productId" from="parentProductId"/>
+                            <econdition field-name="productIdTo" from="productVariantJson.productId"/>
+                            <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                            <date-filter/>
+                        </entity-find>
+                        <!-- If not then create a new ProductAssoc record -->
+                        <if condition="!productAssocs">
+                            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                        </if>
+                    </then><else>
+                        <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${productVariantJson.productId}]"/>
+                    </else>
                     </if>
-                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId,shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                    <if condition="shopifyShopProduct"><then>
+                        <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId,shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
+                    </then><else>
+                        <log level="warn" message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${productVariantJson.productId}]"/>
+                    </else>
+                    </if>
                     <!-- If we have deleteProductFeatureAppls in the output, then delete each productFeatureAppl -->
                     <if condition="deleteProductFeatureAppls">
                         <iterate list="deleteProductFeatureAppls" entry="productFeatureAppl">
