@@ -172,7 +172,7 @@
         </actions>
     </service>
 
-    <service verb="bulkApprove" noun="StoreFulfillTransferOrders" transaction-timeout="3600">
+    <service verb="bulkApprove" noun="StoreFulfillTransferOrders" transaction-timeout="3600" authenticate="anonymous-all">
         <description>
             Service to bulk approve transfer orders where fulfillment is done by OMS i.e. Store to Store and Store to Warehouse Transfer Orders.
             The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item
@@ -327,7 +327,7 @@
         </actions>
     </service>
 
-    <service verb="bulkApprove" noun="WhFulfillTransferOrders" transaction-timeout="3600">
+    <service verb="bulkApprove" noun="WhFulfillTransferOrders" transaction-timeout="3600" authenticate="anonymous-all">
         <description>
             Service to bulk approve transfer orders where fulfillment is done by third party i.e. Warehouse to Store Transfer Orders.
             The Order will be updated to ORDER_APPROVED status. The Items will be updated to the next eligible Item

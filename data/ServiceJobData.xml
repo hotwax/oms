@@ -5,7 +5,7 @@
 
     <!-- Service Job to bulk approve Store Fulfill Transfer Orders -->
     <moqui.basic.Enumeration enumId="BLK_APR_ST_FLF_TO" enumCode="BLK_APR_ST_FLF_TO" description="Bulk Approve Store Fulfill Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
-    <moqui.service.job.ServiceJob jobName="bulkApprove_StoreFulfillTransferOrders" jobTypeEnumId="BLK_APR_ST_FLF_TO"
+    <moqui.service.job.ServiceJob jobName="bulkApprove_StoreFulfillTransferOrders" jobTypeEnumId="BLK_APR_ST_FLF_TO" instanceOfProductId="BLK_APR_ST_FLF_TO"
             description="Service Job to bulk approve the Store Fulfill Transfer Orders in OMS"
             serviceName="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#StoreFulfillTransferOrders"
             cronExpression="0 0 0 * * ?" paused="Y">
@@ -14,7 +14,7 @@
 
     <!-- Service Job to bulk approve Warehouse Fulfill Transfer Orders -->
     <moqui.basic.Enumeration enumId="BLK_APR_WH_FLF_TO" enumCode="BLK_APR_WH_FLF_TO" description="Bulk Approve Warehouse Fulfill Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
-    <moqui.service.job.ServiceJob jobName="bulkApprove_WarehouseTransferOrders" jobTypeEnumId="BLK_APR_WH_FLF_TO"
+    <moqui.service.job.ServiceJob jobName="bulkApprove_WarehouseTransferOrders" jobTypeEnumId="BLK_APR_WH_FLF_TO" instanceOfProductId="BLK_APR_WH_FLF_TO"
             description="Service Job to bulk approve the Warehouse Fulfill Transfer Orders in OMS"
             serviceName="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#WhFulfillTransferOrders"
             cronExpression="0 0 0 * * ?" paused="Y">

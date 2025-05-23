@@ -541,4 +541,25 @@ under the License.
             </method>
         </id>
     </resource>
+
+    <resource name="entityData">
+        <method type="post">
+            <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
+        </method>
+    </resource>
+    <resource name="dataDocumentView">
+        <method type="post">
+            <service name="co.hotwax.oms.common.CommonServices.get#DataDocumentView"/>
+        </method>
+    </resource>
+
+    <!-- Application Layer APIs -->
+    <resource name="productVariant" require-authentication="anonymous-all">
+        <method type="post">
+            <service name="co.hotwax.orderledger.product.ProductServices.create#ProductVariant"/>
+        </method>
+        <method type="put">
+            <service name="co.hotwax.orderledger.product.ProductServices.update#ProductVariant"/>
+        </method>
+    </resource>
 </resource>
