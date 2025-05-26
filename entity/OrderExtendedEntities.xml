@@ -82,10 +82,15 @@ under the License.
             <key-map field-name="orderId"/>
             <key-map field-name="orderItemSeqId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderStatus" short-alias="statuses">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+        </relationship>
 
         <master>
             <detail relationship="adjustments" use-master="default"/>
             <detail relationship="attributes"/>
+            <detail relationship="statuses"/>
         </master>
     </extend-entity>
     <extend-entity entity-name="OrderAdjustment" package="org.apache.ofbiz.order.order">
