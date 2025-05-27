@@ -482,7 +482,7 @@ under the License.
                 <if condition="varianceQuantity>0">
                     <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
                     <set field="inventoryItemVarianceMap"
-                         from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
+                         from="[inventoryItemId: productFacility.inventoryItemId, reasonEnumId: rejectionReasonId,
                         comments: comments, availableToPromiseVar: varianceQuantity.negate()]"/>
 
                     <if condition="updateQOH">
