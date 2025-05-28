@@ -38,7 +38,7 @@
             <expression>statusChanged &amp;&amp; statusId == 'ITEM_COMPLETED'</expression>
         </condition>
         <actions>
-            <service-call name="co.hotwax.poorti.FulfillmentServices.delete#OrderItemReservations" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
+            <service-call name="co.hotwax.oms.order.OrderServices.delete#OrderItemReservations" in-map="[orderId:orderId, orderItemSeqId: orderItemSeqId]"
                           ignore-error="true" disable-authz="true"/>
         </actions>
     </seca>
