@@ -23,7 +23,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
             <parameter name="carrierPartyId" default-value="_NA_"/>
             <parameter name="sourceFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
-            <parameter name="destinationFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
+            <parameter name="destinationFacilityIdList" type="List" default-value="BROADWAY"/>
             <parameter name="orderCount" type="Integer" default-value="3"/>
             <parameter name="maxItems" type="Integer" default-value="10"/>
             <parameter name="maxQuantity" type="Integer" default-value="20"/>
@@ -128,7 +128,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="productStoreId" default-value="STORE"/>
             <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
             <parameter name="carrierPartyId" default-value="_NA_"/>
-            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
+            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY"/>
             <parameter name="destinationFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
             <parameter name="orderCount" type="Integer" default-value="3"/>
             <parameter name="maxItems" type="Integer" default-value="10"/>
