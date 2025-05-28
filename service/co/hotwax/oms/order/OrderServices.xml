@@ -503,4 +503,25 @@ under the License.
             </iterate>
         </actions>
     </service>
+
+    <service verb="delete" noun="OrderItemReservations">
+        <description>Delete order item reservation on item completion using seca rule. As we removed logic to delete reservation on item issuance.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="oisgirs">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderItemSeqId"/>
+            </entity-find>
+            <if condition="oisgirs">
+                <iterate list="oisgirs" entry="oisgir">
+                    <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                                  in-map="oisgir"
+                                  out-map="removedReservations"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
 </services>
