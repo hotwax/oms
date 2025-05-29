@@ -533,12 +533,21 @@ under the License.
             <method type="delete"><entity name="moqui.service.message.SystemMessageRemote" operation="delete"/></method>
         </id>
     </resource>
+
     <resource name="transferOrders">
         <method type="get"><service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrders"/></method>
+        <method type="post">
+            <service name="co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder"/>
+        </method>
         <id name="orderId">
             <method type="get">
                 <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrder"/>
             </method>
+            <resource name="approve" description="Approve Store Fulfill Transfer Order">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
+                </method>
+            </resource>
         </id>
     </resource>
 
