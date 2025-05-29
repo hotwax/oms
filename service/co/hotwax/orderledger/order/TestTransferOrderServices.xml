@@ -23,7 +23,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
             <parameter name="carrierPartyId" default-value="_NA_"/>
             <parameter name="sourceFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
-            <parameter name="destinationFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
+            <parameter name="destinationFacilityIdList" type="List" default-value="BROADWAY"/>
             <parameter name="orderCount" type="Integer" default-value="3"/>
             <parameter name="maxItems" type="Integer" default-value="10"/>
             <parameter name="maxQuantity" type="Integer" default-value="20"/>
@@ -128,7 +128,7 @@ along with this software (see the LICENSE.md file). If not, see
             <parameter name="productStoreId" default-value="STORE"/>
             <parameter name="shipmentMethodTypeId" default-value="STANDARD"/>
             <parameter name="carrierPartyId" default-value="_NA_"/>
-            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY,WEST_JORDAN"/>
+            <parameter name="sourceFacilityIdList" type="List" default-value="BROADWAY"/>
             <parameter name="destinationFacilityIdList" type="List" default-value="CENTRAL_WAREHOUSE"/>
             <parameter name="orderCount" type="Integer" default-value="3"/>
             <parameter name="maxItems" type="Integer" default-value="10"/>
@@ -333,6 +333,10 @@ along with this software (see the LICENSE.md file). If not, see
     </service>
 
     <service verb="test" noun="BulkApproveWhFulfillTransferOrders" authenticate="anonymous-all">
+        <description>
+            Test service to verify Bulk Approve Wh Fulfill TOs.
+            Success Criteria for this scenario: APPROVED_ORDER_COUNT_CHECK_SUCCESSFUL, PENDING_RECEIPT_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL
+        </description>
         <in-parameters>
             <parameter name="orderIds" type="List" required="true">
                 <description>List of order Ids to test the bulk approve of Wh Fulfill Transfer Orders.</description>
@@ -366,9 +370,9 @@ along with this software (see the LICENSE.md file). If not, see
                 <econdition field-name="statusId" value="ORDER_APPROVED"/>
             </entity-find-count>
             <if condition="approvedOrderCount == orderCount"><then>
-                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_MATCH")</script>
+                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_CHECK_SUCCESSFUL")</script>
             </then><else>
-                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_MISMATCH")</script>
+                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_CHECK_FAILURE")</script>
             </else></if>
 
             <!-- 2. Validate Pending Receipt Order Item Count -->
@@ -377,9 +381,9 @@ along with this software (see the LICENSE.md file). If not, see
                 <econdition field-name="statusId" value="ITEM_PENDING_RECEIPT"/>
             </entity-find-count>
             <if condition="approvedOrderItemCount == itemCount"><then>
-                <script>passCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_COUNT_MATCH")</script>
+                <script>passCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL")</script>
             </then><else>
-                <script>failCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_COUNT_MISMATCH")</script>
+                <script>failCriteriaList.add("PENDING_RECEIPT_ORDER_ITEM_CHECK_FAILURE")</script>
             </else>
             </if>
             <!-- Return result -->
@@ -393,6 +397,11 @@ along with this software (see the LICENSE.md file). If not, see
     </service>
 
     <service verb="test" noun="BulkApproveStoreFulfillTransferOrders" authenticate="anonymous-all">
+        <description>
+            Test service to verify Bulk Approve Store Fulfill TOs.
+            Success Criteria for this scenario: APPROVED_ORDER_COUNT_CHECK_SUCCESSFUL,
+            PENDING_FULFILL_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL, RESERVED_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL
+        </description>
         <in-parameters>
             <parameter name="orderIds" type="List" required="true">
                 <description>List of order Ids to test the bulk approve of Store Fulfill Transfer Orders.</description>
@@ -426,9 +435,9 @@ along with this software (see the LICENSE.md file). If not, see
                 <econdition field-name="statusId" value="ORDER_APPROVED"/>
             </entity-find-count>
             <if condition="approvedOrderCount == orderCount"><then>
-                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_MATCH")</script>
+                <script>passCriteriaList.add("APPROVED_ORDER_COUNT_CHECK_SUCCESSFUL")</script>
             </then><else>
-                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_MISMATCH")</script>
+                <script>failCriteriaList.add("APPROVED_ORDER_COUNT_CHECK_FAILURE")</script>
             </else></if>
 
             <!-- 2. Validate Pending Fulfill Order Item Count -->
@@ -437,9 +446,9 @@ along with this software (see the LICENSE.md file). If not, see
                 <econdition field-name="statusId" value="ITEM_PENDING_FULFILL"/>
             </entity-find-count>
             <if condition="approvedOrderItemCount == itemCount"><then>
-                <script>passCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_MATCH")</script>
+                <script>passCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL")</script>
             </then><else>
-                <script>failCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_MISMATCH")</script>
+                <script>failCriteriaList.add("PENDING_FULFILL_ORDER_ITEM_COUNT_CHECK_FAILURE")</script>
             </else>
             </if>
 
@@ -449,9 +458,9 @@ along with this software (see the LICENSE.md file). If not, see
                 <econdition field-name="quantity" operator="is-not-null"/>
             </entity-find-count>
             <if condition="reservedItemCount == itemCount"><then>
-                <script>passCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_MATCH")</script>
+                <script>passCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_CHECK_SUCCESSFUL")</script>
             </then><else>
-                <script>failCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_MISMATCH")</script>
+                <script>failCriteriaList.add("RESERVED_ORDER_ITEM_COUNT_CHECK_FAILURE")</script>
             </else>
             </if>
 
