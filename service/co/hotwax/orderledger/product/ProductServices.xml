@@ -391,12 +391,12 @@ under the License.
                     </iterate>
                 </if>
             </if>
-            <script>
-                isVirtualUpdated = Boolean.valueOf(parentProductKeywords || parentProductFeatureAppls || parentProductDeleteProductKeywords || parentProductDeleteFeatureAppls || parentProductUpdatedInfo)
-                anyVariantUpdated = Boolean.valueOf(variantProductFeatureAppls || variantProductDeleteFeatureAppls || variantProductIdentifications || variantProductPrices || variantProductAssocs || variantProductUpdatedInfo)
-                indexVariants = anyVariantUpdated
-                if (!existingParentProduct) isVirtualUpdated = true
-            </script>
+            <set field="isVirtualUpdated" from="parentProductKeywords || parentProductFeatureAppls || parentProductDeleteProductKeywords || parentProductDeleteFeatureAppls || parentProductUpdatedInfo"/>
+            <set field="anyVariantUpdated" from="variantProductFeatureAppls || variantProductDeleteFeatureAppls || variantProductIdentifications || variantProductPrices || variantProductAssocs || variantProductUpdatedInfo"/>
+            <set field="indexVariants" from="anyVariantUpdated"/>
+            <if condition="!existingParentProduct">
+                <set field="isVirtualUpdated" from="true"/>
+            </if>
 
             <if condition="isVirtualUpdated || anyVariantUpdated">
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
