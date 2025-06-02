@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-facade-xml type="ext-upgrade">
+
+    <!-- SystemMessageType data for consuming New Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"/>
+
+    <!-- SystemMessageType data for consuming Update Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"/>
+</entity-facade-xml>

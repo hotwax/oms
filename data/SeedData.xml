@@ -16,11 +16,11 @@
     <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
             description="New Products Feed"
             parentTypeId="LocalFeedFile"
-            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
             receivePath="/home/${sftpUsername}/hotwax/ProductsFeed"
             receiveResponseEnumId="MsgRrMove"
             receiveMovePath="/home/${sftpUsername}/hotwax/ProductsFeed/archive"
-            sendService="co.hotwax.oms.product.ProductServices.create#ProductAndVariants"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"
             sendPath="${contentRoot}/oms/NewProductsFeed"/>
     <moqui.basic.Enumeration description="New Products Feed" enumId="NewProductsFeed" enumTypeId="OMSMessageTypeEnum"/>
 
@@ -29,11 +29,11 @@
     <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
             description="Product Updates Feed"
             parentTypeId="LocalFeedFile"
-            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedSystemMessage"
+            consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
             receivePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed"
             receiveResponseEnumId="MsgRrMove"
             receiveMovePath="/home/${sftpUsername}/hotwax/UpdatedProductsFeed/archive"
-            sendService="co.hotwax.oms.product.ProductServices.update#ProductAndVariants"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"
             sendPath="${contentRoot}/oms/ProductUpdatesFeed"/>
     <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeed" enumTypeId="OMSMessageTypeEnum"/>
 
