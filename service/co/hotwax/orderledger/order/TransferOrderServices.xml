@@ -145,13 +145,16 @@
             </parameter>
         </out-parameters>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
-                <field-map field-name="externalId" from="payload.externalId"/>
-            </entity-find-one>
+            <!--If externalId is provided, check if Order with the externalId already exists -->
+            <if condition="payload.externalId">
+                <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="orderCount">
+                    <econdition field-name="externalId" from="payload.externalId"/>
+                </entity-find-count>
 
-            <!-- Validate if Order with externalId already exists -->
-            <if condition="orderHeader">
-                <message error="true">Order [External ID: ${payload.externalId}] - Duplicate detected, order already exists</message>
+                <!-- Validate if Order with externalId already exists -->
+                <if condition="orderCount &gt; 0">
+                    <message error="true">Order [External ID: ${payload.externalId}] - Duplicate detected, order already exists</message>
+                </if>
             </if>
 
             <!-- Validate if facility and orderFacility exits in shipGroups -->
