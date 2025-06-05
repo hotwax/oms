@@ -74,6 +74,7 @@
                 <parameter name="orderName"/>
                 <parameter name="externalId"/>
                 <parameter name="statusId"/>
+                <parameter name="maySplit"/>
                 <parameter name="items" type="List">
                     <parameter name="orderItemMap" type="Map">
                         <parameter name="orderItemSeqId"/>
@@ -84,6 +85,7 @@
                         <parameter name="itemDescription"/>
                         <parameter name="cancelQuantity"/>
                         <parameter name="productId"/>
+                        <parameter name="maySplit"/>
                         <parameter name="totalIssuedQuantity"/>
                         <parameter name="totalReceivedQuantity"/>
                     </parameter>
@@ -103,15 +105,17 @@
             <set field="order.status" from="statusItem?.description"/>
 
             <!-- Get Order Item details -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
-                <econdition field-name="orderId"/>
-                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity"/>
+            <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItemList">
+                <econdition field-name="orderId" from="orderId"/>
+                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId"/>
             </entity-find>
+            <set field="order.maySplit" from="orderItemList?.first?.maySplit"/>
 
             <set field="order.items" from="[]"/>
-
             <iterate list="orderItemList" entry="orderItem">
-                <entity-find-related-one value-field="orderItem" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
+                <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
+                    <field-map field-name="statusId" from="orderItem.statusId"/>
+                </entity-find-one>
 
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
 
