@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<entity-facade-xml type="ext-upgrade-dev">
+<entity-facade-xml type="ext-upgrade">
     <!-- New Status Item to be used in Transfer Order items lifecycle -->
     <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILL" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
     <moqui.basic.StatusItem statusId="ITEM_PENDING_RECEIPT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_RECEIPT" description="Pending Receipt"/>
