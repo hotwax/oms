@@ -718,6 +718,8 @@ under the License.
                 <else>
                     <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productVariantJson]" out-map="prepareProductUpdateOutput"/>
                     <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
+                    <set field="identifications" from="prepareProductUpdateOutput.productJson.identifications"/>
+                    <set field="prices" from="prepareProductUpdateOutput.productJson.prices"/>
                     <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
                     <set field="productId" from="productVariantJson.productId"/>
 
