@@ -436,4 +436,118 @@
             </iterate>
         </actions>
     </service>
+
+
+     <service verb="update" noun="TransferOrderItemAndReservation" authenticate="anonymous-all">
+        <description>
+            Update/Delete order item reservation on Shipment Shipped for Transfer Orders using SECA rule, and
+            update the Order Item status for all the items in the Transfer Shipment to the next eligible Item Status based
+            on the statusFlowId associated with the Transfer Order.
+        </description>
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList">
+                <econdition field-name="shipmentId"/>
+            </entity-find>
+
+            <!-- Get the Order Header for status flow id -->
+            <set field="orderShipmentFirst" from="orderShipmentList?.first"/>
+            <entity-find-related-one value-field="orderShipmentFirst" relationship-name="org.apache.ofbiz.order.order.OrderHeader" to-value-field="orderHeader"/>
+
+            <!-- 1. Handle OISGIR update/delete -->
+            <iterate list="orderShipmentList" entry="orderShipment">
+                <entity-find-related-one value-field="orderShipment" relationship-name="org.apache.ofbiz.order.order.OrderItem" to-value-field="orderItem"/>
+
+                <!-- Get OISGIR for the order item -->
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="orderItemShipGrpInvResList">
+                    <econdition field-name="orderId" from="orderShipment.orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderShipment.orderItemSeqId"/>
+                </entity-find>
+                <if condition="orderItemShipGrpInvResList">
+                    <set field="orderItemShipGrpInvRes" from="orderItemShipGrpInvResList.first"/>
+
+                    <!-- Update or Delete OISGIR
+                        NOTE update OISGIR is for TO partial fulfillment scenario Eg.
+                        Case 1: All quantity fulfilled say OI.quantity = 5 and shippedQty = 5
+                                - issuedQty = 5, qtyRemaining = 0
+                                - Delete OISGIR
+                        Case 2: Partial quantity fulfilled say OI.quantity = 5 and shippedQty = 1
+                                - issuedQty = 1, qtyRemaining = 4
+                                - Update OISGIR quantity
+                        Case 2: Excess quantity fulfilled say OI.quantity = 5 and shippedQty = 7
+                                - issuedQty should be 7, we will not restrict the issuance to be =< OI.quantity
+                                - Delete OISGIR quantity
+                    -->
+                    <set field="qtyReserved" from="orderItemShipGrpInvRes.quantity"/>
+                    <set field="qtyRemaining" from="qtyReserved.subtract(orderShipment.quantity)" type="BigDecimal"/>
+
+                    <if condition="qtyRemaining &gt; 0">
+                        <then>
+                            <!-- Update OISGIR record as some quantity remaining to be fulfilled -->
+                            <set field="orderItemShipGrpInvRes.quantity" from="qtyRemaining"/>
+                            <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="orderItemShipGrpInvRes"/>
+                        </then>
+                        <!-- Delete OISGIR record as either all or greater than reserved quantity is being fulfilled  -->
+                        <else>
+                            <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" in-map="orderItemShipGrpInvRes"/>
+                        </else>
+                    </if>
+                </if>
+
+                <!-- Get the next valid Order Item Status start -->
+                <!-- Get OrderItem quantity -->
+                <set field="itemQuantity" from="(orderItem.quantity).subtract(orderItem.cancelQuantity ?: 0)"/>
+
+                <!-- Get Item total Issued Quantity -->
+                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                    <econdition field-name="orderId" from="orderShipment.orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderShipment.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantity"/>
+                </entity-find>
+                <set field="totalIssuedQuantity" from="itemIssuanceList?.first?.quantity"/>
+
+                <!-- Set isItemPendingFulfill in context required for conditionExpression of Status Flow Transition -->
+                <set field="isItemPendingFulfill" from="(totalIssuedQuantity &lt; itemQuantity) ? true : false"/>
+
+                <!-- Get the Status Flow Transitions for the current item status -->
+                <entity-find entity-name="moqui.basic.StatusFlowTransition" list="statusFlowTransitionList" cache="true">
+                    <econdition field-name="statusFlowId" from="orderHeader.statusFlowId"/>
+                    <econdition field-name="statusId" from="orderItem.statusId"/>
+                    <order-by field-name="transitionSequence"/>
+                </entity-find>
+
+                <!-- Here we set the status from the first valid status transition either with or without the
+                conditionExpression if defined -->
+                <iterate list="statusFlowTransitionList" entry="statusFlowTransition">
+                    <if condition="statusFlowTransition.conditionExpression"><then>
+                        <if condition="ec.resource.condition(statusFlowTransition.conditionExpression, '')">
+                            <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                            <break/>
+                        </if>
+                    </then><else>
+                        <set field="toItemStatusId" from="statusFlowTransition.toStatusId"/>
+                        <break/>
+                    </else></if>
+                </iterate>
+                <!-- NOTE Extracting the next valid item status into separate service does not help in scenario say ship#Shipment
+                        where we need to evaluate the conditionExpression and the variable (isItemFullyIssued in the TO scenario)
+                        does not get set as expected in the extracted service. -->
+                <!-- Get the next valid Order Item Status end -->
+
+                <!-- 2. Update the OrderItem status -->
+                <!-- If toItemStatusId is null, no item status change expected E.g. If item being partially fulfilled
+                     for TO_Fulfill_Only, item will still be in ITEM_PENDING_FULFILL  -->
+                <if condition="toItemStatusId">
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                            in-map="[orderId:orderShipment.orderId, orderItemSeqId:orderShipment.orderItemSeqId,
+                            statusId:toItemStatusId, checkCancelCompleteOrder:false]"/>
+                </if>
+            </iterate>
+            <!-- Call checkCancelComplete#Order service to check if Transfer Order can be marked as completed or not,
+                    e.g. for the scenario of TO_Fulfill_Only -->
+            <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderShipmentFirst.orderId]"/>
+        </actions>
+    </service>
 </services>

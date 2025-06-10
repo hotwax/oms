@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
     <!-- Service to cancel sales order item record -->
     <service verb="cancel" noun="SalesOrderItem">
@@ -99,4 +99,27 @@ under the License.
         </actions>
     </service>
 
+    <service verb="update" noun="SalesOrderItem" authenticate="anonymous-all">
+        <description>
+            Update the Order Item status to ITEM_COMPLETED for all the items of the Sales Order Shipment.
+        </description>
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList">
+                <econdition field-name="shipmentId"/>
+            </entity-find>
+
+            <set field="orderId" from="orderShipmentList?.first?.orderId"/>
+            <iterate list="orderShipmentList" entry="orderShipment">
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                        in-map="[orderId:orderShipment.orderId, orderItemSeqId:orderShipment.orderItemSeqId,
+                        statusId:'ITEM_COMPLETED', checkCancelCompleteOrder:false, statusDatetime:ec.user.nowTimestamp]"/>
+            </iterate>
+
+            <!-- Call checkCancelComplete#Order service to confirm if we need to mark the sales order as completed -->
+            <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId]"/>
+        </actions>
+    </service>
 </services>
