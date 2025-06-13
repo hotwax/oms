@@ -571,4 +571,10 @@ under the License.
             <service name="co.hotwax.orderledger.product.ProductServices.update#ProductVariant"/>
         </method>
     </resource>
+
+    <resource name="communicationEvents">
+        <method type="post">
+            <entity name="org.apache.ofbiz.party.communication.CommunicationEvent" operation="create"/>
+        </method>
+    </resource>
 </resource>
