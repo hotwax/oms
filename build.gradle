@@ -35,8 +35,6 @@ tasks.withType(GroovyCompile) { options.compilerArgs << "-proc:none" }
 
 dependencies {
     implementation project(':framework')
-    //mySql Database jar
-    runtimeOnly 'mysql:mysql-connector-java:8.0.33'
 }
 
 // by default the Java plugin runs test on build, change to not do that (only run test if explicit task)
