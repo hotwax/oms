@@ -266,4 +266,20 @@
 
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
     </view-entity>
+
+    <view-entity entity-name="UserLoginSecurityGroupAndGroupPermission" package="co.hotwax.security">
+        <description>UserLoginSecurityGroup And Security Permissions View Entity"</description>
+        <member-entity entity-name="UserLoginSecurityGroup" entity-alias="ULSG"/>
+        <member-entity entity-name="SecurityGroupPermission" entity-alias="SGP" join-from-alias="ULSG">
+            <key-map field-name="groupId"/>
+        </member-entity>
+
+        <alias entity-alias="ULSG" name="userLoginId"/>
+        <alias entity-alias="ULSG" name="groupId"/>
+        <alias entity-alias="ULSG" name="fromDate"/>
+        <alias entity-alias="ULSG" name="thruDate"/>
+        <alias entity-alias="SGP" name="permissionId"/>
+        <alias entity-alias="SGP" name="sgpFromDate" field="fromDate"/>
+        <alias entity-alias="SGP" name="sgpThruDate" field="thruDate"/>
+    </view-entity>
 </entities>
