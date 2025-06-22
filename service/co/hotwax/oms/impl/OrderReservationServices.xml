@@ -108,11 +108,14 @@
             <set field="hasParentType"
                  from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.product.ProductType', 'productTypeId', product?.productTypeId, 'parentTypeId', 'MARKETING_PKG_PICK')" type="Boolean"/>
             <set field="reservedItems" from="[]"/>
+            <entity-find entity-name="co.hotwax.oms.order.OrderItemReservation" list="reservations">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find>
+            <if condition="!reservations">
+                <return message="OrderItem [${orderId}:${orderItemSeqId}] reservation not found." type="warning"/>
+            </if>
             <if condition="hasParentType">
-                <entity-find entity-name="co.hotwax.oms.order.OrderItemReservation" list="reservations">
-                    <econdition field-name="orderId" from="orderId"/>
-                    <econdition field-name="orderItemSeqId" from="orderItemSeqId"/>
-                </entity-find>
                 <iterate list="reservations" entry="reservation">
                     <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
                         <econdition field-name="productId" from="orderItem.productId"/>
@@ -128,13 +131,21 @@
                     </else>
                     </if>
                     <set field="remainingQty" from="reservation.reservedQty - cancelReservedQty" type="BigDecimal"/>
+                    <!-- In case of a rollover inventory item, the original inventory may have already been allocated
+                         to OrderItemShipGrpInvRes (OISGIR) records. Therefore, during cancellation, locate and cancel
+                         the inventory reservations associated with the old inventory item.
+
+                        The available-to-promise (ATP) difference will be logged against the new (current) inventory item,
+                        as the ATP and quantity-on-hand (QOH) values are transferred to the new item during the rollover process.
+                    -->
                     <script>
-                        reservedItems.add([productId: reservation.reservedProductId, cancelQuantity: cancelReservedQty, remainingQty: remainingQty])
+                        reservedItems.add([productId: reservation.reservedProductId, reservedInventoryItemId: reservation.inventoryItemId, cancelQuantity: cancelReservedQty, remainingQty: remainingQty])
                     </script>
                 </iterate>
                 <else>
+                    <set field="reservation" from="reservations[0]"/>
                     <script>
-                        reservedItems.add([productId: orderItem.productId, cancelQuantity: cancelQuantity, remainingQty: 0.0])
+                        reservedItems.add([productId: orderItem.productId, reservedInventoryItemId:reservation.inventoryItemId, cancelQuantity: cancelQuantity, remainingQty: 0.0])
                     </script>
                 </else>
             </if>
@@ -157,7 +168,14 @@
                 <set field="createDetailMap.availableToPromiseDiff" from="reservedItem.cancelQuantity"/>
                 <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail" in-map="createDetailMap"/>
                 <if condition="(reservedItem.remainingQty).compareTo(BigDecimal.ZERO) > 0">
-                    <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                    <if condition="reservedItem.reservedInventoryItemId !== inventoryItemId">
+                        <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                                      in-map="[orderId: orderId,
+                                    orderItemSeqId: orderItemSeqId,
+                                    inventoryItemId: reservedItem.reservedInventoryItemId,
+                                    shipGroupSeqId: orderItem.shipGroupSeqId]"/>
+                    </if>
+                    <service-call name="store#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
                             in-map="[orderId: orderId,
                                     orderItemSeqId: orderItemSeqId,
                                     inventoryItemId: inventoryItemId,
@@ -167,7 +185,7 @@
                     <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
                             in-map="[orderId: orderId,
                                     orderItemSeqId: orderItemSeqId,
-                                    inventoryItemId: inventoryItemId,
+                                    inventoryItemId: reservedItem.reservedInventoryItemId,
                                     shipGroupSeqId: orderItem.shipGroupSeqId]"/>
                 </else>
                 </if>
