@@ -36,17 +36,6 @@ under the License.
             <parameter name="response" type="Map"/>
         </out-parameters>
     </service>
-    <service verb="get" noun="Products" type="oms-rest" location="searchProducts" method="post">
-        <description>Get Product Details from Solr.</description>
-        <!-- <service-call name="co.hotwax.oms.search.SearchServices.get#Product" in-map="[filters:['productId:${productId}']]" out-map="response"
-                        transaction="force-new" ignore-error="true"/> -->
-        <in-parameters>
-            <parameter name="filters" required="true" type="List"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="response" type="Map"/>
-        </out-parameters>
-    </service>
     <service verb="index" noun="OrderItem" type="oms-rest" location="service/createOrderIndex" method="post" authenticate="anonymous-view">
         <description>Create order index</description>
         <in-parameters>
