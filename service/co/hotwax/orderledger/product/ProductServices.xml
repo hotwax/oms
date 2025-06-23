@@ -635,8 +635,8 @@ under the License.
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
             <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
             <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
-            <set field="keywords" from="prepareProductUpdateOutput.productJson.remove('keywords')"/>
-            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.remove('featureAppls')"/>
+            <set field="keywords" from="prepareProductUpdateOutput.productJson.keywords"/>
+            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.featureAppls"/>
             <set field="updatedInfo" from="prepareProductUpdateOutput.productJson.remove('updatedInfo')"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
             <set field="productId" from="productJson.productId"/>
