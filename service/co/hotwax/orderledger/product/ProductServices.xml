@@ -756,21 +756,4 @@ under the License.
             </if>
         </actions>
     </service>
-
-    <service verb="testing" noun="OneTwoThree">
-        <in-parameters>
-            <parameter name="productId" type="String" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="result" type="String"/>
-        </out-parameters>
-        <actions>
-            <set field="filters" type="List" from="['productId:M100015']"/>
-            <log level="info" message="@@@@@ ${filters}"/>
-            <service-call name="co.hotwax.oms.search.SearchServices.get#Products" in-map="[filters:filters]" out-map="response"
-                          transaction="force-new" ignore-error="true"/>
-            <log level="info" message="\n\nResponse from Search Service: ${response} \n\n"/>
-            <set field="result" value="success"/>
-        </actions>
-    </service>
 </services>
