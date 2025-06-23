@@ -7,15 +7,4 @@
   <userPermissions description="ServiceJob: Parameters Update" userPermissionId="SJ_PARAMETERS_UPDATE"/>
   <userPermissions description="ServiceJob: Schedule Update" userPermissionId="SJ_CRON_UPDATE"/>
 
-  <Product productId="BLK_APR_ST_FLF_TO" productTypeId="SERVICE" internalName="BLK_APR_ST_FLF_TO"
-           productName="Bulk Approve Store Fulfill Transfer Orders" description="Bulk Approve Store Fulfill Transfer Orders"
-           primaryProductCategoryId="ORDER_SYS_JOB"/>
-  <ProductCategoryMember productId="BLK_APR_ST_FLF_TO" productCategoryId="ORDER_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
-  <moqui.service.job.ServiceJob jobName="bulkApprove_StoreFulfillTransferOrders" jobTypeEnumId="BLK_APR_ST_FLF_TO" instanceOfProductId="BLK_APR_ST_FLF_TO"/>
-
-  <Product productId="BLK_APR_WH_FLF_TO" productTypeId="SERVICE" internalName="BLK_APR_WH_FLF_TO"
-           productName="Bulk Approve Warehouse Fulfill Transfer Orders" description="Bulk Approve Warehouse Fulfill Transfer Orders"
-           primaryProductCategoryId="ORDER_SYS_JOB"/>
-  <ProductCategoryMember productId="BLK_APR_WH_FLF_TO" productCategoryId="ORDER_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
-  <moqui.service.job.ServiceJob jobName="bulkApprove_WarehouseTransferOrders" jobTypeEnumId="BLK_APR_WH_FLF_TO" instanceOfProductId="BLK_APR_WH_FLF_TO"/>
 </entity-facade-xml>
