@@ -284,6 +284,7 @@ under the License.
                 <script>rejectItemCond.add(conditionFactory.makeCondition([facilityId: facilityId, itemStatusId: 'ITEM_APPROVED']))</script>
                 <set field="maySplit" from="'Y'.equals(item.maySplit)"/>
                 <set field="cascadeRejectByProduct" from="'Y'.equals(item.cascadeRejectByProduct)"/>
+                <set field="relatedRejectReasonId" from="item.rejectionReasonId"/>
                 <if condition="maySplit">
                     <if condition="cascadeRejectByProduct">
                         <!--maySplit = Y, cascadeRejectByProduct = Y: Reject items with the same product ID, but only those specifically targeted or matching criteria. -->
@@ -300,6 +301,7 @@ under the License.
                         </else>
                     </if>
                     <else>
+                        <set field="relatedRejectReasonId" value="REJ_AVOID_ORD_SPLIT"/>
                         <if condition="cascadeRejectByProduct">
                             <!-- maySplit = N, cascadeRejectByProduct = Y: Reject entire ship groups for all orders containing the specified product. -->
                             <!--  Utilized Moqui framework's support for subqueries in the WHERE clause.
@@ -336,8 +338,19 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]"/>
+                    <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
+                        <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
+                        <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
+                            <set field="rejectOrderItemMap.rejectionReasonId" value="REJ_CASCADE_BY_PROD"/>
+                        </if>
+                        <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionReason" cache="true">
+                            <field-map field-name="enumId" from="rejectOrderItemMap.rejectionReasonId"/>
+                        </entity-find-one>
+                        <set field="rejectOrderItemMap.comments" from="rejectionReason?.description"/>
+                    </if>
                     <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
-                                  in-map="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]" out-map="outResult"/>
+                                  in-map="rejectOrderItemMap" out-map="outResult"/>
                     <if condition="outResult.cancelledReservations">
                         <script>cancelledReservations.addAll(outResult.cancelledReservations)</script>
                     </if>
@@ -469,14 +482,14 @@ under the License.
                 <if condition="varianceQuantity>0">
                     <!-- These details go in a map placed inside 'inventoryItemVariances' list -->
                     <set field="inventoryItemVarianceMap"
-                         from="[inventoryItemId: productFacility.inventoryItemId, varianceReasonId: rejectionReasonId,
+                         from="[inventoryItemId: productFacility.inventoryItemId, reasonEnumId: rejectionReasonId,
                         comments: comments, availableToPromiseVar: varianceQuantity.negate()]"/>
 
                     <if condition="updateQOH">
                         <set field="inventoryItemVarianceMap.quantityOnHandVar" from="varianceQuantity.negate()"/>
                     </if>
                     <set field="inventoryItemVarianceMap.inventoryItemDetail"
-                         from="[rejectionReasonId: rejectionReasonId,
+                         from="[orderId: orderId, orderItemSeqId: orderItemSeqId, rejectionReasonId: rejectionReasonId,
                      availableToPromiseDiff : inventoryItemVarianceMap.availableToPromiseVar,  quantityOnHandDiff : inventoryItemVarianceMap.quantityOnHandVar]"/>
 
                     <!--  These go in top level Map - createPhysicalInventoryMap -->
@@ -488,6 +501,27 @@ under the License.
 
                 </if>
             </iterate>
+        </actions>
+    </service>
+
+    <service verb="delete" noun="OrderItemReservations">
+        <description>Delete order item reservation on item completion using seca rule. As we removed logic to delete reservation on item issuance.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" list="oisgirs">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderItemSeqId"/>
+            </entity-find>
+            <if condition="oisgirs">
+                <iterate list="oisgirs" entry="oisgir">
+                    <service-call name="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes"
+                                  in-map="oisgir"
+                                  out-map="removedReservations"/>
+                </iterate>
+            </if>
         </actions>
     </service>
 </services>
