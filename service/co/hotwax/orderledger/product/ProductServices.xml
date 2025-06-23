@@ -635,8 +635,8 @@ under the License.
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
             <set field="deleteProductFeatureAppls" from="prepareProductUpdateOutput.remove('deleteProductFeatureAppls')"/>
             <set field="deleteProductKeywords" from="prepareProductUpdateOutput.remove('deleteProductKeywords')"/>
-            <set field="keywords" from="prepareProductUpdateOutput.productJson.remove('keywords')"/>
-            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.remove('featureAppls')"/>
+            <set field="keywords" from="prepareProductUpdateOutput.productJson.keywords"/>
+            <set field="featureAppls" from="prepareProductUpdateOutput.productJson.featureAppls"/>
             <set field="updatedInfo" from="prepareProductUpdateOutput.productJson.remove('updatedInfo')"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="prepareProductUpdateOutput.productJson" out-map="updateProductOutput"/>
             <set field="productId" from="productJson.productId"/>
@@ -754,6 +754,23 @@ under the License.
                     </if>
                 </else>
             </if>
+        </actions>
+    </service>
+
+    <service verb="testing" noun="OneTwoThree">
+        <in-parameters>
+            <parameter name="productId" type="String" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="result" type="String"/>
+        </out-parameters>
+        <actions>
+            <set field="filters" type="List" from="['productId:M100015']"/>
+            <log level="info" message="@@@@@ ${filters}"/>
+            <service-call name="co.hotwax.oms.search.SearchServices.get#Products" in-map="[filters:filters]" out-map="response"
+                          transaction="force-new" ignore-error="true"/>
+            <log level="info" message="\n\nResponse from Search Service: ${response} \n\n"/>
+            <set field="result" value="success"/>
         </actions>
     </service>
 </services>
