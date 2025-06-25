@@ -62,4 +62,12 @@ under the License.
         </master>
     </extend-entity>
 
+    <extend-entity entity-name="CarrierShipmentBoxType" package="org.apache.ofbiz.shipment.shipment">
+        <relationship type="one" fk-name="CARR_SHBX_TYPE" related="org.apache.ofbiz.shipment.shipment.ShipmentBoxType" short-alias="shipmentBoxType">
+            <key-map field-name="shipmentBoxTypeId"/>
+        </relationship>
+        <master name="shipmentBox">
+            <detail relationship="shipmentBoxType"></detail>
+        </master>
+    </extend-entity>
 </entities>
