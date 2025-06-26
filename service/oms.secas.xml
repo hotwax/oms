@@ -42,4 +42,19 @@
                           ignore-error="true" disable-authz="true"/>
         </actions>
     </seca>
+
+    <!-- Seca rule on order Complete to generate generic order feed for other ERP system -->
+    <seca id="OrderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
+        <condition>
+            <expression>statusChanged &amp;&amp; statusId == 'ORDER_COMPLETED'</expression>
+        </condition>
+        <actions>
+            <entity-find entity-name="co.hotwax.common.WebhookConfig" list="webhookConfig" limit="1">
+                <econdition field-name="topicEnumId" value="WEBHOOK_ODR_COMPLETE"/>
+            </entity-find>
+            <if condition="webhookConfig &amp;&amp; webhookConfig.remoteUrl != null">
+                <service-call name="co.hotwax.sob.fulfillment.FulfillmentFeedServices.post#ShopifyFulfillment" in-map="[shipmentId:shipmentId]" async="true"/>
+            </if>
+        </actions>
+    </seca>
 </secas>
