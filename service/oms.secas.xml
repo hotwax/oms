@@ -49,11 +49,12 @@
             <expression>statusChanged &amp;&amp; statusId == 'ORDER_COMPLETED'</expression>
         </condition>
         <actions>
+            <!-- Added pre-check before calling service -->
             <entity-find entity-name="co.hotwax.common.WebhookConfig" list="webhookConfig" limit="1">
                 <econdition field-name="topicEnumId" value="WEBHOOK_ODR_COMPLETE"/>
             </entity-find>
             <if condition="webhookConfig &amp;&amp; webhookConfig.remoteUrl != null">
-                <service-call name="co.hotwax.sob.fulfillment.FulfillmentFeedServices.post#ShopifyFulfillment" in-map="[shipmentId:shipmentId]" async="true"/>
+                <service-call name="co.hotwax.oms.order.OrderServices.send#OrderWebhook" in-map="[orderId:orderId,topicEnumId:'WEBHOOK_ODR_COMPLETE']" async="true"/>
             </if>
         </actions>
     </seca>
