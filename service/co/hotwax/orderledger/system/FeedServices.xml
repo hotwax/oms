@@ -100,5 +100,206 @@ under the License.
                     in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
         </actions>
     </service>
+    <service verb="consume" noun="OMSFeedNew" transaction-timeout="1800">
+        <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
+        <in-parameters>
+            <parameter name="systemMessageId" type="String" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="moqui.service.message.SystemMessage" value-field="systemMessage"/>
+            <entity-find-one entity-name="moqui.service.message.SystemMessageRemote" value-field="systemMessageRemote">
+                <field-map field-name="systemMessageRemoteId" from="systemMessage.systemMessageRemoteId"/>
+            </entity-find-one>
+            <set field="shopId" from="systemMessageRemote?.remoteId"/>
+            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop"/>
+
+            <entity-find entity-name="co.hotwax.product.ProductUpdateHistory" list="productUpdateHistories">
+                <econdition field-name="systemMessageId" from="systemMessageId"/>
+            </entity-find>
+            <iterate list="productUpdateHistories" entry="productUpdateHistory">
+                <script>
+                    diff = productUpdateHistory.differenceMap ? new groovy.json.JsonSlurper().parseText(productUpdateHistory.differenceMap) : null
+                </script>
+
+                <entity-find entity-name="co.hotwax.product.GoodIdentification" list="goodIdentification">
+                    <econdition field-name="idValue" from="productUpdateHistory.productId"/>
+                    <date-filter/>
+                </entity-find>
+                <set field="productId" from="goodIdentification ? goodIdentification[0].productId : null"/>
+
+                <if condition="diff.assocs">
+                    <set field="primary" from="[:]"/>
+    
+                    <if condition="diff.title">
+                        <set field="primary.productName" value="diff.title"/>
+                    </if>
+                    <if condition="diff.featureImageUrl">
+                        <set field="primary.productImageUrl" value="diff.featureImageUrl"/>
+                    </if>
+                    <if condition="diff.isGiftCard">
+                        <set field="primary.isGiftCard" from="diff.isGiftCard"/>
+                    </if>
+                    <if condition="diff.hasVariantsThatRequireComponents">
+                        <set field="primary.requiresComponents" from="diff.hasVariantsThatRequireComponents"/>
+                    </if>
+    
+                    <set field="primary.productTypeId" value="FINISHED_GOOD"/>
+                    <if condition="!primary.requiresShipping">
+                        <set field="primary.productTypeId" value="DIGITAL_GOOD"/>
+                    </if>
+                    <if condition="primary.requiresComponents">
+                        <set field="primary.productTypeId" value="MARKETING_PKG_PICK"/>
+                    </if>
+                    <if condition="diff.isGiftCard">
+                        <set field="primary.productTypeId" value="FINISHED_GOOD"/>
+                    </if>
+                    <set field="primary.productVariant" value="false"/>
+    
+                    <set field="primary.createdDate" from="ec.user.nowTimestamp"/>
+                    <service-call name="co.hotwax.sob.product.ProductHelperServices.get#ProductStoreBrowseRootCategory"
+                                  in-map="[productStoreId:shopifyShop.productStoreId]" out-map="catResp"/>
+                    <if condition="catResp.categoryId">
+                        <set field="primary.primaryProductCategoryId" from="catResp.categoryId"/>
+                    </if>
+    
+                    <service-call name="store#org.apache.ofbiz.product.product.Product"
+                                  in-map="[productId:productId] + primary" out-map="prodOut"/>
+                    <if condition="!productId">
+                        <set field="productId" from="prodOut.productId"/>
+                    </if>
+    
+                    <if condition="diff.tags.added">
+                        <iterate list="diff.tags.added" entry="kw">
+                            <service-call name="create#org.apache.ofbiz.product.product.ProductKeyword"
+                                          in-map="[productId:productId, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
+                        </iterate>
+                    </if>
+                    <if condition="diff.tags.removed">
+                        <iterate list="diff.tags.removed" entry="kw">
+                            <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword"
+                                          in-map="[productId:productId, keywordTypeId:'KWT_TAG', keyword:kw]"/>
+                        </iterate>
+                    </if>
+    
+                    <if condition="diff.features.added">
+                        <iterate list="diff.features.added" entry="feat">
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                          in-map="[productId:productId, productFeatureTypeDesc:'', productFeatureId:feat, productFeatureApplTypeId:'SELECTABLE_FEATURE']"/>
+                        </iterate>
+                    </if>
+                    <if condition="diff.features.removed">
+                        <iterate list="diff.features.removed" entry="feat">
+                            <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                          in-map="[productId:productId, productFeatureId:feat]"/>
+                        </iterate>
+                    </if>
+    
+                    <if condition="diff.assocs.added">
+                        <iterate list="diff.assocs.added" entry="vid">
+                            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                                          in-map="[productIdTo:vid, productId:productId, productAssocTypeId:'PRODUCT_VARIANT']"/>
+                        </iterate>
+                    </if>
+                    <if condition="diff.assocs.removed">
+                        <iterate list="diff.assocs.removed" entry="vid">
+                            <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc"
+                                          in-map="[productIdTo:vid, productId:productId, productAssocTypeId:'PRODUCT_VARIANT']"/>
+                        </iterate>
+                    </if>
+    
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
+                                  in-map="[productId:productId, shopId:ec.context.shopId, shopifyProductId:productUpdateHistory.productId]"/>
+                <else>
+                    <set field="vid" from="productUpdateHistory.productId"/>
+                    <set field="vMap" from="[:]"/>
+
+                    <if condition="diff.title">
+                        <set field="vMap.internalName" from="diff.title"/>
+                    </if>
+                    <if condition="diff.price">
+                        <set field="vMap.price" value="diff.price"/>
+                    </if>
+
+                    <set field="vMap.productTypeId" value="FINISHED_GOOD"/>
+                    <if condition="!diff.requiresShipping">
+                        <set field="vMap.productTypeId" value="DIGITAL_GOOD"/>
+                    </if>
+                    <if condition="diff.requiresComponents">
+                        <set field="vMap.productTypeId" value="MARKETING_PKG_PICK"/>
+                    </if>
+                    <if condition="diff.isGiftCard">
+                        <set field="vMap.productTypeId" value="FINISHED_GOOD"/>
+                    </if>
+                    <set field="vMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+
+                    <if condition="diff.identifications">
+                        <set field="vMap.productVariantSku" from="diff.identifications.sku"/>
+                        <set field="vMap.barcode" from="diff.identifications.barcode"/>
+                    </if>
+
+                    <if condition="diff.price">
+                        <set field="vMap.productPrices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE', currencyUomId:'USD', price:diff.price, productStoreGroupId:'DEFAULT']"/>
+                    </if>
+
+                    <if condition="diff.parentProductId">
+                        <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="paCheck">
+                            <econdition field-name="productId" from="diff.parentProductId"/>
+                            <econdition field-name="productIdTo" from="vid"/>
+                            <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        </entity-find>
+                        <if condition="!paCheck">
+                            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                                          in-map="[productIdTo:vid, productId:diff.parentProductId, productAssocTypeId:'PRODUCT_VARIANT']"/>
+                        </if>
+                    </if>
+
+                    <service-call name="store#org.apache.ofbiz.product.product.Product"
+                                  in-map="[productId:vid] + vMap"/>
+
+                    <if condition="diff.tags.added">
+                        <iterate list="diff.tags.added" entry="kw">
+                            <service-call name="create#org.apache.ofbiz.product.product.ProductKeyword"
+                                          in-map="[productId:vid, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
+                        </iterate>
+                    </if>
+                    <if condition="diff.tags.removed">
+                        <iterate list="diff.tags.removed" entry="kw">
+                            <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword"
+                                          in-map="[productId:vid, keywordTypeId:'KWT_TAG', keyword:kw]"/>
+                        </iterate>
+                    </if>
+
+                    <if condition="diff.features.added">
+                        <iterate list="diff.features.added" entry="feat">
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                          in-map="[productId:vid, productFeatureTypeDesc:'',productFeatureId:feat,productFeatureApplTypeId:'SELECTABLE_FEATURE']"/>
+                        </iterate>
+                    </if>
+                    <if condition="diff.features.removed">
+                        <iterate list="diff.features.removed" entry="feat">
+                            <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                          in-map="[productId:vid, productFeatureId:feat]"/>
+                        </iterate>
+                    </if>
+
+                    <if condition="diff.identifications">
+                        <if condition="diff.identifications.sku">
+                            <service-call name="create#co.hotwax.product.GoodIdentification"
+                                          in-map="[productId:vid, goodIdentificationTypeId:'SKU', idValue:diff.identifications.sku]"/>
+                        </if>
+                        <if condition="diff.identifications.barcode">
+                            <service-call name="create#co.hotwax.product.GoodIdentification"
+                                          in-map="[productId:vid, goodIdentificationTypeId:'UPCA', idValue:diff.identifications.barcode]"/>
+                        </if>
+                    </if>
+
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
+                                  in-map="[productId:vid, shopId:ec.context.shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:diff.identifications.id]"/>
+                </else>
+                </if>
+            </iterate>
+            <!-- Call Solr API to index the products -->
+        </actions>
+    </service>
 
 </services>
