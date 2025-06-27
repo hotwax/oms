@@ -88,8 +88,6 @@ under the License.
                     selectedEntity=org.apache.ofbiz.product.store.ProductStoreSetting
                 </description>
             </parameter>
-            <parameter name="pageLimit" default-value="20" type="Integer"/>
-            <parameter name="pageIndex" type="Integer" default="0"/>
             <parameter name="filterByDate" type="Boolean" default-value="false"/>
             <parameter name="customParametersMap" type="Map">
                 <description>
@@ -102,12 +100,12 @@ under the License.
         </out-parameters>
         <actions>
             <if condition="filterByDate">
-                <entity-find entity-name="${selectedEntity}" list="entityValueList" offset="pageIndex" limit="pageLimit">
+                <entity-find entity-name="${selectedEntity}" list="entityValueList">
                     <search-form-inputs input-fields-map="customParametersMap"/>
                     <date-filter/>
                 </entity-find>
             <else>
-                <entity-find entity-name="${selectedEntity}" list="entityValueList" offset="pageIndex" limit="pageLimit">
+                <entity-find entity-name="${selectedEntity}" list="entityValueList">
                     <search-form-inputs input-fields-map="customParametersMap"/>
                 </entity-find>
             </else>
