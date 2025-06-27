@@ -572,7 +572,7 @@ under the License.
             </iterate>
         </actions>
     </service>
-    <service verb="send" noun="OrderWebhook" type="oms-rest" location="service/sendOrderWebhook" method="post" transaction-timeout="180">
+    <service verb="send" noun="OrderWebhook" type="oms-rest" location="service/sendOrderWebhook" method="post" transaction-timeout="180" authenticate="anonymous-view">
         <description>Send order related webhook to remote url</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
