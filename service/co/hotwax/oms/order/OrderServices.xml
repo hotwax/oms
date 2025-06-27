@@ -524,4 +524,59 @@ under the License.
             </if>
         </actions>
     </service>
+
+    <!-- This service marks order item completed on shipment shipped. Here we are considering that its OMS responsibility to mark item complete on fulfillment done, so we are adding this service in oms -->
+    <!-- Main actions of this service
+       - complete order item
+       - Complete order if all items has been completed
+       - Call service to notify Shopify on item completion
+       - Trigger service to send completed order feed to location for further processing by Nifi/ERP systems if needed
+    -->
+    <service verb="complete" noun="SalesOrderItemByShipment" authenticate="anonymous-all">
+        <description>
+            Update the Order Item status to ITEM_COMPLETED for all the items of the Sales Order Shipment.
+        </description>
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList" distinct="true">
+                <econdition field-name="shipmentId"/>
+                <select-field field-name="orderId,orderItemSeqId"/>
+            </entity-find>
+            <!-- Adding below handling for the scenario of shipments containing items of multiple orders  -->
+            <set field="orderIdSet" from="new HashSet(orderShipmentList*.orderId)"/>
+
+            <iterate list="orderIdSet" entry="orderId">
+                <filter-map-list list="orderShipmentList" to-list="shipmentOrderItemList">
+                    <field-map field-name="orderId"/>
+                </filter-map-list>
+                <iterate list="shipmentOrderItemList" entry="shipmentOrderItem">
+                    <!-- Update order item status to completed -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                                  in-map="[orderId:shipmentOrderItem.orderId, orderItemSeqId:shipmentOrderItem.orderItemSeqId,
+                            statusId:'ITEM_COMPLETED', checkCancelCompleteOrder:false, statusDatetime:ec.user.nowTimestamp]"/>
+                </iterate>
+                <!-- Call checkCancelComplete#Order service to confirm if we need to mark the sales order as completed -->
+                <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId]"/>
+
+                <!-- Now call service to inform Shopify about fulfillment complete.
+                  - Calling this service inline in async mode to inform shopify about fulfillment.
+                -->
+                <entity-find entity-name="co.hotwax.common.WebhookConfig" list="webhookConfig" limit="1">
+                    <econdition field-name="topicEnumId" value="WEBHOOK_SHIP_SHIPPED"/>
+                </entity-find>
+                <if condition="webhookConfig &amp;&amp; webhookConfig.remoteUrl != null">
+                    <service-call name="co.hotwax.sob.fulfillment.FulfillmentFeedServices.post#ShopifyFulfillment" in-map="[shipmentId:shipmentId]" async="true"/>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="send" noun="OrderWebhook" type="oms-rest" location="service/sendOrderWebhook" method="post" transaction-timeout="180" authenticate="anonymous-view">
+        <description>Send order related webhook to remote url</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="topicEnumId" required="true"/>
+        </in-parameters>
+    </service>
 </services>
