@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<entity-facade-xml type="seed">
+<entity-facade-xml type="ext-upgrade">
     <!-- New Status Item to be used in Transfer Order items lifecycle -->
     <moqui.basic.StatusItem statusId="ITEM_PENDING_FULFILL" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_FULFILLMENT" description="Pending Fulfillment"/>
     <moqui.basic.StatusItem statusId="ITEM_PENDING_RECEIPT" statusTypeId="ORDER_ITEM_STATUS" statusCode="PENDING_RECEIPT" description="Pending Receipt"/>
@@ -22,4 +21,46 @@
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_PENDING_RECEIPT" transitionSequence="1" transitionName="Fulfill Item" conditionExpression="isItemPendingFulfill == false &amp;&amp; totalIssuedQuantity &gt; 0"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_FULFILL" toStatusId="ITEM_CANCELLED" transitionSequence="2" transitionName="Cancel Item" conditionExpression="isItemPendingFulfill == false &amp;&amp; totalIssuedQuantity == 0"/>
     <moqui.basic.StatusFlowTransition statusFlowId="TO_Fulfill_And_Receive" statusId="ITEM_PENDING_RECEIPT" toStatusId="ITEM_COMPLETED" transitionSequence="1" transitionName="Receive Item" conditionExpression="isItemPendingReceipt == false"/>
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="OMSTransferOrderFeed"
+         description="Create Transfer Order Feed for OMS"
+         parentTypeId="LocalFeedFile"
+         consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeed"
+         sendServiceName="co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder"
+         sendPath="${contentRoot}/oms/TransferOrderFeed">
+    </moqui.service.message.SystemMessageType>
+
+    <!-- Service Job to bulk approve Store Fulfill Transfer Orders -->
+    <moqui.basic.Enumeration enumId="BLK_APR_ST_FLF_TO" enumCode="BLK_APR_ST_FLF_TO" description="Bulk Approve Store Fulfill Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
+    <Product productId="BLK_APR_ST_FLF_TO" productTypeId="SERVICE" internalName="BLK_APR_ST_FLF_TO"
+             productName="Bulk Approve Store Fulfill Transfer Orders" description="Bulk Approve Store Fulfill Transfer Orders"
+             primaryProductCategoryId="ORDER_SYS_JOB"/>
+    <ProductCategoryMember productId="BLK_APR_ST_FLF_TO" productCategoryId="ORDER_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
+    <moqui.service.job.ServiceJob jobName="bulkApprove_StoreFulfillTransferOrders" jobTypeEnumId="BLK_APR_ST_FLF_TO" instanceOfProductId="BLK_APR_ST_FLF_TO"
+            description="Service Job to bulk approve the Store Fulfill Transfer Orders in OMS"
+            serviceName="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#StoreFulfillTransferOrders"
+            cronExpression="0 0 0 * * ?" paused="Y">
+        <parameters parameterName="orderIds"/>
+    </moqui.service.job.ServiceJob>
+
+    <!-- Service Job to bulk approve Warehouse Fulfill Transfer Orders -->
+    <moqui.basic.Enumeration enumId="BLK_APR_WH_FLF_TO" enumCode="BLK_APR_WH_FLF_TO" description="Bulk Approve Warehouse Fulfill Transfer Orders" enumTypeId="ORDER_SYS_JOB"/>
+    <Product productId="BLK_APR_WH_FLF_TO" productTypeId="SERVICE" internalName="BLK_APR_WH_FLF_TO"
+             productName="Bulk Approve Warehouse Fulfill Transfer Orders" description="Bulk Approve Warehouse Fulfill Transfer Orders"
+             primaryProductCategoryId="ORDER_SYS_JOB"/>
+    <ProductCategoryMember productId="BLK_APR_WH_FLF_TO" productCategoryId="ORDER_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
+    <moqui.service.job.ServiceJob jobName="bulkApprove_WarehouseTransferOrders" jobTypeEnumId="BLK_APR_WH_FLF_TO" instanceOfProductId="BLK_APR_WH_FLF_TO"
+            description="Service Job to bulk approve the Warehouse Fulfill Transfer Orders in OMS"
+            serviceName="co.hotwax.orderledger.order.TransferOrderServices.bulkApprove#WhFulfillTransferOrders"
+            cronExpression="0 0 0 * * ?" paused="Y">
+        <parameters parameterName="orderIds"/>
+    </moqui.service.job.ServiceJob>
+
+    <!-- SystemMessageType data for consuming New Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="NewProductsFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"/>
+
+    <!-- SystemMessageType data for consuming Update Products Feed -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeed"
+            sendServiceName="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"/>
 </entity-facade-xml>

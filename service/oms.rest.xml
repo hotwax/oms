@@ -480,7 +480,7 @@ under the License.
         </resource>
         <resource name="carrierShipmentBoxTypes">
             <method type="get">
-                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="list"/>
+                <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="list" masterName="shipmentBox"/>
             </method>
             <method type="post">
                 <entity name="org.apache.ofbiz.shipment.shipment.CarrierShipmentBoxType" operation="create"/>
@@ -533,12 +533,48 @@ under the License.
             <method type="delete"><entity name="moqui.service.message.SystemMessageRemote" operation="delete"/></method>
         </id>
     </resource>
+
     <resource name="transferOrders">
-        <method type="get"><service name="co.hotwax.oms.order.TransferOrderServices.get#TransferOrders"/></method>
+        <method type="get"><service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrders"/></method>
+        <method type="post">
+            <service name="co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder"/>
+        </method>
         <id name="orderId">
             <method type="get">
                 <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrder"/>
             </method>
+            <resource name="approve" description="Approve Store Fulfill Transfer Order">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
+                </method>
+            </resource>
         </id>
+    </resource>
+
+    <resource name="entityData">
+        <method type="post">
+            <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
+        </method>
+    </resource>
+    <resource name="dataDocumentView">
+        <method type="post">
+            <service name="co.hotwax.oms.common.CommonServices.get#DataDocumentView"/>
+        </method>
+    </resource>
+
+    <!-- Application Layer APIs -->
+    <resource name="productVariant" require-authentication="anonymous-all">
+        <method type="post">
+            <service name="co.hotwax.orderledger.product.ProductServices.create#ProductVariant"/>
+        </method>
+        <method type="put">
+            <service name="co.hotwax.orderledger.product.ProductServices.update#ProductVariant"/>
+        </method>
+    </resource>
+
+    <resource name="communicationEvents">
+        <method type="post">
+            <entity name="org.apache.ofbiz.party.communication.CommunicationEvent" operation="create"/>
+        </method>
     </resource>
 </resource>
