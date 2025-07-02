@@ -488,18 +488,18 @@ under the License.
 
                     <!-- Call find or create cycle count service -->
 
-                    <entity-find-one entity-name="orderHeader"
-                                     value-field="currentProductStore">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader"
+                                     value-field="orderHeader">
                         <field-map field-name="orderId" from="orderId"/>
                     </entity-find-one>
 
-                    <entity-find-one entity-name="productStoreSetting"
-                                     value-field="rejectedItemCycleCountSetting">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting"
+                                     value-field="ProductStoreSetting">
                         <field-map field-name="settingTypeEnumId" from="REJ_ITM_CC_CRT"/>
-                        <field-map field-name="productStoreId" value="currentProductStore.productStoreId"/>
+                        <field-map field-name="productStoreId" value="orderHeader.productStoreId"/>
                     </entity-find-one>
 
-                    <set field="rejectedItemSettingValue" from="rejectedItemCycleCountSetting.settingValue"/>
+                    <set field="rejectedItemSettingValue" from="ProductStoreSetting.settingValue"/>
 
                     <if condition="rejectedItemSettingValue=true">
                         <service-call name="co.hotwax.cycleCount.InventoryCountServices.findOrCreate#RejectedItemCycleCount"
