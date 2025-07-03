@@ -281,7 +281,7 @@ under the License.
 
     <resource name="facilityContactMechs">
         <method type="get">
-            <entity name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" operation="list"/>
+            <service name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs"/>
         </method>
         <resource name="facilityPhone" require-authentication="anonymous-all">
             <method type="post">
