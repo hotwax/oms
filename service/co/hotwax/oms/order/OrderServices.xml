@@ -508,13 +508,13 @@ under the License.
 
                     <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting"
                                      value-field="productStoreSetting">
-                        <field-map field-name="settingTypeEnumId" from="REJ_ITM_CC_CRT"/>
-                        <field-map field-name="productStoreId" value="orderHeader.productStoreId"/>
+                        <field-map field-name="settingTypeEnumId" value="REJ_ITM_CC_CRT"/>
+                        <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
                     </entity-find-one>
 
                     <set field="rejectedItemSettingValue" from="productStoreSetting?.settingValue"/>
 
-                    <if condition="rejectedItemSettingValue">
+                    <if condition="rejectedItemSettingValue=='true'">
                         <service-call name="co.hotwax.cycleCount.InventoryCountServices.findOrCreate#RejectedItemCycleCount"
                                       in-map="productId: product.productId, facilityId: fromFacilityId" out-map="cycleCount"/>
                     </if>
