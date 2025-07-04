@@ -244,6 +244,7 @@ under the License.
                         <description>Whether to reject other items in the order with the same product in the same facility. Default is N.</description>
                     </parameter>
                     <parameter name="comments"/>
+                    <parameter name="excludeOrderFacilityDuration"/>
                     <parameter name="rejectionReasonId" required="true"/>
                     <parameter name="kitComponents" type="List">
                         <parameter name="kitProductId"/>
@@ -338,7 +339,7 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
-                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]"/>
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId, excludeOrderFacilityDuration:excludeOrderFacilityDuration]"/>
                     <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
                         <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
                         <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
@@ -367,6 +368,7 @@ under the License.
             <parameter name="updateQOH" default-value="false" type="Boolean"/>
             <parameter name="rejectionReasonId" required="true"/>
             <parameter name="comments" />
+            <parameter name="excludeOrderFacilityDuration"/>
             <parameter name="kitComponents" type="List">
                 <parameter name="kitProductId"/>
             </parameter>
@@ -432,6 +434,23 @@ under the License.
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionEnum" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
+
+            <!-- 7 Create ExcludedOrderFacility for item -->
+            <if condition="excludeOrderFacilityDuration">
+                <set field="excludeDays" from="excludeOrderFacilityDuration" type="Integer"/>
+                <if condition="excludeDays &gt; 0">
+                    <set field="expiringDateTime" from="ec.user.nowTimestamp + excludeDays"/>
+                    <set field="excludedOrderFacility" from="[
+                        orderId: orderId,
+                        orderItemSeqId: orderItemSeqId,
+                        facilityId: fromFacilityId,
+                        shipGroupSeqId:shipGroupSeqId,
+                        fromDate:ec.user.nowTimestamp,
+                        thruDate:expiringDateTime
+                    ]"/>
+                    <service-call name="create#co.hotwax.facility.ExcludedOrderFacility" in-map="excludedOrderFacility" out-map="excludedOrderFacilityOut"/>
+                </if>
+            </if>
 
             <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_NO_VAR')">
                 <return message="Order Item [${orderId}: ${orderItemSeqId}] rejected successfully to facility: $rejectToFacilityId}" type="success"/>
