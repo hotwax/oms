@@ -198,6 +198,7 @@
         <alias name="itemStatusId" field="statusId" entity-alias="OI"/>
         <alias name="shipmentId" entity-alias="S"/>
         <alias name="shipmentStatusId" field="statusId" entity-alias="S"/>
+        <alias name="shipmentTypeId" entity-alias="S"/>
     </view-entity>
 
     <view-entity entity-name="PostalAddressAndGeo" package="co.hotwax.oms.contact">
