@@ -756,4 +756,134 @@ under the License.
             </if>
         </actions>
     </service>
+    <service verb="update" noun="ExternalProductVariant">
+        <description>Updates an existing variant product from variant JSON input and creates related features and identifiers.</description>
+        <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
+        <out-parameters>
+            <parameter name="productId" type="String"/>
+        </out-parameters>
+        <actions>
+            <!-- Fetch SystemMessage -->
+            <entity-find-one entity-name="moqui.service.message.SystemMessage" value-field="systemMessage"/>
+
+            <!-- Parse messageText as productVariantJson -->
+            <set field="productVariantJson" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(systemMessage.messageText, Map.class)"/>
+
+            <!-- Fetch SystemMessageRemote to get shopId -->
+            <entity-find-one entity-name="moqui.service.message.SystemMessageRemote" value-field="systemMessageRemote">
+                <field-map field-name="systemMessageRemoteId" from="systemMessage.systemMessageRemoteId"/>
+            </entity-find-one>
+
+            <set field="shopId" from="systemMessageRemote.internalId"/>
+
+            <!-- Fetch existing product by UPCA -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="existingProduct">
+                <field-map field-name="internalName" from="productVariantJson.barcode"/>
+            </entity-find-one>
+
+            <if condition="!existingProduct">
+                <return error="true" message="Product with UPCA [${productVariantJson.barcode}] does not exist."/>
+            </if>
+
+            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop"/>
+            <!-- Update product fields -->
+            <set field="updateProductMap" from="[:]"/>
+            <set field="updateProductMap.productId" from="existingProduct.productId"/>
+            <set field="updateProductMap.productName" from="productVariantJson.title"/>
+            <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
+            <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
+            <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+            <set field="updateProductMap.isVariant" value="Y"/>
+            <set field="updateProductMap.isVirtual" value="N"/>
+            <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap" transaction="force-new"/>
+
+            <set field="productId" from="existingProduct.productId"/>
+
+            <!-- Insert GoodIdentification for Barcode -->
+            <if condition="productVariantJson.barcode">
+                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
+                              in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode]"
+                              transaction="force-new"/>
+            </if>
+
+            <!-- Insert GoodIdentification for SKU -->
+            <if condition="productVariantJson.sku">
+                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
+                              in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku]"
+                              transaction="force-new"/>
+                <else>
+                    <return error="true" message="Primary Identifier UPCA is missing."/>
+                </else>
+            </if>
+
+            <!-- Insert GoodIdentification for ERP_ID -->
+            <if condition="productVariantJson.ERP_ID">
+                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
+                              in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID]"
+                              transaction="force-new"/>
+            </if>
+
+            <!-- Insert variant options as ProductFeature if provided -->
+            <if condition="productVariantJson.selectedOptions">
+                <iterate list="productVariantJson.selectedOptions" entry="selectedOption">
+                    <set field="productFeatureTypeDesc" from="selectedOption.name"/>
+                    <set field="featureDesc" from="selectedOption.value"/>
+
+                    <!-- Fetch or create ProductFeatureType -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="productFeatureTypeDesc"/>
+                    </entity-find>
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
+                                          out-map="createdFeatureType"
+                                          in-map="[description: productFeatureTypeDesc]"
+                                          transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
+                        </else>
+                    </if>
+
+                    <!-- Fetch or create ProductFeature -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="featureDesc"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                    </entity-find>
+                    <if condition="productFeatures">
+                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
+                                          out-map="createdFeature"
+                                          in-map="[productFeatureTypeId: productFeatureTypeId, description: featureDesc]"
+                                          transaction="force-new"/>
+                            <set field="productFeatureId" from="createdFeature.productFeatureId"/>
+                        </else>
+                    </if>
+
+                    <!-- Create ProductFeatureAppl -->
+                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'SELECTABLE_FEATURE']"
+                                  transaction="force-new"/>
+                </iterate>
+            </if>
+
+            <!-- Insert product price -->
+            <if condition="productVariantJson.price">
+                <entity-find entity-name="org.apache.ofbiz.product.store.ProductStore" list="productStores">
+                    <econdition field-name="productStoreId" from="shopifyShop.productStoreId"/>
+                </entity-find>
+                <service-call name="create#org.apache.ofbiz.product.price.ProductPrice"
+                              in-map="[productId: productId, productPriceTypeId: 'LIST_PRICE', productPricePurposeId: 'PURCHASE',
+                        currencyUomId: productStores[0].defaultCurrencyUomId,
+                        productStoreGroupId: productStores[0].primaryStoreGroupId,
+                        price: productVariantJson.price, fromDate: ec.user.nowTimestamp]"
+                              transaction="force-new"/>
+            </if>
+
+            <!-- Index product -->
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
+                          in-map="[productId: productId, indexVariants: false]" ignore-error="true" transaction="force-new"/>
+            <log level="info" message="Updated and indexed product: ${productId}"/>
+        </actions>
+    </service>
 </services>
