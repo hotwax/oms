@@ -811,9 +811,6 @@ under the License.
                 <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
                               in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku]"
                               transaction="force-new"/>
-                <else>
-                    <return error="true" message="Primary Identifier UPCA is missing."/>
-                </else>
             </if>
 
             <!-- Insert GoodIdentification for ERP_ID -->
