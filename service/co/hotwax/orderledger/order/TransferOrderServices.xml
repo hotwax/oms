@@ -27,7 +27,7 @@
             </parameter>
             <parameter name="excludeOriginFacilityIds" type="List">
                 <description>
-                    The list of source Facility IDs OMS to exclude.
+                    The list of source Facility IDs in OMS to exclude for the Transfer Orders.
                     Eg. To exclude the Rejected TOs in the Receiving App, send the parameter with value as REJECTED_ITM_PARKING.</description>
             </parameter>
             <parameter name="orderName">
