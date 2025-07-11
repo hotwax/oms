@@ -34,6 +34,12 @@
             <parameter name="limit" type="Integer" default="20">
                 <description>Number of records per page (default 20).</description>
             </parameter>
+            <parameter name="customParametersMap" type="Map">
+                <description>This map defines custom conditions to fetch Transfer Orders, allowing flexibility to add new conditions dynamically.
+                    This parameter expects map in a specific format including suffixes like *_op for operators and *_ic for case-insensitivity.
+                    Eg. In Receiving App, to exclude the Rejected TOs, the map will be prepared as {"facilityId_op":"equals","facilityId_not":"Y","facilityId":"REJECTED_ITM_PARKING"}
+                </description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="orders" type="List"/>
@@ -47,7 +53,7 @@
                     TODO check the possible application of distinct when get on entity in rest.xml file  -->
             <!-- Entity Find on OrderHeaderItemShipGroup view entity -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
-                <search-form-inputs default-order-by="orderDate"/>
+                <search-form-inputs input-fields-map="customParametersMap" default-order-by="orderDate"/>
                 <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
