@@ -279,7 +279,7 @@ under the License.
                         </else>
                     </if>
 
-                    <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
+                    <set field="featureAppls" from="featureAppls + [productFeatureId:productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum, fromDate: ec.user.nowTimestamp]"/>
                 </iterate>
                 <set field="productJson.featureAppls" from="featureAppls"/>
             </if>
