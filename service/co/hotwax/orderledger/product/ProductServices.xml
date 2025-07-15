@@ -770,6 +770,10 @@ under the License.
             <set field="productVariantJson" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(systemMessage.messageText, Map.class)"/>
 
             <!-- Fetch SystemMessageRemote to get shopId -->
+            <if condition="productVariantJson.message">
+                <return error="true" message="Received message: ${productVariantJson.message} in response, not consuming message: ${systemMessageId}"/>
+                <return/>
+            </if>
             <entity-find-one entity-name="moqui.service.message.SystemMessageRemote" value-field="systemMessageRemote">
                 <field-map field-name="systemMessageRemoteId" from="systemMessage.systemMessageRemoteId"/>
             </entity-find-one>
@@ -807,9 +811,9 @@ under the License.
                     <date-filter/>
                 </entity-find>
                 <if condition="!identifications">
-                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                              in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode, fromDate: ec.user.nowTimestamp]"
-                              transaction="force-new"/>
+                    <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
+                                  in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode, fromDate: ec.user.nowTimestamp]"
+                                  transaction="force-new"/>
                 </if>
             </if>
 
