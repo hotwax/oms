@@ -884,7 +884,7 @@ under the License.
 
                     <!-- Create ProductFeatureAppl -->
                     <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'SELECTABLE_FEATURE']"
+                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"
                                   transaction="force-new"/>
                 </iterate>
             </if>
