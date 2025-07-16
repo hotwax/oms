@@ -96,9 +96,14 @@ under the License.
             </script>
 
             <!-- Create SystemMessage record for the error file path reference -->
+            <!-- Creating the system message in SmsgProduced status and isOutgoing = 'N' because
+                 if send#AllProducedSystemMessage job is scheduled then it will pick all the system messages
+                 in 'SmsgProduced' status and isOutgoing = 'Y' hence the service job will pick these system messages
+                 as well and will fail for these as there is no sendServiceName configured for FeedErrorFile system message type. -->
             <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
-                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
+                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath,
+                    parentMessageId:systemMessage.systemMessageId,statusId:'SmsgProduced', isOutgoing:'N',
+                    initDate:ec.user.nowTimestamp]"/>
         </actions>
     </service>
-
 </services>
