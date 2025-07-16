@@ -797,8 +797,6 @@ under the License.
             <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
-            <set field="updateProductMap.isVariant" value="Y"/>
-            <set field="updateProductMap.isVirtual" value="N"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap" transaction="force-new"/>
 
             <set field="productId" from="existingProduct.productId"/>
