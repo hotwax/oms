@@ -790,16 +790,68 @@ under the License.
             </if>
 
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop"/>
+
+            <set field="productId" from="existingProduct.productId"/>
+            <set field="productName" value=""/>
+            <!-- Insert variant options as ProductFeature if provided -->
+            <if condition="productVariantJson.selectedOptions">
+                <iterate list="productVariantJson.selectedOptions" entry="selectedOption">
+                    <set field="productFeatureTypeDesc" from="selectedOption.name"/>
+                    <set field="featureDesc" from="selectedOption.value"/>
+
+                    <!-- Append featureDesc to productName with '/' separator -->
+                    <if condition="productName">
+                        <set field="productName" value="${productName} / ${featureDesc}"/>
+                        <else>
+                            <set field="productName" from="featureDesc"/>
+                        </else>
+                    </if>
+                    <!-- Fetch or create ProductFeatureType -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                        <econdition field-name="description" from="productFeatureTypeDesc"/>
+                    </entity-find>
+                    <if condition="productFeatureTypes">
+                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
+                                          out-map="createdFeatureType"
+                                          in-map="[description: productFeatureTypeDesc]"
+                                          transaction="force-new"/>
+                            <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
+                        </else>
+                    </if>
+
+                    <!-- Fetch or create ProductFeature -->
+                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                        <econdition field-name="description" from="featureDesc"/>
+                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                    </entity-find>
+                    <if condition="productFeatures">
+                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                        <else>
+                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
+                                          out-map="createdFeature"
+                                          in-map="[productFeatureTypeId: productFeatureTypeId, description: featureDesc]"
+                                          transaction="force-new"/>
+                            <set field="productFeatureId" from="createdFeature.productFeatureId"/>
+                        </else>
+                    </if>
+
+                    <!-- Create ProductFeatureAppl -->
+                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"
+                                  transaction="force-new"/>
+                </iterate>
+            </if>
             <!-- Update product fields -->
             <set field="updateProductMap" from="[:]"/>
             <set field="updateProductMap.productId" from="existingProduct.productId"/>
-            <set field="updateProductMap.productName" from="productVariantJson.title"/>
+            <set field="updateProductMap.productName" from="productName ?: productVariantJson.title"/>
             <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap" transaction="force-new"/>
 
-            <set field="productId" from="existingProduct.productId"/>
 
             <!-- Insert GoodIdentification for Barcode -->
             <if condition="productVariantJson.barcode">
@@ -841,50 +893,6 @@ under the License.
                                   in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID, fromDate: ec.user.nowTimestamp]"
                                   transaction="force-new"/>
                 </if>
-            </if>
-
-            <!-- Insert variant options as ProductFeature if provided -->
-            <if condition="productVariantJson.selectedOptions">
-                <iterate list="productVariantJson.selectedOptions" entry="selectedOption">
-                    <set field="productFeatureTypeDesc" from="selectedOption.name"/>
-                    <set field="featureDesc" from="selectedOption.value"/>
-
-                    <!-- Fetch or create ProductFeatureType -->
-                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
-                        <econdition field-name="description" from="productFeatureTypeDesc"/>
-                    </entity-find>
-                    <if condition="productFeatureTypes">
-                        <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
-                        <else>
-                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
-                                          out-map="createdFeatureType"
-                                          in-map="[description: productFeatureTypeDesc]"
-                                          transaction="force-new"/>
-                            <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
-                        </else>
-                    </if>
-
-                    <!-- Fetch or create ProductFeature -->
-                    <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
-                        <econdition field-name="description" from="featureDesc"/>
-                        <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
-                    </entity-find>
-                    <if condition="productFeatures">
-                        <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
-                        <else>
-                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
-                                          out-map="createdFeature"
-                                          in-map="[productFeatureTypeId: productFeatureTypeId, description: featureDesc]"
-                                          transaction="force-new"/>
-                            <set field="productFeatureId" from="createdFeature.productFeatureId"/>
-                        </else>
-                    </if>
-
-                    <!-- Create ProductFeatureAppl -->
-                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"
-                                  transaction="force-new"/>
-                </iterate>
             </if>
 
             <!-- Insert product price -->
