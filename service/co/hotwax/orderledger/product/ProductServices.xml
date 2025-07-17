@@ -799,13 +799,9 @@ under the License.
                     <set field="productFeatureTypeDesc" from="selectedOption.name"/>
                     <set field="featureDesc" from="selectedOption.value"/>
 
-                    <!-- Append featureDesc to productName with '/' separator -->
-                    <if condition="productName">
-                        <set field="productName" value="${productName} / ${featureDesc}"/>
-                        <else>
-                            <set field="productName" from="featureDesc"/>
-                        </else>
-                    </if>
+                    <!-- Store feature in featureMap for later ordered processing -->
+                    <set field="featureMap[${productFeatureTypeDesc}]" from="featureDesc"/>
+
                     <!-- Fetch or create ProductFeatureType -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
                         <econdition field-name="description" from="productFeatureTypeDesc"/>
@@ -841,6 +837,19 @@ under the License.
                     <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
                                   in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"
                                   transaction="force-new"/>
+                </iterate>
+
+                <!-- Build productName in order: Color / Size / Color Code -->
+                <set field="orderedFeatures" from="['Color', 'Size', 'Color Code']"/>
+                <iterate list="orderedFeatures" entry="featureType">
+                    <if condition="featureMap[${featureType}]">
+                        <if condition="productName">
+                            <set field="productName" value="${productName} / ${featureMap[${featureType}]}"/>
+                            <else>
+                                <set field="productName" from="featureMap[${featureType}]"/>
+                            </else>
+                        </if>
+                    </if>
                 </iterate>
             </if>
             <!-- Update product fields -->
