@@ -57,4 +57,16 @@ under the License.
         <documents dataDocumentId="OmsProduct"/>
     </moqui.entity.feed.DataFeed>
     -->
+
+    <dataDocuments dataDocumentId="ApiCommunicationEventOrder" documentName="Api Communication Event Order"
+                   primaryEntityName="org.apache.ofbiz.order.order.CommunicationEventOrder" documentTitle="Api Communication Event Order">
+        <fields fieldSeqId="01" fieldPath="org.apache.ofbiz.party.communication.CommunicationEvent:communicationEventTypeId" fieldNameAlias="communicationEventTypeId"/>
+        <fields fieldSeqId="02" fieldPath="org.apache.ofbiz.party.communication.CommunicationEvent:content" fieldNameAlias="content"/>
+        <fields fieldSeqId="03" fieldPath="org.apache.ofbiz.party.communication.CommunicationEvent:subject" fieldNameAlias="subject"/>
+        <fields fieldSeqId="04" fieldPath="org.apache.ofbiz.party.communication.CommunicationEvent:note" fieldNameAlias="note"/>
+        <fields fieldSeqId="05" fieldPath="org.apache.ofbiz.party.communication.CommunicationEvent:entryDate" fieldNameAlias="entryDate"/>
+        <fields fieldSeqId="06" fieldPath="orderId"/>
+        <conditions conditionSeqId="01" fieldNameAlias="communicationEventTypeId" operator="equals" fieldValue="API_COMMUNICATION"/>
+        <conditions conditionSeqId="02" fieldNameAlias="subject" operator="equals" fieldValue="ORDER_TO_INVOICE_API"/>
+    </dataDocuments>
 </entity-facade-xml>
