@@ -120,7 +120,6 @@
         <alias entity-alias="P" name="partyTypeId"/>
         <alias entity-alias="P" name="statusId"/>
         <alias entity-alias="PR" name="roleTypeId"/>
-        <alias entity-alias="PG" name="groupName"/>
         <alias entity-alias="CSM" name="shipmentMethodCount" field="shipmentMethodTypeId" function="count"/>
     </view-entity>
 
