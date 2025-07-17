@@ -786,13 +786,14 @@ under the License.
             </entity-find-one>
 
             <if condition="!existingProduct">
-                <return error="true" message="Product with UPCA [${productVariantJson.barcode}] does not exist."/>
+                <return error="true" message="Product with UPCA: ${productVariantJson.barcode} does not exist."/>
             </if>
 
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop"/>
 
             <set field="productId" from="existingProduct.productId"/>
             <set field="productName" value=""/>
+            <set field="featureMap" from="[:]"/>
             <!-- Insert variant options as ProductFeature if provided -->
             <if condition="productVariantJson.selectedOptions">
                 <iterate list="productVariantJson.selectedOptions" entry="selectedOption">
@@ -800,7 +801,7 @@ under the License.
                     <set field="featureDesc" from="selectedOption.value"/>
 
                     <!-- Store feature in featureMap for later ordered processing -->
-                    <set field="featureMap[${productFeatureTypeDesc}]" from="featureDesc"/>
+                    <set field="featureMap[productFeatureTypeDesc]" from="featureDesc"/>
 
                     <!-- Fetch or create ProductFeatureType -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
@@ -842,11 +843,11 @@ under the License.
                 <!-- Build productName in order: Color / Size / Color Code -->
                 <set field="orderedFeatures" from="['Color', 'Size', 'Color Code']"/>
                 <iterate list="orderedFeatures" entry="featureType">
-                    <if condition="featureMap[${featureType}]">
+                    <if condition="featureMap[featureType]">
                         <if condition="productName">
-                            <set field="productName" value="${productName} / ${featureMap[${featureType}]}"/>
+                            <set field="productName" value="${productName} / ${featureMap[featureType]}"/>
                             <else>
-                                <set field="productName" from="featureMap[${featureType}]"/>
+                                <set field="productName" from="featureMap[featureType]"/>
                             </else>
                         </if>
                     </if>
