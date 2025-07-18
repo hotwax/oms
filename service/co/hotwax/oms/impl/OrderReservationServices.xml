@@ -436,7 +436,7 @@
                     If the item is allocated to a virtual facility, the find#OrderItemShipGroup service returns the existing ship group sequence ID.
                 -->
                 <service-call name="co.hotwax.oms.order.OrderServices.find#OrderItemShipGroup"
-                          in-map="[orderId: orderId, facilityId: facilityId]" out-map="outMap"/>
+                          in-map="[orderId: orderId, facilityId: facilityId, shipmentMethodTypeId: fromShipGroup.shipmentMethodTypeId]" out-map="outMap"/>
                 <set field="toShipGroupSeqId" from="outMap.shipGroupSeqId"/>
                 <!-- Create a new ship group and copy the fields from the original ship group sequence ID.-->
                 <if condition="!toShipGroupSeqId">
