@@ -162,7 +162,7 @@ under the License.
             </entity-find>
             <!-- Set productId in the productVariantMap if the productId exists -->
             <if condition="productsList">
-                <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+                <set field="productVariantJson.productId" from="productsList.first?.productId"/>
             </if>
             <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
@@ -172,7 +172,7 @@ under the License.
                 <set field="productId" from="productVariantJson.productId"/>
                 <if condition="shopifyShopProduct"><then>
                     <!-- Create ShopifyShopProduct record -->
-                         <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
+                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
                             productId:productVariantJson.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
                             shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
                 </then><else>
@@ -694,7 +694,7 @@ under the License.
             </entity-find>
             <!-- Set productId in the productVariantMap if the productId exists -->
             <if condition="productsList">
-            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+                <set field="productVariantJson.productId" from="productsList.first?.productId"/>
             </if>
             <!-- Set the shopifyShopProduct record from the productJson -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
