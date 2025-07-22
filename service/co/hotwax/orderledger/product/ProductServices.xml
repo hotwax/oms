@@ -158,18 +158,12 @@ under the License.
             <!-- Check if the product already exists -->
             <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
                 <econdition field-name="internalName" from="productVariantJson.internalName"/>
+                <econdition field-name="productTypeId" operator="not-equals" value="DRAFT_PRODUCT"/>
             </entity-find>
-            <!--Then try again but specifically for placeholder-->
-            <if condition="!productsList">
-                <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
-                    <econdition field-name="internalName" from="productVariantJson.shopifyShopProduct.shopifyProductId"/>
-                    <econdition field-name="productTypeId" value="DRAFT_GOOD"/>
-                </entity-find>
-            </if>
-
             <!-- Set productId in the productVariantMap if the productId exists -->
-            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
-
+            <if condition="productsList">
+                <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
+            </if>
             <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
@@ -177,24 +171,16 @@ under the License.
             <if condition="productVariantJson.productId">
                 <set field="productId" from="productVariantJson.productId"/>
                 <if condition="shopifyShopProduct"><then>
-
-                    <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="shopifyShopProduct" limit="1">
-                        <econdition field-name="shopId" from="shopifyShopProduct.shopId"/>
-                        <econdition field-name="shopifyProductId" from="shopifyShopProduct.shopifyProductId"/>
-                    </entity-find>
-                    <!-- Create ShopifyShopProduct record if not exist-->
-                     <if condition="!shopifyShopProduct">
+                    <!-- Create ShopifyShopProduct record -->
                          <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
                             productId:productVariantJson.productId,shopifyProductId:shopifyShopProduct.shopifyProductId,
                             shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]" out-map="context"/>
-                     </if>
                 </then><else>
                     <log message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${productVariantJson.productId}]"/>
                 </else>
                 </if>
                 <if condition="parentProductId"><then>
                     <!-- Identify if parent product and productVariantJson.productId are already associated in ProductAssoc entity-->
-
                     <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs" limit="1">
                         <econdition field-name="productId" from="parentProductId"/>
                         <econdition field-name="productIdTo" from="productVariantJson.productId"/>
@@ -205,7 +191,6 @@ under the License.
                     <if condition="!productAssocs">
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                     </if>
-                    <service-call name="co.hotwax.orderledger.product.ProductServices.update#ProductVariant" in-map="[productVariantJson:productVariantJson]"/>
                     <return/>
                 </then>
                     <else>
@@ -705,19 +690,12 @@ under the License.
             <!-- Check if the product already exists -->
             <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
                 <econdition field-name="internalName" from="productVariantJson.internalName"/>
+                <econdition field-name="productTypeId" operator="not-equals" value="DRAFT_PRODUCT"/>
             </entity-find>
-
-            <if condition="!productsList">
-                <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
-                    <econdition field-name="internalName" from="productVariantJson?.shopifyShopProduct?.shopifyProductId"/>
-                    <econdition field-name="productTypeId" value="DRAFT_GOOD"/>
-                </entity-find>
-            </if>
-
-            <set field="productTypeId" from="productVariantJson.productTypeId"/>
             <!-- Set productId in the productVariantMap if the productId exists -->
+            <if condition="productsList">
             <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
-
+            </if>
             <!-- Set the shopifyShopProduct record from the productJson -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
