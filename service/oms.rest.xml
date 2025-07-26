@@ -37,6 +37,11 @@ under the License.
             <method type="delete">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="delete"/>
             </method>
+            <resource name="details">
+                <method type="get">
+                    <service name="co.hotwax.orderledger.order.OrderServices.get#AllOrderDetails"/>
+                </method>
+            </resource>
             <resource name="items">
                 <method type="get">
                     <entity name="org.apache.ofbiz.order.order.OrderItem" operation="list"/>
@@ -107,6 +112,9 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="storePickup">
+            <method type="get"><service name="co.hotwax.orderledger.order.OrderServices.get#StorePickupOrders"/></method>
+        </resource>
     </resource>
     <resource name="returns">
         <method type="get">
