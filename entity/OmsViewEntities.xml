@@ -261,7 +261,7 @@
         <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
         <alias entity-alias="OISG" name="carrierPartyId"/>
         <alias entity-alias="OISG" name="orderFacilityId"/>
-
+        <alias entity-alias="OISG" name="shippingInstructions"/>
         <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
 
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>

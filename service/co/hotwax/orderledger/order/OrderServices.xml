@@ -98,5 +98,260 @@ under the License.
 
         </actions>
     </service>
+    <!-- NOTE This service is being used to fetch Eligible Store Pickup Orders in the BOPIS App -->
+    <service verb="get" noun="StorePickupOrders">
+        <description>
+            Service to get BOPIS Orders primarily.
+            By default, the service will return orders with status ORDER_APPROVED.
+        </description>
+        <in-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Order in OMS.</description>
+            </parameter>
+            <parameter name="orderStatusId" default-value="ORDER_APPROVED">
+                <description>The status of the Order in OMS.</description>
+            </parameter>
+            <parameter name="originFacilityId">
+                <description>The source facility ID of the Order in OMS.</description>
+            </parameter>
+            <parameter name="shipmentMethodTypeId" default-value="STOREPICKUP"/>
+            <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT,SHIPMENT_PACKED,SHIPMENT_SHIPPED">
+                <description>List of comma separated shipment statuses</description>
+            </parameter>
+            <parameter name="shipmentStatusId_op" default-value="in"/>
+            <parameter name="shipmentStatusId_not" default-value="Y"/>
+            <parameter name="pageIndex" type="Integer" default="0">
+                <description>Page number to return, starting with zero.</description>
+            </parameter>
+            <parameter name="limit" type="Integer" default="20">
+                <description>Number of records per page (default 20).</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orders" type="List"/>
+            <parameter name="ordersCount" type="Integer"/>
+        </out-parameters>
+        <actions>
+            <!-- Fetch distinct orders with passed filters -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="ordersList" distinct="true">
+                <search-form-inputs/>
+                <econdition field-name="orderTypeId" value="SALES_ORDER"/>
+                <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId"/>
+                <econdition field-name="orderId" ignore-if-empty="true"/>
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>
+            </entity-find>
+            <!-- Initialize the eligible orders list -->
+            <set field="orders" from="[]"/>
 
+            <iterate list="ordersList" entry="orderHeader">
+                <set field="order" from="[:]"/>
+                <set field="order.orderId" from="orderHeader.orderId"/>
+                <set field="order.orderName" from="orderHeader.orderName"/>
+                <set field="order.orderExternalId" from="orderHeader.orderExternalId"/>
+                <set field="order.orderStatusId" from="orderHeader.orderStatusId"/>
+                <set field="order.orderStatusDesc" from="orderHeader.orderStatusDesc"/>
+                <set field="order.orderDate" from="orderHeader.orderDate"/>
+                <set field="order.facilityId" from="orderHeader.facilityId"/>
+                <set field="order.items" from="[]"/>
+
+                <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
+                    <search-form-inputs default-order-by="-createdDate"/>
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                    <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
+                </entity-find>
+                <if condition="picklistShipment">
+                    <set field="order.picklistId" from="picklistShipment[0].picklistId"/>
+                    <set field="order.shipmentId" from="picklistShipment[0].shipmentId"/>
+                    <else>
+                        <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
+                            <econdition field-name="orderId" from="orderHeader.orderId"/>
+                            <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                            <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                            <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
+                        </entity-find>
+                        <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">
+                            <continue/>
+                        </if>
+                    </else>
+                </if>
+
+                <!-- Fetch items for this order -->
+                <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                    <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
+                        statusId,shippingInstructions,facilityId"/>
+                </entity-find>
+
+                <!-- Build items list -->
+                <set field="order.items" from="orderItems"/>
+
+                <!-- Fetch BILL_TO_CUSTOMER role -->
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderRole" value-field="billToCustomer">
+                    <field-map field-name="orderId" from="orderHeader.orderId"/>
+                    <field-map field-name="roleTypeId" value="BILL_TO_CUSTOMER"/>
+                    <select-field field-name="partyId"/>
+                </entity-find-one>
+
+                <if condition="billToCustomer">
+                    <!-- Fetch Person name based on partyId -->
+                    <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
+                        <field-map field-name="partyId" from="billToCustomer.partyId"/>
+                        <select-field field-name="firstName,lastName"/>
+                    </entity-find-one>
+
+                    <set field="order.customerId" from="billToCustomer.partyId"/>
+                    <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
+                </if>
+
+                <!-- Add this order with its items to final orders list -->
+                <set field="orders" from="orders + order"/>
+            </iterate>
+            <set field="ordersCount" from="orders.size()"/>
+        </actions>
+    </service>
+    <service verb="get" noun="AllOrderDetails">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderDetail"/>
+        </out-parameters>
+        <actions>
+            <!-- The following view returns all the shipment details for the order; if exists at item level -->
+            <entity-find entity-name="co.hotwax.warehouse.OrderItemShipmentDetail" list="orderItemShipments">
+                <econdition field-name="orderId"/>
+                <order-by field-name="shipGroupSeqId"/>
+            </entity-find>
+
+            <set field="orderDetail" from="[:]"/>
+            <if condition="orderItemShipments">
+                <set field="orderDetail.orderId" from="orderItemShipments[0].orderId"/>
+                <set field="orderDetail.orderName" from="orderItemShipments[0].orderName"/>
+                <set field="orderDetail.orderExternalId" from="orderItemShipments[0].orderExternalId"/>
+                <set field="orderDetail.orderDate" from="orderItemShipments[0].orderDate"/>
+                <set field="orderDetail.orderStatusId" from="orderItemShipments[0].orderStatusId"/>
+                <set field="orderDetail.productStoreId" from="orderItemShipments[0].productStoreId"/>
+                <set field="orderDetail.entryDate" from="orderItemShipments[0].entryDate"/>
+                <set field="orderDetail.grandTotal" from="orderItemShipments[0].grandTotal"/>
+                <set field="orderDetail.currencyUom" from="orderItemShipments[0].currency"/>
+                <set field="orderDetail.salesChannel" from="orderItemShipments[0].salesChannel"/>
+                <set field="orderDetail.partyId" from="orderItemShipments[0].customerPartyId"/>
+                <set field="orderDetail.roleTypeId" from="orderItemShipments[0].roleTypeId"/>
+                <set field="orderDetail.customerFirstName" from="orderItemShipments[0].customerFirstName"/>
+                <set field="orderDetail.customerLastName" from="orderItemShipments[0].customerLastName"/>
+                <set field="shipGroups" from="[]"/>
+
+                <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
+                    <econdition field-name="orderId"/>
+                </entity-find>
+
+                <iterate list="orderItemShipments" entry="orderItemShipment">
+                    <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
+                    <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipmentId == orderItemShipment.shipmentId &amp;&amp; it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
+                    <if condition="existingShipGroup">
+                        <set field="item" from="[:]"/>
+                        <set field="item.orderId" from="orderItemShipment.orderId"/>
+                        <set field="item.orderItemSeqId" from="orderItemShipment.orderItemSeqId"/>
+                        <set field="item.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
+                        <set field="item.facilityId" from="orderItemShipment.facilityId"/>
+                        <set field="item.productId" from="orderItemShipment.productId"/>
+                        <set field="item.productTypeId" from="orderItemShipment.productTypeId"/>
+                        <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
+                        <set field="item.unitPrice" from="orderItemShipment.unitPrice"/>
+                        <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
+                        <else>
+                            <set field="shipGroup" from="[:]"/>
+                            <set field="shipGroup.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
+                            <set field="shipGroup.shipmentMethodTypeId" from="orderItemShipment.shipmentMethodTypeId"/>
+                            <set field="shipGroup.shipmentMethodTypeDesc" from="shipmentMethodTypes.find{ it.shipmentMethodTypeId == orderItemShipment.shipmentMethodTypeId }?.description"/>
+                            <set field="shipGroup.shipmentId" from="orderItemShipment.shipmentId"/>
+                            <set field="shipGroup.trackingCode" from="orderItemShipment.trackingNumber"/>
+                            <set field="shipGroup.carrierPartyId" from="orderItemShipment.carrierPartyId"/>
+                            <set field="shipGroup.facilityId" from="orderItemShipment.facilityId"/>
+                            <set field="shipGroup.facilityTypeId" from="orderItemShipment.facilityTypeId"/>
+                            <set field="shipGroup.facilityTypeDescription" from="orderItemShipment.facilityTypeDesc"/>
+                            <set field="shipGroup.picklistId" from="existingPicklistShipmentAndRole?.picklistId"/>
+                            <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
+                            <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
+                            <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
+                            <set field="item" from="[:]"/>
+                            <set field="item.orderId" from="orderItemShipment.orderId"/>
+                            <set field="item.orderItemSeqId" from="orderItemShipment.orderItemSeqId"/>
+                            <set field="item.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
+                            <set field="item.facilityId" from="orderItemShipment.facilityId"/>
+                            <set field="item.productId" from="orderItemShipment.productId"/>
+                            <set field="item.productTypeId" from="orderItemShipment.productTypeId"/>
+                            <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
+                            <set field="item.unitPrice" from="orderItemShipment.unitPrice"/>
+                            <set field="shipGroup.items" from="[item]"/>
+                            <set field="shipGroups" from="shipGroups + shipGroup"/>
+                        </else>
+                    </if>
+                </iterate>
+
+                <set field="orderDetail.shipGroups" from="shipGroups"/>
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderContactMech" list="orderContactMechList">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="contactMechPurposeTypeId" operator="in" value="BILLING_LOCATION,BILLING_EMAIL,PHONE_BILLING"/>
+                    <order-by field-name="-lastUpdatedStamp"/>
+                </entity-find>
+
+                <!-- If orderContactMechList then fetch the billTo details using the contactMechIds -->
+                <if condition="orderContactMechList">
+                    <set field="billingAddressContactMechId" from="orderContactMechList.find{ 'BILLING_LOCATION'.equals(it.contactMechPurposeTypeId) }?.contactMechId"/>
+                    <set field="billingEmailContactMech" from="orderContactMechList.find{ 'BILLING_EMAIL'.equals(it.contactMechPurposeTypeId) }"/>
+                    <set field="billingPhoneContactMechId" from="orderContactMechList.find{ 'PHONE_BILLING'.equals(it.contactMechPurposeTypeId) }?.contactMechId"/>
+
+                    <if condition="billingAddressContactMechId">
+                        <!-- Get the BillTo Postal Address Details -->
+                        <entity-find-one entity-name="co.hotwax.oms.contact.PostalAddressAndGeo" value-field="billingAddressMap">
+                            <field-map field-name="contactMechId" from="billingAddressContactMechId"/>
+                        </entity-find-one>
+                    </if>
+
+                    <if condition="billingEmailContactMech">
+                        <!-- Get the BillTo Email Address Details -->
+                        <entity-find-related-one value-field="billingEmailOrderContactMech" relationship-name="org.apache.ofbiz.party.contact.ContactMech" to-value-field="billingEmailContactMech"/>
+                    </if>
+
+                    <if condition="billingPhoneContactMechId">
+                        <!-- Get the BillTo Phone Number Details -->
+                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.TelecomNumber" value-field="billingPhoneDetails">
+                            <field-map field-name="contactMechId" from="billingPhoneContactMechId"/>
+                        </entity-find-one>
+                    </if>
+                </if>
+
+                <set field="orderDetail.billingAddress" from="billingAddressMap ? billingAddressMap.getMap() : [:] "/>
+                <set field="orderDetail.billingEmail" from="billingEmailContactMech?.infoString"/>
+                <set field="orderDetail.billingPhone" from="billingPhoneDetails"/>
+
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderAttribute" list="orderAttributes">
+                    <econdition field-name="orderId"/>
+                    <select-field field-name="orderId,attrName,attrValue"/>
+                </entity-find>
+                <set field="orderDetail.attributes" from="orderAttributes"/>
+
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderStatus" list="orderStatuses">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="statusId" operator="in" from="['ORDER_CREATED','ORDER_APPROVED','ORDER_COMPLETED']"/>
+                    <select-field field-name="orderId,statusId,statusDateTime"/>
+                </entity-find>
+                <set field="orderDetail.statuses" from="orderStatuses"/>
+
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderPaymentPreference" list="orderPaymentPreferences">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="statusId" operator="not-equals" value="PAYMENT_CANCELLED"/>
+                    <select-field field-name="orderId,orderItemSeqId,paymentMethodTypeId,amount,statusId,createdDate"/>
+                </entity-find>
+                <set field="orderDetail.paymentPreferences" from="orderPaymentPreferences"/>
+            </if>
+        </actions>
+    </service>
 </services>
