@@ -120,6 +120,9 @@ under the License.
             </parameter>
             <parameter name="shipmentStatusId_op" default-value="in"/>
             <parameter name="shipmentStatusId_not" default-value="Y"/>
+            <parameter name="keyword">
+                <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
+            </parameter>
             <parameter name="pageIndex" type="Integer" default="0">
                 <description>Page number to return, starting with zero.</description>
             </parameter>
@@ -139,6 +142,11 @@ under the License.
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
+                <econditions combine="or">
+                    <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
+                </econditions>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>
             </entity-find>
@@ -229,6 +237,9 @@ under the License.
                 <order-by field-name="shipGroupSeqId"/>
             </entity-find>
 
+            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentMethodType" list="shipmentMethodTypes">
+                <select-field field-name="shipmentMethodTypeId,description"/>
+            </entity-find>
             <set field="orderDetail" from="[:]"/>
             <if condition="orderItemShipments">
                 <set field="orderDetail.orderId" from="orderItemShipments[0].orderId"/>
@@ -268,15 +279,17 @@ under the License.
                         <else>
                             <set field="shipGroup" from="[:]"/>
                             <set field="shipGroup.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
-                            <set field="shipGroup.shipmentMethodTypeId" from="orderItemShipment.shipmentMethodTypeId"/>
-                            <set field="shipGroup.shipmentMethodTypeDesc" from="shipmentMethodTypes.find{ it.shipmentMethodTypeId == orderItemShipment.shipmentMethodTypeId }?.description"/>
+                            <set field="shipGroup.shipmentMethodTypeId" from="orderItemShipment.slaShipmentMethodTypeId"/>
+                            <set field="shipGroup.shipmentMethodTypeDesc" from="shipmentMethodTypes.find{ it.shipmentMethodTypeId == orderItemShipment.slaShipmentMethodTypeId }?.description"/>
                             <set field="shipGroup.shipmentId" from="orderItemShipment.shipmentId"/>
+                            <set field="shipGroup.shipmentStatusId" from="orderItemShipment.shipmentStatusId"/>
                             <set field="shipGroup.trackingCode" from="orderItemShipment.trackingNumber"/>
                             <set field="shipGroup.carrierPartyId" from="orderItemShipment.carrierPartyId"/>
                             <set field="shipGroup.facilityId" from="orderItemShipment.facilityId"/>
                             <set field="shipGroup.facilityTypeId" from="orderItemShipment.facilityTypeId"/>
                             <set field="shipGroup.facilityTypeDescription" from="orderItemShipment.facilityTypeDesc"/>
                             <set field="shipGroup.picklistId" from="existingPicklistShipmentAndRole?.picklistId"/>
+                            <set field="shipGroup.picklistDate" from="existingPicklistShipmentAndRole?.picklistDate"/>
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
@@ -345,10 +358,10 @@ under the License.
                 </entity-find>
                 <set field="orderDetail.statuses" from="orderStatuses"/>
 
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderPaymentPreference" list="orderPaymentPreferences">
+                <entity-find entity-name="co.hotwax.order.OrderPaymentPreferenceDetail" list="orderPaymentPreferences">
                     <econdition field-name="orderId"/>
                     <econdition field-name="statusId" operator="not-equals" value="PAYMENT_CANCELLED"/>
-                    <select-field field-name="orderId,orderItemSeqId,paymentMethodTypeId,amount,statusId,createdDate"/>
+                    <select-field field-name="orderId,orderItemSeqId,paymentMethodTypeId,paymentMethodTypeDesc,maxAmount,statusId,statusDesc,createdDate"/>
                 </entity-find>
                 <set field="orderDetail.paymentPreferences" from="orderPaymentPreferences"/>
             </if>
