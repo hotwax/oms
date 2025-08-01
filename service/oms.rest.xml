@@ -39,7 +39,7 @@ under the License.
             </method>
             <resource name="details">
                 <method type="get">
-                    <service name="co.hotwax.orderledger.order.OrderServices.get#AllOrderDetails"/>
+                    <service name="co.hotwax.orderledger.order.OrderServices.get#OrderDetails"/>
                 </method>
             </resource>
             <resource name="items">

@@ -223,7 +223,7 @@ under the License.
             <set field="ordersCount" from="orders.size()"/>
         </actions>
     </service>
-    <service verb="get" noun="AllOrderDetails">
+    <service verb="get" noun="OrderDetails">
         <in-parameters>
             <parameter name="orderId" required="true"/>
         </in-parameters>
