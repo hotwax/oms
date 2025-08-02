@@ -53,7 +53,7 @@ under the License.
         <master>
             <detail relationship="roles"/>
             <detail relationship="contactMechs" use-master="default"/>
-            <detail relationship="paymentPreferences"/>
+            <detail relationship="paymentPreferences" use-master="default"/>
             <detail relationship="adjustments" use-master="default"/>
             <detail relationship="attributes"/>
             <detail relationship="notes"/>
