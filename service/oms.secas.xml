@@ -52,4 +52,20 @@
             <service-call name="co.hotwax.oms.order.OrderServices.send#OrderWebhook" in-map="[orderId:orderId,topicEnumId:'WEBHOOK_ODR_COMPLETE']" async="true" disable-authz="true"/>
         </actions>
     </seca>
+    <seca id="SendCancellationEmail" service="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItem" when="tx-commit">
+        <condition>
+            <expression>orderId &amp;&amp; shipGroupSeqId</expression>
+        </condition>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="orderItemShipGroup">
+                <field-map field-name="orderId"/>
+                <field-map field-name="shipGroupSeqId"/>
+            </entity-find-one>
+            <if condition="orderItemShipGroup.shipmentMethodTypeId != 'STOREPICKUP'">
+                <return/>
+            </if>
+            <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
+            <service-call name="co.hotwax.orderledger.order.OrderServices.send#EmailOnOrderEvents" in-map="context" disable-authz="true"/>
+        </actions>
+    </seca>
 </secas>

@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <!--
+    Events List:
+    a. Rejection (REJECT_BOPIS_ORDER)
+    b. Cancellation (ORDER_CANCELLATION)
+    c. Ready for Pickup (READY_FOR_PICKUP)
+    ============================
+    1. Seca on services linked to the above events will invoke send#EmailOnOrderEvents.
+       a. send#EmailOnOrderEvents service will fetch SystemMessageType from emailType.
+         i. SystemMessageType records for above events REJECT_BOPIS_ORDER, ORDER_CANCELLATION, READY_FOR_PICKUP.
+         ii. SystemMessageRemote will be fetched from ProductStoreEmailSetting based on emailType.
+         iii. queue#SystemMessage service will be called to create SystemMessage with in parameters systemMessageTypeId, systemMessageRemoteId,
+         and messageText as orderData.
+    2. The send service of queued system message named send#EmailRequest will be called to send the email:
+       a. The send service will fetch SystemMessageTypeParameters for the SystemMessageTypeId.
+       b. The templateLocation will be fetched from SystemMessageTypeParameters.
+       c. The orderData will be passed to the template and email will be sent.
+       d. FTL will give the required JSON as per the integration viz. Klaviyo with complete details.
+       e. send#UnishipRequest service is invoked to send prepared JSON in payload.
+
+    -->
+    <service verb="send" noun="EmailOnOrderEvents">
+        <in-parameters>
+            <parameter name="orderId"/>
+            <parameter name="orderItems"/>
+            <parameter name="orderItemSeqId"/>
+            <parameter name="shipmentId"/>
+            <parameter name="emailType" required="true"/>
+        </in-parameters>
+        <actions>
+            <if condition="!orderId &amp;&amp; !shipmentId">
+                <return error="true" message="Either Order ID or Shipment ID is required to send email with type: ${emailType}."/>
+            </if>
+            <if condition="!orderId">
+                <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment"/>
+                <set field="orderId" from="shipment.primaryOrderId"/>
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                    <econdition field-name="orderId"/>
+                    <econdition field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
+                </entity-find>
+            </if>
+
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumValue">
+                <field-map field-name="enumId" from="emailType"/>
+            </entity-find-one>
+
+            <!-- If no enumValue then return -->
+            <if condition="!enumValue || !enumValue.relatedEnumId">
+                <return error="true" message="Related SystemMessageType to create SystemMessage for ${emailType} not defined, not creating related system message."/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="order">
+                <select-field field-name="orderId, productStoreId"/>
+            </entity-find-one>
+
+            <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="systemMessageType">
+                <field-map field-name="systemMessageTypeId" from="enumValue.relatedEnumId"/>
+            </entity-find-one>
+            <if condition="!systemMessageType">
+                <return error="true" message="Related SystemMessageType with ID ${systemMessageType.systemMessageTypeId} not defined, not creating system message."/>
+            </if>
+
+            <script>
+                // Using master-detail relationship to fetch all order details
+                order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderDetail.orderId).oneMaster("default")
+            </script>
+            <iterate list="order.shipGroups" entry="shipGroup">
+                <iterate list="shipGroup.items" entry="item">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                        <field-map field-name="productId" from="item.productId"/>
+                    </entity-find-one>
+                    <set field="item.productImageUrl" from="product.detailImageUrl"/>
+
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssocAndFrom" list="parentProductDetails" cache="true">
+                        <econdition field-name="productIdTo" from="item.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <set field="item.parentProductId" from="parentProductDetails?.first?.productId"/>
+                    <set field="item.parentProductName" from="parentProductDetails?.first?.productName"/>
+                    <set field="item.parentProductImageUrl" from="parentProductDetails?.first?.detailImageUrl"/>
+                </iterate>
+            </iterate>
+
+            <set field="partyIdTo" from="order.roles?.find { it.roleTypeId == 'BILL_TO_CUSTOMER' }?.partyId "/>
+            <set field="toString" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+
+            <set field="orderData" from="['productStoreId': order.productStoreId, 'messageData': order, 'emailType': emailType, 'emailAddress': toString]"/>
+            <service-call name="org.moqui.impl.SystemMessageServices.queue#SystemMessage"
+                          in-map="[systemMessageTypeId:enumValue.relatedEnumId,
+                    messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderData), productStoreId:order.productStoreId]" out-map="systemMessage"/>
+            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:order.orderId, communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
+                    content: orderData, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, orderId: order.orderId, partyIdTo: partyIdTo, toString: toString]"/>
+        </actions>
+    </service>
+
+    <service verb="send" noun="EmailRequest">
+        <implements service="org.moqui.impl.SystemMessageServices.send#SystemMessage"/>
+        <actions>
+            <entity-find-one entity-name="moqui.service.message.SystemMessageAndType" value-field="systemMessage"/>
+
+            <set field="payload" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(systemMessage.messageText, Map.class)"/>
+
+            <if condition="!payload || !payload.productStoreId || !payload.emailType">
+                <return error="true" message="Payload must contain productStoreId and emailType."/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmailSetting">
+                <field-map field-name="productStoreId" from="payload.productStoreId"/>
+                <field-map field-name="emailType" from="payload.emailType"/>
+                <select-field field-name="productStoreId,emailType,systemMessageRemoteId"/>
+            </entity-find-one>
+            <if condition="!productStoreEmailSetting">
+                <return error="true" message="Product Store Email Setting for ${emailType} not defined, not creating related system message."/>
+            </if>
+            <set field="systemMessageRemoteId" from="productStoreEmailSetting.systemMessageRemoteId"/>
+
+            <entity-find-one entity-name="moqui.service.message.SystemMessageRemote" value-field="systemMessageRemote">
+                <field-map field-name="systemMessageRemoteId"/>
+            </entity-find-one>
+            <if condition="!systemMessageRemote">
+                <return error="true" message="Could not find SystemMessageRemote with ID ${systemMessageRemoteId}"/>
+            </if>
+            <if condition="!systemMessageRemote.sendUrl">
+                <return error="true" message="No sendUrl found in SystemMessageRemote with ID ${systemMessageRemoteId}"/>
+            </if>
+            <set field="payload.commGatewayConfigId" from="systemMessageRemote.remoteId"/>
+
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+
+            RestClient restClient = ec.service.rest()
+            restClient.timeoutRetry(true)
+            restClient.retry(2, 4)
+            restClient.method('POST')
+
+            // Construct full URL
+            String url = systemMessageRemote.sendUrl
+            if (!url.endsWith("/")) {
+                url += "/"
+            }
+            url += systemMessage.sendPath
+            restClient.uri(url)
+
+            // Add Content-Type header
+            restClient.addHeader("Content-Type", "application/json")
+            // Add Authorization header from SystemMessageRemote publicKey
+            if (systemMessageRemote.publicKey) {
+                restClient.addHeader("api_key", systemMessageRemote.publicKey)
+            }
+            restClient.addHeader("tenant_Id", systemMessageRemote.internalId)
+            restClient.addHeader("revision", System.getProperty("klaviyo_api_version"))
+
+            // Add request body if present
+            if (payload != null && !payload.isEmpty()) {
+                restClient.jsonObject(payload)
+            }
+
+            // Execute API call
+            RestClient.RestResponse restResponse = restClient.call()
+            statusCode = restResponse.getStatusCode()
+            response = restResponse.jsonObject()
+
+            if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                ec.message.addError("Unsuccessful with status code: ${statusCode} and response: ${response}")
+            }
+        ]]></script>
+        </actions>
+    </service>
+
+    <service verb="send" noun="EmailCommunication">
+        <in-parameters>
+            <parameter name="requestBody" type="Map"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="statusCode" type="Integer" required="true"/>
+            <parameter name="response" type="Map"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmailSetting">
+                <field-map field-name="productStoreId" from="requestBody.productStoreId"/>
+                <field-map field-name="emailType" from="requestBody.emailType"/>
+                <select-field field-name="productStoreId,emailType,systemMessageRemoteId"/>
+            </entity-find-one>
+            <if condition="!productStoreEmailSetting">
+                <return error="true" message="Product Store Email Setting for ${emailType} not defined, not creating related system message."/>
+            </if>
+            <set field="systemMessageRemoteId" from="productStoreEmailSetting.systemMessageRemoteId"/>
+
+            <entity-find-one entity-name="moqui.service.message.SystemMessageRemote" value-field="systemMessageRemote">
+                <field-map field-name="systemMessageRemoteId" from="systemMessageRemoteId"/>
+            </entity-find-one>
+            <if condition="!systemMessageRemote">
+                <return error="true" message="Could not find SystemMessageRemote with ID ${systemMessageRemoteId}"/>
+            </if>
+            <if condition="!systemMessageRemote.sendUrl">
+                <return error="true" message="No sendUrl found in SystemMessageRemote with ID ${systemMessageRemoteId}"/>
+            </if>
+
+            <script><![CDATA[
+            import org.moqui.util.RestClient
+
+            RestClient restClient = ec.service.rest()
+            restClient.timeoutRetry(true)
+            restClient.retry(2, 4)
+            restClient.method('POST')
+
+            // Construct full URL
+            String fullUrl = systemMessageRemote.sendUrl
+            restClient.uri(fullUrl)
+
+            // Add Content-Type header
+            restClient.addHeader("Content-Type", "application/json")
+            // Add Authorization header from SystemMessageRemote sharedSecret or password
+            if (systemMessageRemote.sharedSecret) {
+                restClient.addHeader("Authorization", systemMessageRemote.sharedSecret)
+            } else if (systemMessageRemote.password) {
+                restClient.addHeader("Authorization", systemMessageRemote.password)
+            }
+
+
+            // Add request body if present
+            if (requestBody != null && !requestBody.isEmpty()) {
+                restClient.jsonObject(requestBody)
+            }
+
+            // Execute API call
+
+            RestClient.RestResponse restResponse = restClient.call()
+            statusCode = restResponse.getStatusCode()
+            response = restResponse.jsonObject()
+
+            if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                ec.logger.warn("Unsuccessful with status code: ${statusCode} and response: ${response}")
+                return
+            }
+        ]]></script>
+        </actions>
+    </service>
+    <service verb="testing" noun="Hello">
+        <in-parameters>
+            <parameter name="orderId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="order"/>
+        </out-parameters>
+        <actions>
+            <script>
+                order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderId).oneMaster()
+                Boolean a = ec.entity.find("org.apache.ofbiz.shipment.shipment.Shipment").condition("shipmentId", "M100051").one().shipmentMethodTypeId == 'STANDARD'
+            </script>
+            <iterate list="order.shipGroups" entry="shipGroup">
+                <iterate list="shipGroup.items" entry="item">
+                    <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                        <field-map field-name="productId" from="item.productId"/>
+                    </entity-find-one>
+                    <set field="item.productImageUrl" from="product.detailImageUrl"/>
+
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssocAndFrom" list="parentProductDetails" cache="true">
+                        <econdition field-name="productIdTo" from="item.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <set field="item.parentProductId" from="parentProductDetails?.first?.productId"/>
+                    <set field="item.parentProductName" from="parentProductDetails?.first?.productName"/>
+                    <set field="item.parentProductImageUrl" from="parentProductDetails?.first?.detailImageUrl"/>
+                </iterate>
+            </iterate>
+        </actions>
+    </service>
+</services>

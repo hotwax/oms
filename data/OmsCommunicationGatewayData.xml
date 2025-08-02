@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="ext">
+
+    <moqui.basic.Enumeration enumId="SendReadyForPickupEmail" description="Send Ready for Pickup Email" enumTypeId="OMSMessageTypeEnum"/>
+    <moqui.basic.Enumeration enumId="SendBOPISRejectionEmail" description="Send BOPIS Rejection Email" enumTypeId="OMSMessageTypeEnum"/>
+    <moqui.basic.Enumeration enumId="SendBOPISCancellationEmail" description="Send BOPIS Cancellation Email" enumTypeId="OMSMessageTypeEnum"/>
+    <moqui.basic.Enumeration enumId="CreateKlaviyoEvent" description="Create Klaviyo Event" enumTypeId="OMSMessageTypeEnum"/>
+
+
+    <moqui.basic.Enumeration description="The Order Item's Reject Store Pickup Notification is an email that gets sent to the customer when Order Item's has been rejected from store" enumCode="REJECT_BOPIS_ORDER" enumId="REJECT_BOPIS_ORDER" enumName="BOPIS Order Rejection" enumTypeId="PRDS_EMAIL" relatedEnumId="SendBOPISRejectionEmail"/>
+    <moqui.basic.Enumeration description="Ready to Pickup Item" enumCode="READY_FOR_PICKUP" enumId="READY_FOR_PICKUP" enumName="BOPIS Order Ready for Pickup" enumTypeId="PRDS_EMAIL" relatedEnumId="SendReadyForPickupEmail"/>
+    <moqui.basic.Enumeration description="The BOPIS Order Cancellation Notification." enumCode="CANCEL_BOPIS_ORDER" enumId="CANCEL_BOPIS_ORDER" enumName="BOPIS Order Cancellation" enumTypeId="PRDS_EMAIL" relatedEnumId="SendBOPISCancellationEmail"/>
+    <moqui.basic.Enumeration description="Create event on Klaviyo" enumCode="CREATE_KLAVIYO_EVENT" enumId="CREATE_KLAVIYO_EVENT" enumName="Create Klaviyo Event" enumTypeId="PRDS_EMAIL" relatedEnumId="CreateKlaviyoEvent"/>
+
+    <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="REJECT_BOPIS_ORDER" productStoreId="STORE" subject="Reject BOPIS Order Item" systemMessageRemoteId="UNIGATE_CONFIG"/>
+    <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="CANCEL_BOPIS_ORDER" productStoreId="STORE" subject="BOPIS Order Cancellation Email" systemMessageRemoteId="UNIGATE_CONFIG"/>
+    <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="READY_FOR_PICKUP" productStoreId="STORE" subject="Ready To Pick-Up Notification" systemMessageRemoteId="UNIGATE_CONFIG"/>
+    <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="CREATE_KLAVIYO_EVENT" productStoreId="STORE" subject="Create Klaviyo Event" systemMessageRemoteId="UNIGATE_CONFIG"/>
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="SendReadyForPickupEmail" description="Send Ready for Pickup Email"
+                                             sendServiceName="co.hotwax.orderledger.order.email.send#EmailOnOrderEvents"
+                                             sendPath="events"/>
+
+    <org.apache.ofbiz.party.communication.CommunicationEventType communicationEventTypeId="SYS_MSG_EMAIL_COMM" parentTypeId="EMAIL_COMMUNICATION" hasTable="N" description="Email Communication as a part of SystemMessage flow" contactMechTypeId="EMAIL_ADDRESS"/>
+
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="UNIGATE_CONFIG"
+                                               description="Unigate Connection Configuration"
+                                               sendUrl="http://localhost:8081/rest/s1/unigate/communication" publicKey=""
+                                               remoteId="KLAVIYO" internalId="ADOC"/>
+
+
+    <!-- UNIGATE DATA -->
+
+    <co.hotwax.unigate.CommGatewayConfig commGatewayConfigId="KLAVIYO"
+                                         description="Klaviyo gateway for testing"
+                                         sendEmailServiceName="co.hotwax.klaviyo.KlaviyoServices.send#EmailCommunication"
+                                         createEventServiceName="co.hotwax.klaviyo.KlaviyoServices.create#WorkflowEvent"/>
+
+    <co.hotwax.unigate.Party partyId="ADOC" partyTypeEnumId="PtyOrganization">
+        <organization organizationName="ADOC"/>
+    </co.hotwax.unigate.Party>
+
+    <moqui.security.UserAccount userId="ADOC" username="adoc.apiuser" userFullName="Adoc apps"  partyId="ADOC"/>
+    <moqui.security.UserGroupMember userGroupId="UNIGATE_API" userId="ADOC" fromDate="2025-05-07T08:00:00"/>
+
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="KLAVIYO"
+                                               description="Klaviyo API Configuration" sendUrl="https://a.klaviyo.com/api/"
+                                               authHeaderName="Authorization" publicKey="Klaviyo-API-Key privateKey" />
+
+    <co.hotwax.unigate.CommGatewayAuth systemMessageRemoteId="KLAVIYO" commGatewayConfigId="KLAVIYO" tenantPartyId="ADOC"/>
+
+
+</entity-facade-xml>
