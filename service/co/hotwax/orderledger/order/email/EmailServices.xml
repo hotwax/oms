@@ -29,13 +29,23 @@ under the License.
             <if condition="!orderId &amp;&amp; !shipmentId">
                 <return error="true" message="Either Order ID or Shipment ID is required to send email with type: ${emailType}."/>
             </if>
-            <if condition="!orderId">
+            <if condition="shipmentId">
                 <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment"/>
                 <set field="orderId" from="shipment.primaryOrderId"/>
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
                     <econdition field-name="orderId"/>
                     <econdition field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
                 </entity-find>
+            </if>
+            <if condition="!orderId">
+                <return error="true" message="Order ID is required to send email with type: ${emailType}."/>
+            </if>
+            <if condition="orderItemSeqId">
+                <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                    <field-map field-name="orderId"/>
+                    <field-map field-name="orderItemSeqId"/>
+                </entity-find-one>
+                <set field="orderItems" from="[orderItem]"/>
             </if>
 
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumValue">
@@ -63,6 +73,9 @@ under the License.
                 order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderId).oneMaster("default")
             </script>
             <iterate list="order.shipGroups" entry="shipGroup">
+                <if condition="orderItems?.first.shipGroupSeqId == shipGroup.shipGroupSeqId">
+                    <set field="facilityId" from="shipGroup.facilityId"/>
+                </if>
                 <iterate list="shipGroup.items" entry="item">
                     <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
                         <field-map field-name="productId" from="item.productId"/>
@@ -81,7 +94,7 @@ under the License.
                 </iterate>
             </iterate>
             <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactMechs">
-                <econdition field-name="facilityId" from="orderItems[0].facilityId"/>
+                <econdition field-name="facilityId"/>
                 <econdition field-name="contactMechTypeId" value="POSTAL_ADDRESS"/>
                 <econdition field-name="contactMechPurposeTypeId" value="PRIMARY_LOCATION"/>
                 <date-filter/>
@@ -92,9 +105,10 @@ under the License.
                 <econdition field-name="orderContentTypeId" value="ORDER_STATUS_URL"/>
                 <select-field field-name="orderId,orderContentTypeId,textData"/>
             </entity-find>
+            <set field="order.orderStatusUrl" from="orderContentAndInfo?.first?.textData"/>
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.generate#OrderUpdateUrl"
                           in-map="[orderId: orderId]" out-map="context" ignore-error="true"/>
-            <set field="order.orderStatusUrl" from="orderContentAndInfo?.first?.textData"/>
+
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
             <set field="order.items" from="orderItems"/>
 
@@ -103,16 +117,19 @@ under the License.
                 <field-map field-name="partyId" from="partyIdTo"/>
                 <select-field field-name="partyId,firstName,lastName"/>
             </entity-find-one>
-            <set field="firstName" from="person.firstName"/>
-            <set field="lastName" from="person.lastName"/>
-            <set field="toString" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+            <set field="order.firstName" from="person.firstName"/>
+            <set field="order.lastName" from="person.lastName"/>
+            <set field="emailAddress" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+            <if condition="!emailAddress">
+                <return error="true" message="Could not send ${emailType} email, No email address found for the order with ID ${orderId}."/>
+            </if>
 
-            <set field="orderDetail" from="['productStoreId': order.productStoreId, 'messageData': order, 'emailType': emailType, 'emailAddress': toString]"/>
+            <set field="orderDetail" from="['productStoreId': order.productStoreId, 'messageData': order, 'emailType': emailType, 'emailAddress': emailAddress]"/>
             <service-call name="org.moqui.impl.SystemMessageServices.queue#SystemMessage"
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:order.orderId, communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, orderId: order.orderId, partyIdTo: partyIdTo, toString: toString]"/>
+                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, orderId: order.orderId, partyIdTo: partyIdTo, toString: emailAddress]"/>
         </actions>
     </service>
 
@@ -172,7 +189,6 @@ under the License.
                 restClient.addHeader("api_key", systemMessageRemote.publicKey)
             }
             restClient.addHeader("tenant_Id", systemMessageRemote.internalId)
-            restClient.addHeader("revision", System.getProperty("klaviyo_api_version"))
 
             // Add request body if present
             if (payload != null && !payload.isEmpty()) {
