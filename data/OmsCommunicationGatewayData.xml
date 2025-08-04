@@ -23,32 +23,5 @@
                                              sendPath="events"/>
 
     <org.apache.ofbiz.party.communication.CommunicationEventType communicationEventTypeId="SYS_MSG_EMAIL_COMM" parentTypeId="EMAIL_COMMUNICATION" hasTable="N" description="Email Communication as a part of SystemMessage flow" contactMechTypeId="EMAIL_ADDRESS"/>
-
-    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="UNIGATE_CONFIG"
-                                               description="Unigate Connection Configuration"
-                                               sendUrl="http://localhost:8081/rest/s1/unigate/communication" publicKey=""
-                                               remoteId="KLAVIYO" internalId="ADOC"/>
-
-
-    <!-- UNIGATE DATA -->
-
-    <co.hotwax.unigate.CommGatewayConfig commGatewayConfigId="KLAVIYO"
-                                         description="Klaviyo gateway for testing"
-                                         sendEmailServiceName="co.hotwax.klaviyo.KlaviyoServices.send#EmailCommunication"
-                                         createEventServiceName="co.hotwax.klaviyo.KlaviyoServices.create#WorkflowEvent"/>
-
-    <co.hotwax.unigate.Party partyId="ADOC" partyTypeEnumId="PtyOrganization">
-        <organization organizationName="ADOC"/>
-    </co.hotwax.unigate.Party>
-
-    <moqui.security.UserAccount userId="ADOC" username="adoc.apiuser" userFullName="Adoc apps"  partyId="ADOC"/>
-    <moqui.security.UserGroupMember userGroupId="UNIGATE_API" userId="ADOC" fromDate="2025-05-07T08:00:00"/>
-
-    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="KLAVIYO"
-                                               description="Klaviyo API Configuration" sendUrl="https://a.klaviyo.com/api/"
-                                               authHeaderName="Authorization" publicKey="Klaviyo-API-Key privateKey" />
-
-    <co.hotwax.unigate.CommGatewayAuth systemMessageRemoteId="KLAVIYO" commGatewayConfigId="KLAVIYO" tenantPartyId="ADOC"/>
-
-
+    
 </entity-facade-xml>
