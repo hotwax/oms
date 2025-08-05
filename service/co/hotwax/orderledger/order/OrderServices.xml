@@ -54,6 +54,20 @@ under the License.
                 <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Already cancelled or completed"/>
             </if>
 
+            <!-- Call reject#OrderItem service to release the reservations and reset the Shipment -->
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
+                <field-map field-name="primaryOrderId" from="orderId"/>
+                <field-map field-name="primaryShipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+            <if condition="shipment">
+                <if condition="shipment.shipmentMethodTypeId == 'STOREPICKUP'">
+                    <set field="rejectToFacilityId" value="PICKUP_REJECTED"/>
+                </if>
+                <set field="rejectionReasonId" value="AUTO_CANCEL"/>
+                <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
+                              in-map="context" out-map="outResult" out-map-add-to-existing="false"/>
+            </if>
+
             <!-- Update the order item cancel quantity -->
             <set field="orderItem.cancelQuantity" value="1"/>
             <entity-update value-field="orderItem"/>
@@ -72,8 +86,9 @@ under the License.
             <!-- TODO: internalNote:Y or N ; Also we can save the comment/reason as a part of the note-->
 
             <!-- Call cancel#OrderItemInventoryReservation to cancel the inventory reservation -->
-            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,
-                    cancelQuantity:orderItem.quantity]"/>
+            <!-- Commented the service as releasing inventory reservation is handled in reject#OrderItem -->
+<!--            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,-->
+<!--                    cancelQuantity:orderItem.quantity]"/>-->
 
             <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
             <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
