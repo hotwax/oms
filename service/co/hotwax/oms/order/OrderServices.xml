@@ -341,7 +341,7 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
-                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId, excludeOrderFacilityDuration:item.excludeOrderFacilityDuration]"/>
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, rejectToFacilityId: rejectToFacilityId, excludeOrderFacilityDuration:item.excludeOrderFacilityDuration]"/>
                     <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
                         <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
                         <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
