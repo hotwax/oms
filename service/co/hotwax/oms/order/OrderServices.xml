@@ -415,6 +415,9 @@ under the License.
                 <field-map field-name="shipGroupSeqId"/>
                 <field-map field-name="orderId" />
             </entity-find-one>
+            <if condition="currentShipGroup.shipmentMethodTypeId == 'STOREPICKUP'">
+                <set field="rejectToFacilityId" value="STOREPICKUP"/>
+            </if>
             <set field="fromFacilityId" from="currentShipGroup.facilityId"/>
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity,

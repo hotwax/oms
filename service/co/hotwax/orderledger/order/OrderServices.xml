@@ -18,6 +18,44 @@ under the License.
 
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
 
+    <!-- Service to cancel multiple sales order item(s) -->
+    <service verb="cancel" noun="SalesOrderItems">
+        <description>Cancels multiple sales order items by calling cancel#SalesOrderItem in a loop</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="items" type="List" required="true">
+                <parameter name="item" type="Map">
+                    <parameter name="orderItemSeqId" required="true"/>
+                    <parameter name="shipGroupSeqId" required="true"/>
+                    <parameter name="reason"/>
+                    <parameter name="comment"/>
+                </parameter>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="cancelledItems" type="List">
+                <parameter name="cancelledItem">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="shipGroupSeqId"/>
+                    <parameter name="inventoryItemId"/>
+                    <parameter name="cancelledQuantity" type="BigDecimal"/>
+                </parameter>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <set field="cancelledItems" value="[]"/>
+            <iterate list="items" entry="item">
+                <set field="item.orderId" from="orderId"/>
+                <service-call name="cancel#SalesOrderItem" in-map="item" out-map="outResult"/>
+                <if condition="outResult?.cancelledItems">
+                    <iterate list="outResult.cancelledItems" entry="cancelledItem">
+                        <set field="cancelledItems" from="cancelledItems + cancelledItem"/>
+                    </iterate>
+                </if>
+            </iterate>
+        </actions>
+    </service>
     <!-- Service to cancel sales order item record -->
     <service verb="cancel" noun="SalesOrderItem">
         <description>Cancels a sales order item</description>
@@ -28,6 +66,18 @@ under the License.
             <parameter name="reason"/>
             <parameter name="comment"/>
         </in-parameters>
+        <out-parameters>
+            <!-- Returning a list, as in the case of a marketing package, we also perform reservation for its components.-->
+            <parameter name="cancelledItems" type="List">
+                <parameter name="cancelledItem">
+                    <parameter name="orderId"/>
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="shipGroupSeqId"/>
+                    <parameter name="inventoryItemId"/>
+                    <parameter name="cancelledQuantity" type="BigDecimal"/>
+                </parameter>
+            </parameter>
+        </out-parameters>
         <actions>
             <!-- Validate the order item is already cancelled or completed -->
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
@@ -60,12 +110,10 @@ under the License.
                 <field-map field-name="primaryShipGroupSeqId" from="shipGroupSeqId"/>
             </entity-find-one>
             <if condition="shipment">
-                <if condition="shipment.shipmentMethodTypeId == 'STOREPICKUP'">
-                    <set field="rejectToFacilityId" value="PICKUP_REJECTED"/>
-                </if>
                 <set field="rejectionReasonId" value="AUTO_CANCEL"/>
                 <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
-                              in-map="context" out-map="outResult" out-map-add-to-existing="false"/>
+                              in-map="context" out-map="outResult"/>
+                <set field="cancelledItems" from="outResult.cancelledReservations"/>
             </if>
 
             <!-- Update the order item cancel quantity -->
