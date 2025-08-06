@@ -44,10 +44,10 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
-            <set field="cancelledItems" value="[]"/>
+            <set field="cancelledItems" from="[]"/>
             <iterate list="items" entry="item">
                 <set field="item.orderId" from="orderId"/>
-                <service-call name="cancel#SalesOrderItem" in-map="item" out-map="outResult"/>
+                <service-call name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItem" in-map="item" out-map="outResult"/>
                 <if condition="outResult?.cancelledItems">
                     <iterate list="outResult.cancelledItems" entry="cancelledItem">
                         <set field="cancelledItems" from="cancelledItems + cancelledItem"/>
@@ -105,16 +105,11 @@ under the License.
             </if>
 
             <!-- Call reject#OrderItem service to release the reservations and reset the Shipment -->
-            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
-                <field-map field-name="primaryOrderId" from="orderId"/>
-                <field-map field-name="primaryShipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find-one>
-            <if condition="shipment">
-                <set field="rejectionReasonId" value="AUTO_CANCEL"/>
-                <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
-                              in-map="context" out-map="outResult"/>
-                <set field="cancelledItems" from="outResult.cancelledReservations"/>
-            </if>
+            <set field="rejectionReasonId" value="AUTO_CANCEL"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
+                          in-map="context" out-map="outResult"/>
+            <set field="cancelledItems" from="outResult.cancelledReservations"/>
+
 
             <!-- Update the order item cancel quantity -->
             <set field="orderItem.cancelQuantity" value="1"/>

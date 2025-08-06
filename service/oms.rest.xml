@@ -37,6 +37,11 @@ under the License.
             <method type="delete">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="delete"/>
             </method>
+            <resource name="cancel">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItems"/>
+                </method>
+            </resource>
             <resource name="details">
                 <method type="get">
                     <service name="co.hotwax.orderledger.order.OrderServices.get#SalesOrders"/>
