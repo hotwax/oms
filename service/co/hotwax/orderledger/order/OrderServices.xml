@@ -184,7 +184,7 @@ under the License.
             <parameter name="pageIndex" type="Integer" default="0">
                 <description>Page number to return, starting with zero.</description>
             </parameter>
-            <parameter name="limit" type="Integer" default="20">
+            <parameter name="pageSize" type="Integer" default="20">
                 <description>Number of records per page (default 20).</description>
             </parameter>
         </in-parameters>
@@ -194,7 +194,7 @@ under the License.
         </out-parameters>
         <actions>
             <!-- Fetch distinct orders with passed filters -->
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="ordersList" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
                 <search-form-inputs/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
