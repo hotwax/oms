@@ -8,6 +8,7 @@
     <userPermissions description="ServiceJob: Schedule Update" userPermissionId="SJ_CRON_UPDATE"/>
 
     <artifactGroups artifactGroupId="OMS_API" description="Commerce OMS API (via root resource)">
+        <artifacts artifactName="component://oms/screen/Oms.xml" artifactTypeEnumId="AT_XML_SCREEN" inheritAuthz="Y"/>
         <artifacts artifactTypeEnumId="AT_REST_PATH" inheritAuthz="Y" artifactName="/oms"/>
         <!-- Full permissions for the ADMIN user group -->
         <authz artifactAuthzId="OMS_API_ADMIN" userGroupId="ADMIN" authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>

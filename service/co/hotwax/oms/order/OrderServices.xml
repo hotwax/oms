@@ -188,6 +188,7 @@ under the License.
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="facilityId" required="true"/>
+            <parameter name="shipmentMethodTypeId"/>
         </in-parameters>
         <out-parameters>
             <parameter name="shipGroupSeqId"/>
@@ -204,6 +205,7 @@ under the License.
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
+                    <econdition field-name="shipmentMethodTypeId" from="shipmentMethodTypeId" ignore-if-empty="true"/>
                     <order-by field-name="shipGroupSeqId DESC"/>
                 </entity-find>
                 <if condition="orderItemShipGroups">
