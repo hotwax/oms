@@ -1,0 +1,78 @@
+name: Create New Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseNumber:
+        description: 'Release number (e.g. 1.2.3)'
+        required: true
+      sourceBranch:
+        description: 'Source branch (e.g. main)'
+        required: true
+        default: main
+permissions:
+  contents: write  # needed to push commits/tags and create releases
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.sourceBranch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate releaseNumber format
+        run: |
+          if [[ ! "${{ github.event.inputs.releaseNumber }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "releaseNumber must follow the format v<MAJOR>.<MINOR>.<PATCH> (e.g., v1.2.3)"
+            exit 1
+          fi
+      - name: Set up Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Derive plain version (without 'v') for component.xml
+        run: |
+          TAG_NAME="${{ github.event.inputs.releaseNumber }}"
+          [[ "$TAG_NAME" =~ ^v ]] && CLEAN_VERSION="${TAG_NAME:1}" || CLEAN_VERSION="$TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "component_version=$CLEAN_VERSION" >> "$GITHUB_ENV"
+      - name: Update version in component.xml
+        run: |
+          sed -i -E '/<component /,/>/ s/(version=")[^"]+/\1${{ env.component_version }}/' component.xml
+          cat component.xml
+
+      - name: Move upgrade/UpcomingRelease to upgrade/${{ github.event.inputs.releaseNumber }}
+        run: |
+          if [ -d upgrade/UpcomingRelease ]; then
+            git mv upgrade/UpcomingRelease upgrade/${{ github.event.inputs.releaseNumber }}
+          else
+            echo "Directory upgrade/UpcomingRelease does not exist!"
+          fi
+
+      - name: Create empty upgrade/UpcomingRelease folder
+        run: |
+          mkdir -p upgrade/UpcomingRelease
+          cat <<EOF > upgrade/UpcomingRelease/UpgradeData.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <entity-facade-xml type="ext-upgrade">
+          </entity-facade-xml>
+          
+      - name: Commit and push changes
+        run: |
+          git add component.xml upgrade/
+          git commit -m "chore: prepare release ${{ github.event.inputs.releaseNumber }}"
+          git push origin ${{ github.event.inputs.sourceBranch }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.releaseNumber }}
+          target_commitish: ${{ github.event.inputs.sourceBranch }}
+          name: Release ${{ github.event.inputs.releaseNumber }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
