@@ -228,20 +228,16 @@ under the License.
                     <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                     <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
                 </entity-find>
-                <if condition="picklistShipment">
-                    <set field="order.picklistId" from="picklistShipment[0].picklistId"/>
-                    <set field="order.shipmentId" from="picklistShipment[0].shipmentId"/>
-                    <else>
-                        <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
-                            <econdition field-name="orderId" from="orderHeader.orderId"/>
-                            <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
-                            <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
-                            <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
-                        </entity-find>
-                        <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">
-                            <continue/>
-                        </if>
-                    </else>
+                <if condition="!picklistShipment">
+                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
+                        <econdition field-name="orderId" from="orderHeader.orderId"/>
+                        <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                        <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                        <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
+                    </entity-find>
+                    <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">
+                        <continue/>
+                    </if>
                 </if>
 
                 <!-- Fetch items for this order -->
