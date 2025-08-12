@@ -19,8 +19,17 @@
     <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="CREATE_KLAVIYO_EVENT" productStoreId="STORE" subject="Create Klaviyo Event" systemMessageRemoteId="UNIGATE_CONFIG"/>
 
     <moqui.service.message.SystemMessageType systemMessageTypeId="SendReadyForPickupEmail" description="Send Ready for Pickup Email"
-                                             sendServiceName="co.hotwax.orderledger.order.email.send#EmailOnOrderEvents"
-                                             sendPath="events"/>
+                                             sendServiceName="co.hotwax.orderledger.order.email.EmailServices.send#EmailRequest"
+                                             sendPath="communication/email"/>
+    <moqui.service.message.SystemMessageType systemMessageTypeId="SendBOPISRejectionEmail" description="Send BOPIS Rejection Email"
+                                             sendServiceName="co.hotwax.orderledger.order.email.EmailServices.send#EmailRequest"
+                                             sendPath="communication/email"/>
+    <moqui.service.message.SystemMessageType systemMessageTypeId="SendBOPISCancellationEmail" description="Send BOPIS Cancellation Email"
+                                             sendServiceName="co.hotwax.orderledger.order.email.EmailServices.send#EmailRequest"
+                                             sendPath="communication/email"/>
+    <moqui.service.message.SystemMessageType systemMessageTypeId="CreateKlaviyoEvent" description="Create Klaviyo Event"
+                                             sendServiceName="co.hotwax.orderledger.order.email.EmailServices.send#EmailRequest"
+                                             sendPath="communication/event"/>
 
     <org.apache.ofbiz.party.communication.CommunicationEventType communicationEventTypeId="SYS_MSG_EMAIL_COMM" parentTypeId="EMAIL_COMMUNICATION" hasTable="N" description="Email Communication as a part of SystemMessage flow" contactMechTypeId="EMAIL_ADDRESS"/>
     

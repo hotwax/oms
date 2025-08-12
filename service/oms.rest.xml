@@ -109,7 +109,7 @@ under the License.
         </id>
         <resource name="pickupScheduledNotification">
             <method type="post">
-                <service name="co.hotwax.orderledger.order.OrderServices.send#EmailOnOrderEvents"/>
+                <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
             </method>
         </resource>
     </resource>

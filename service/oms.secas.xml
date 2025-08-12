@@ -65,7 +65,7 @@
                 <return/>
             </if>
             <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
-            <service-call name="co.hotwax.orderledger.order.OrderServices.send#EmailOnOrderEvents" in-map="context" disable-authz="true"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" disable-authz="true"/>
         </actions>
     </seca>
 </secas>
