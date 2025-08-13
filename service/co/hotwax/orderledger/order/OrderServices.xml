@@ -194,7 +194,7 @@ under the License.
         </out-parameters>
         <actions>
             <!-- Fetch distinct orders with passed filters -->
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
                 <search-form-inputs/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
@@ -221,24 +221,24 @@ under the License.
                 <set field="order.orderDate" from="orderHeader.orderDate"/>
                 <set field="order.facilityId" from="orderHeader.facilityId"/>
 
-                <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
-                    <search-form-inputs default-order-by="-createdDate"/>
-                    <econdition field-name="orderId" from="orderHeader.orderId"/>
-                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
-                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
-                    <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
-                </entity-find>
-                <if condition="!picklistShipment">
-                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">
-                        <econdition field-name="orderId" from="orderHeader.orderId"/>
-                        <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
-                        <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
-                        <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>
-                    </entity-find>
-                    <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">
-                        <continue/>
-                    </if>
-                </if>
+<!--                <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">-->
+<!--                    <search-form-inputs default-order-by="-createdDate"/>-->
+<!--                    <econdition field-name="orderId" from="orderHeader.orderId"/>-->
+<!--                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>-->
+<!--                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>-->
+<!--                    <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>-->
+<!--                </entity-find>-->
+<!--                <if condition="!picklistShipment">-->
+<!--                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">-->
+<!--                        <econdition field-name="orderId" from="orderHeader.orderId"/>-->
+<!--                        <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>-->
+<!--                        <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>-->
+<!--                        <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>-->
+<!--                    </entity-find>-->
+<!--                    <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">-->
+<!--                        <continue/>-->
+<!--                    </if>-->
+<!--                </if>-->
 
                 <!-- Fetch items for this order -->
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
