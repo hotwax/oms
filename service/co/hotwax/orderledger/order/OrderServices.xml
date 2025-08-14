@@ -169,6 +169,9 @@ under the License.
             <parameter name="orderStatusId" default-value="ORDER_APPROVED">
                 <description>The status of the Order in OMS.</description>
             </parameter>
+            <parameter name="statusId" default-value="ITEM_APPROVED"/>
+            <parameter name="statusId_op" default-value="in"/>
+            <parameter name="statusId_not" default-value="N"/>
             <parameter name="originFacilityId">
                 <description>The source facility ID of the Order in OMS.</description>
             </parameter>
@@ -208,6 +211,7 @@ under the License.
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>
             </entity-find>
+            <set field="ordersCount" from="ordersListCount"/>
             <!-- Initialize the eligible orders list -->
             <set field="orders" from="[]"/>
 
@@ -221,27 +225,9 @@ under the License.
                 <set field="order.orderDate" from="orderHeader.orderDate"/>
                 <set field="order.facilityId" from="orderHeader.facilityId"/>
 
-<!--                <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">-->
-<!--                    <search-form-inputs default-order-by="-createdDate"/>-->
-<!--                    <econdition field-name="orderId" from="orderHeader.orderId"/>-->
-<!--                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>-->
-<!--                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>-->
-<!--                    <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>-->
-<!--                </entity-find>-->
-<!--                <if condition="!picklistShipment">-->
-<!--                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndItem" list="picklistShipment" limit="1">-->
-<!--                        <econdition field-name="orderId" from="orderHeader.orderId"/>-->
-<!--                        <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>-->
-<!--                        <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>-->
-<!--                        <select-field field-name="picklistId,shipmentId,shipmentStatusId"/>-->
-<!--                    </entity-find>-->
-<!--                    <if condition="(picklistShipment &amp;&amp; shipmentStatusId_not == 'Y') || (!picklistShipment &amp;&amp; shipmentStatusId_not != 'Y')">-->
-<!--                        <continue/>-->
-<!--                    </if>-->
-<!--                </if>-->
-
                 <!-- Fetch items for this order -->
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
+                    <search-form-inputs input-fields-map="[statusId: statusId]" />
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
                     <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
@@ -315,7 +301,6 @@ under the License.
                 <!-- Add this order with its items to final orders list -->
                 <set field="orders" from="orders + order"/>
             </iterate>
-            <set field="ordersCount" from="orders.size()"/>
         </actions>
     </service>
     <service verb="get" noun="SalesOrders">
