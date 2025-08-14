@@ -2,4 +2,9 @@
 <!-- No copyright or license for configuration file, details here are not considered a creative work. -->
 <moqui-conf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/moqui-conf-3.xsd">
 
+    <screen-facade>
+        <screen location="component://webroot/screen/webroot/apps.xml" default-subscreen="Oms">
+            <subscreens-item name="Oms" menu-title="Hotwax Commerce" menu-index="10" location="component://oms/screen/Oms.xml"/>
+        </screen>
+    </screen-facade>
 </moqui-conf>

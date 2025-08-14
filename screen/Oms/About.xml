@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a
+Grant of Patent License.
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-3.xsd"
+        default-menu-index="1" menu-image="fa fa-info-circle" menu-image-type="icon" default-menu-include="false">
+
+    <transition name="jobRunDetail"><default-response url="//system/ServiceJob/JobRuns/JobRunDetail"/></transition>
+    <transition name="serviceJobDetail"><default-response url="//system/ServiceJob/Jobs/ServiceJobDetail"/></transition>
+    <transition name="releaseJobLock">
+        <service-call name="co.hotwax.common.CommonServices.release#ServiceJobRunLock"/>
+        <default-response url="." type="url"/>
+    </transition>
+    <actions>
+        <set field="smap" from="ec.factory.getStatusMap(true)"/>
+        <set field="loadPercent" from="(smap.Utilization.LoadPercent as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)"/>
+        <set field="heapPercent" from="(smap.Utilization.HeapPercent as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)"/>
+        <set field="diskPercent" from="(smap.Utilization.DiskPercent as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)"/>
+        <set field="componentInfoList" from="orderMapList(ec.factory.getComponentInfoList(), ['^name'])"/>
+
+        <set field="runtimeVersionMap" from="ec.factory.versionMap"/>
+
+        <set field="workerPool" from="ec.factory.workerPool"/>
+        <set field="jobWorkerPool" from="ec.service.jobWorkerPool"/>
+
+        <set field="maargDockerComponent" from="ec.factory.getComponentInfoList().find { it.name == 'maarg-docker-config' }"/>
+        <set field="componentRelease" value="UpcomingRelease"/>
+        <set field="versionMap" from="maargDockerComponent.versionMap"/>
+        <if condition="versionMap">
+            <if condition="!'HEAD'.equals(versionMap.branch)">
+                <set field="componentRelease" value="${versionMap.branch}"/>
+                <else>
+                    <set field="componentRelease" value="${versionMap.tag}"/>
+                </else>
+            </if>
+            <set field="commitSHA" from="versionMap.head"/>
+        </if>
+        <script>
+            def calendar = java.util.Calendar.getInstance()
+            calendar.add(java.util.Calendar.MINUTE, -20)
+            maxLockTimestamp = new java.sql.Timestamp(calendar.getTimeInMillis())
+        </script>
+    </actions>
+    <widgets>
+        <container-box id="MaargDashboard"><box-header title="Maarg Information"/>
+            <box-body>
+                <container-row>
+                    <row-col md="6">
+                        <container-row>
+                            <row-col xs="5"><label text="Instance" type="strong"/></row-col>
+                            <row-col xs="7"><label text="${System.getProperty('instance_purpose')}"/></row-col>
+                        </container-row>
+                        <container-row>
+                            <row-col xs="5">
+                                <label condition="!'HEAD'.equals(versionMap?.branch)" text="Branch" type="strong"/>
+                                <label condition="'HEAD'.equals(versionMap?.branch)" text="Tag" type="strong"/>
+                            </row-col>
+                            <row-col xs="7"><label text="${componentRelease}"/></row-col>
+                            <row-col xs="5">
+                                <label condition="commitSHA"  text="Commit SHA" type="strong"/>
+                            </row-col>
+                            <row-col xs="7"><label condition="commitSHA" text="${commitSHA}"/></row-col>
+                        </container-row>
+                    </row-col>
+                    <row-col md="6">
+                        <container-row>
+                            <row-col xs="5"><label text="Instance name" type="strong"/></row-col>
+                            <row-col xs="7"><label text="${System.getProperty('ofbiz.instance.name')}"/></row-col>
+                        </container-row>
+                        <container-row>
+                            <row-col xs="5"><label text="OMS Instance Url" type="strong"/></row-col>
+                            <row-col xs="7">
+                                <link url="${System.getProperty('ofbiz.instance.url')}" text="${System.getProperty('ofbiz.instance.url')}" link-type="anchor"/>
+                            </row-col>
+                        </container-row>
+                    </row-col>
+                </container-row>
+            </box-body>
+        </container-box>
+        <container-box id="RunningJobRun"><box-header title="Running Job Overview"/>
+            <box-body>
+                <form-list name="JobRunList" list="jobRunList">
+                    <entity-find entity-name="moqui.service.job.ServiceJobRunLock" list="jobRunList">
+                        <econdition field-name="jobRunId" operator="is-not-null"/>
+                    </entity-find>
+                    <field name="jobRunId">
+                        <default-field><link url="jobRunDetail" text="${jobRunId}" link-type="anchor"/></default-field></field>
+                    <field name="jobName">
+                        <default-field><link url="serviceJobDetail" text="${jobName}" link-type="anchor"/></default-field>
+                    </field>
+                    <field name="lastRunTime">
+                        <header-field title="Start Time"/>
+                        <default-field><display/></default-field>
+                    </field>
+                    <field name="comments">
+                        <default-field>
+                            <label condition="lastRunTime !=null &amp;&amp; lastRunTime.before(maxLockTimestamp)"  text="This is a long-running job, and it may be locked." />
+                        </default-field>
+                    </field>
+                    <field name="delete">
+                        <default-field title="">
+                            <link condition="lastRunTime !=null &amp;&amp; lastRunTime.before(maxLockTimestamp)" url="releaseJobLock" text="X" confirmation="Are you sure want to release ${jobName} run lock"
+                                  parameter-map="[jobName: jobName, jobRunId: jobRunId]"/>
+                        </default-field>
+                    </field>
+                </form-list>
+            </box-body>
+        </container-box>
+        <container-box id="SystemInformation"><box-header title="System Information"/><box-toolbar>
+            <container-dialog id="RequestHeaders" button-text="Request Details">
+                <label text="${ec.web.getRequestDetails()}" type="pre"/>
+            </container-dialog>
+        </box-toolbar><box-body>
+            <container-row><row-col sm="4">
+                <label text="Uptime: ${ec.l10n.format(smap.JavaRuntime.UptimeHours, '#,##0.00')} hours" type="strong"/>
+            </row-col><row-col sm="4">
+                <label text="Locale: ${Locale.getDefault()}" type="strong"/>
+            </row-col><row-col sm="4">
+                <label text="Time: ${ec.l10n.format(ec.user.nowTimestamp, null, null, TimeZone.getDefault())} ${TimeZone.getDefault().getID()} GMT${ec.l10n.format(TimeZone.getDefault().getRawOffset()/(1000*60*60), '+00.0;-00.0')} DST ${TimeZone.getDefault().getDSTSavings()/(1000*60*60)}" type="strong"/>
+            </row-col></container-row>
+            <container-row><row-col md="4">
+                <container-row><row-col xs="5"><label text="Heap Memory" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Heap: ${ec.l10n.format(heapPercent, '00.0')}%" style="${heapPercent &lt; 70 ? 'text-success' : (heapPercent &lt; 90 ? 'text-warn' : 'text-danger' )}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Used" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.Heap.Used, '#,##0.00')} MiB"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Committed" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.Heap.Committed, '#,##0.00')} MiB"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Max" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.Heap.Max, '#,##0.00')} MiB"/></row-col></container-row>
+
+                <label text="Non-Heap Memory" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Used" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.NonHeap.Used, '#,##0.00')} MiB"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Committed" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.NonHeap.Committed, '#,##0.00')} MiB"/></row-col></container-row>
+
+                <container-row><row-col xs="5"><label text="Disk (runtime)" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Disk: ${ec.l10n.format(diskPercent, '00.0')}%" style="${diskPercent &lt; 70 ? 'text-success' : (diskPercent &lt; 90 ? 'text-warn' : 'text-danger' )}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Usable" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.Disk.Usable, '#,##0.00')} MiB"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Total" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.Disk.Total, '#,##0.00')} MiB"/></row-col></container-row>
+            </row-col><row-col md="4">
+                <container-row><row-col xs="5"><label text="System" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Load: ${ec.l10n.format(loadPercent, '00.0')}%" style="${loadPercent &lt; 70 ? 'text-success' : (loadPercent &lt; 90 ? 'text-warn' : 'text-danger' )}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Load" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.System.Load, '#,##0.00')} (avg last minute)"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="CPU" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.System.CPU} (${smap.System.Processors} threads)"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="OS" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.System.OsName} ${smap.System.OsVersion}"/></row-col></container-row>
+
+                <label text="Java Runtime" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Version" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaRuntime.SpecVersion} (${smap.JavaRuntime.VmVendor} ${smap.JavaRuntime.VmVersion})"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Start" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaRuntime.Start}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Uptime" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.JavaRuntime.UptimeHours, '#,##0.00')} hours"/></row-col></container-row>
+
+                <label text="Moqui Framework" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Version" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.factory.moquiVersion}"/></row-col></container-row>
+            </row-col><row-col md="4">
+                <label text="Web Server" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Local IP" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.Web.LocalAddr}:${smap.Web.LocalPort}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Local Name" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.Web.LocalName}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Requested" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.Web.ServerName}:${smap.Web.ServerPort}"/></row-col></container-row>
+
+                <label text="Java Statistics" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="GC" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaStats.GcCount}, ${ec.l10n.format(smap.JavaStats.GcTimeSeconds, '#,##0.00')}s total"/></row-col></container-row>
+                <!-- <container-row><row-col xs="1"/><row-col xs="4"><label text="JIT" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaStats.JIT}"/></row-col></container-row> -->
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Compile Time" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${ec.l10n.format(smap.JavaStats.CompileTimeSeconds, '#,##0.00')}s total"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Loaded Classes" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaStats.ClassesLoaded} (${smap.JavaStats.ClassesTotalLoaded} tot, ${smap.JavaStats.ClassesUnloaded} unl)"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
+                    <row-col xs="7"><label text="${smap.JavaStats.ThreadCount} (${smap.JavaStats.PeakThreadCount} peak)"/></row-col></container-row>
+
+                <label text="Worker Pool" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Active: ${workerPool.getActiveCount()} Cur: ${workerPool.getPoolSize()} Max: ${workerPool.getMaximumPoolSize()}"
+                                           style="${workerPool.getActiveCount() == workerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Cur: ${workerPool.queue.size()} Rem: ${workerPool.queue.remainingCapacity()}"
+                                           style="${workerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (workerPool.queue.size() &gt; workerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
+
+                <label text="Service Job Pool" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Active: ${jobWorkerPool.getActiveCount()} Cur: ${jobWorkerPool.getPoolSize()} Max: ${jobWorkerPool.getMaximumPoolSize()}"
+                                           style="${jobWorkerPool.getActiveCount() == jobWorkerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Cur: ${jobWorkerPool.queue.size()} Rem: ${jobWorkerPool.queue.remainingCapacity()}"
+                                           style="${jobWorkerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (jobWorkerPool.queue.size() &gt; jobWorkerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
+            </row-col></container-row>
+        </box-body><box-body-nopad>
+            <form-list name="DatasourceList" list="smap.DataSources" skip-form="true">
+                <field name="group"><default-field title="Entity Group"><display/></default-field></field>
+                <field name="uniqueName"><default-field><display/></default-field></field>
+                <field name="database"><default-field><display/></default-field></field>
+            </form-list>
+            <label text="Framework: ${runtimeVersionMap.framework.toString()}" condition="runtimeVersionMap?.framework" type="div"/>
+            <label text="Runtime: ${runtimeVersionMap.runtime.toString()}" condition="runtimeVersionMap?.runtime" type="div"/>
+            <form-list name="ComponentInfoList" list="componentInfoList" skip-form="true">
+                <field name="name"><default-field title="Component Name"><display/></default-field></field>
+                <field name="version"><default-field><display/></default-field></field>
+                <field name="location"><default-field><display/></default-field></field>
+                <field name="versionMap"><default-field title="Version Detail"><display/></default-field></field>
+                <field name="dependsOnNames"><default-field><display/></default-field></field>
+                <form-list-column><field-ref name="name"/><field-ref name="version"/></form-list-column>
+                <form-list-column><field-ref name="location"/><field-ref name="versionMap"/></form-list-column>
+                <form-list-column><field-ref name="dependsOnNames"/></form-list-column>
+            </form-list>
+        </box-body-nopad></container-box>
+    </widgets>
+</screen>
