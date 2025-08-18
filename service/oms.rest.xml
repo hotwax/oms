@@ -549,6 +549,11 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
+            <method type="get">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderGrouped"/>
+            </method>
+        </resource>
     </resource>
 
     <resource name="entityData">
