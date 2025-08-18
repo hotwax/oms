@@ -286,7 +286,9 @@
         <alias entity-alias="SGP" name="sgpFromDate" field="fromDate"/>
         <alias entity-alias="SGP" name="sgpThruDate" field="thruDate"/>
     </view-entity>
-    
+
+    <!-- TODO: Check using the OrderHeaderItemShipGroup that has all the fields similar to this view.
+         This view has an extra check of orderTypeId = 'TRANSFER_ORDER' -->
     <view-entity entity-name="TransferOrderAndItem" package="co.hotwax.oms.order">
         <description>View to get Transfer Order details.</description>
         <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
@@ -306,16 +308,16 @@
         <alias entity-alias="OH" name="orderId"/>
         <alias entity-alias="OH" name="orderName"/>
         <alias entity-alias="OH" name="grandTotal"/>
-        <alias entity-alias="OH" name="orderDate"/>
+        <alias entity-alias="OH" name="orderDate" function="max"/>
         <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
         <alias entity-alias="OH" name="orderTypeId"/>
         <alias entity-alias="OH" name="productStoreId"/>
+        <alias entity-alias="OH" name="statusFlowId"/>
 
         <alias entity-alias="OI" name="orderItemSeqId"/>
         <alias entity-alias="OI" name="shipGroupSeqId"/>
         <alias entity-alias="OI" name="quantity"/>
         <alias entity-alias="OI" name="unitPrice"/>
-        <alias entity-alias="OI" name="unitListPrice"/>
         <alias entity-alias="OI" field="statusId" name="itemStatusId"/>
         <alias entity-alias="OI" name="productId"/>
 
