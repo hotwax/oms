@@ -105,7 +105,7 @@ under the License.
             </if>
 
             <!-- Call reject#OrderItem service to release the reservations and reset the Shipment -->
-            <set field="rejectionReasonId" value="AUTO_CANCEL"/>
+            <set field="rejectionReasonId" from="reasonEnum"/>
             <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
                           in-map="context" out-map="outResult"/>
             <set field="cancelledItems" from="outResult.cancelledReservations"/>
@@ -127,11 +127,6 @@ under the License.
             <!-- Call create#OrderHeaderNote service to associate the created note to the order -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:noteDataResponse.noteId]"/>
             <!-- TODO: internalNote:Y or N ; Also we can save the comment/reason as a part of the note-->
-
-            <!-- Call cancel#OrderItemInventoryReservation to cancel the inventory reservation -->
-            <!-- Commented the service as releasing inventory reservation is handled in reject#OrderItem -->
-<!--            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId,-->
-<!--                    cancelQuantity:orderItem.quantity]"/>-->
 
             <!-- Call get#OrderItemSalesTaxTotal inline and get the sales tax total of the order item -->
             <service-call name="co.hotwax.oms.order.OrderServices.get#OrderItemSalesTaxTotal" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]" out-map="orderItemSalesTaxTotalResponse"/>
@@ -157,7 +152,7 @@ under the License.
         </actions>
     </service>
     <!-- NOTE This service is being used to fetch Eligible Store Pickup Orders in the BOPIS App -->
-    <service verb="get" noun="StorePickupOrders">
+    <service verb="get" noun="PickupOrders">
         <description>
             Service to get BOPIS Orders primarily.
             By default, the service will return orders with status ORDER_APPROVED.
@@ -172,8 +167,8 @@ under the License.
             <parameter name="statusId" default-value="ITEM_APPROVED"/>
             <parameter name="statusId_op" default-value="in"/>
             <parameter name="statusId_not" default-value="N"/>
-            <parameter name="originFacilityId">
-                <description>The source facility ID of the Order in OMS.</description>
+            <parameter name="facilityId">
+                <description>The facility ID of the Order in OMS.</description>
             </parameter>
             <parameter name="shipmentMethodTypeId" default-value="STOREPICKUP"/>
             <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT,SHIPMENT_PACKED,SHIPMENT_SHIPPED">
@@ -201,7 +196,7 @@ under the License.
                 <search-form-inputs/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
-                <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
@@ -216,20 +211,13 @@ under the License.
             <set field="orders" from="[]"/>
 
             <iterate list="ordersList" entry="orderHeader">
-                <set field="order" from="[:]"/>
-                <set field="order.orderId" from="orderHeader.orderId"/>
-                <set field="order.orderName" from="orderHeader.orderName"/>
-                <set field="order.orderExternalId" from="orderHeader.orderExternalId"/>
-                <set field="order.orderStatusId" from="orderHeader.orderStatusId"/>
-                <set field="order.orderStatusDesc" from="orderHeader.orderStatusDesc"/>
-                <set field="order.orderDate" from="orderHeader.orderDate"/>
-                <set field="order.facilityId" from="orderHeader.facilityId"/>
+                <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
                 <!-- Fetch items for this order -->
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
                     <search-form-inputs input-fields-map="[statusId: statusId]" />
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
-                    <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                    <econdition field-name="facilityId" ignore-if-empty="true"/>
                     <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                     <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
                         statusId,shippingInstructions,facilityId"/>
@@ -239,20 +227,12 @@ under the License.
                     <econdition field-name="orderId" from="order.orderId"/>
                 </entity-find>
                 <!-- Build items list inside shipGroup -->
-<!--                <set field="order.items" from="orderItems"/>-->
                 <set field="shipGroups" from="[]"/>
                 <iterate list="orderItems" entry="orderItem">
                     <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId }"/>
                     <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId }"/>
                     <if condition="existingShipGroup">
-                        <set field="item" from="[:]"/>
-                        <set field="item.orderId" from="orderItem.orderId"/>
-                        <set field="item.orderItemSeqId" from="orderItem.orderItemSeqId"/>
-                        <set field="item.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
-                        <set field="item.facilityId" from="orderItem.facilityId"/>
-                        <set field="item.productId" from="orderItem.productId"/>
-                        <set field="item.quantity" from="orderItem.quantity"/>
-                        <set field="item.unitPrice" from="orderItem.unitPrice"/>
+                        <set field="item" from="orderItem.getPlainValueMap(0)"/>
                         <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
                         <else>
                             <set field="shipGroup" from="[:]"/>
@@ -265,14 +245,7 @@ under the License.
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
-                            <set field="item" from="[:]"/>
-                            <set field="item.orderId" from="orderItem.orderId"/>
-                            <set field="item.orderItemSeqId" from="orderItem.orderItemSeqId"/>
-                            <set field="item.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
-                            <set field="item.facilityId" from="orderItem.facilityId"/>
-                            <set field="item.productId" from="orderItem.productId"/>
-                            <set field="item.quantity" from="orderItem.quantity"/>
-                            <set field="item.unitPrice" from="orderItem.unitPrice"/>
+                            <set field="item" from="orderItem.getPlainValueMap(0)"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
                         </else>

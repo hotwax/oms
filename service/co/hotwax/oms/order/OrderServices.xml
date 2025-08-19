@@ -267,7 +267,6 @@ under the License.
         </out-parameters>
         <actions>
             <set field="cancelledReservations" from="[]"/>
-            <return error="true" message="Order item [${orderId}] not found."/>
             <set field="conditionFactory" from="ec.entity.getConditionFactory()"/>
             <set field="shipmentCondition"
                     from="conditionFactory.makeCondition(
