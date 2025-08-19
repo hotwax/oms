@@ -276,7 +276,7 @@ under the License.
             </iterate>
         </actions>
     </service>
-    <service verb="get" noun="SalesOrders">
+    <service verb="get" noun="SalesOrder">
         <in-parameters>
             <parameter name="orderId" required="true"/>
         </in-parameters>
@@ -400,20 +400,9 @@ under the License.
             </entity-find>
             <set field="orderDetail" from="[:]"/>
             <if condition="orderItemShipments">
-                <set field="orderDetail.orderId" from="orderItemShipments[0].orderId"/>
-                <set field="orderDetail.orderName" from="orderItemShipments[0].orderName"/>
-                <set field="orderDetail.orderExternalId" from="orderItemShipments[0].orderExternalId"/>
-                <set field="orderDetail.orderDate" from="orderItemShipments[0].orderDate"/>
-                <set field="orderDetail.orderStatusId" from="orderItemShipments[0].orderStatusId"/>
-                <set field="orderDetail.productStoreId" from="orderItemShipments[0].productStoreId"/>
-                <set field="orderDetail.entryDate" from="orderItemShipments[0].entryDate"/>
-                <set field="orderDetail.grandTotal" from="orderItemShipments[0].grandTotal"/>
+                <set field="orderDetail" from="orderItemShipments[0].getPlainValueMap(0)"/>
                 <set field="orderDetail.currencyUom" from="orderItemShipments[0].currency"/>
-                <set field="orderDetail.salesChannel" from="orderItemShipments[0].salesChannel"/>
                 <set field="orderDetail.partyId" from="orderItemShipments[0].customerPartyId"/>
-                <set field="orderDetail.roleTypeId" from="orderItemShipments[0].roleTypeId"/>
-                <set field="orderDetail.customerFirstName" from="orderItemShipments[0].customerFirstName"/>
-                <set field="orderDetail.customerLastName" from="orderItemShipments[0].customerLastName"/>
                 <set field="shipGroups" from="[]"/>
 
                 <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
@@ -424,15 +413,8 @@ under the License.
                     <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipmentId == orderItemShipment.shipmentId &amp;&amp; it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <if condition="existingShipGroup">
-                        <set field="item" from="[:]"/>
-                        <set field="item.orderId" from="orderItemShipment.orderId"/>
-                        <set field="item.orderItemSeqId" from="orderItemShipment.orderItemSeqId"/>
-                        <set field="item.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
-                        <set field="item.facilityId" from="orderItemShipment.facilityId"/>
-                        <set field="item.productId" from="orderItemShipment.productId"/>
-                        <set field="item.productTypeId" from="orderItemShipment.productTypeId"/>
+                        <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
                         <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
-                        <set field="item.unitPrice" from="orderItemShipment.unitPrice"/>
                         <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
                         <else>
                             <set field="shipGroup" from="[:]"/>
@@ -451,15 +433,8 @@ under the License.
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
-                            <set field="item" from="[:]"/>
-                            <set field="item.orderId" from="orderItemShipment.orderId"/>
-                            <set field="item.orderItemSeqId" from="orderItemShipment.orderItemSeqId"/>
-                            <set field="item.shipGroupSeqId" from="orderItemShipment.shipGroupSeqId"/>
-                            <set field="item.facilityId" from="orderItemShipment.facilityId"/>
-                            <set field="item.productId" from="orderItemShipment.productId"/>
-                            <set field="item.productTypeId" from="orderItemShipment.productTypeId"/>
+                            <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
                             <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
-                            <set field="item.unitPrice" from="orderItemShipment.unitPrice"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
                         </else>
