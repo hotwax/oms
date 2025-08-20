@@ -447,7 +447,7 @@
         </actions>
     </service>
 
-    <service verb="get" noun="TransferOrderGrouped">
+    <service verb="get" noun="TransferOrderGroups">
         <in-parameters>
             <parameter name="orderName"/>
             <parameter name="productStoreId"/>
@@ -457,7 +457,7 @@
             <parameter name="carrierPartyId"/>
             <parameter name="orderStatusDesc"/>
             <parameter name="fieldsToSelect" default-value="orderId"/>
-            <parameter name="limit" default-value="50" type="Integer"/>
+            <parameter name="limit" default-value="20" type="Integer"/>
             <parameter name="index" default-value="0" type="Integer"/>
         </in-parameters>
         <out-parameters>
@@ -489,7 +489,7 @@
             <parameter name="shipmentMethodTypeId"/>
             <parameter name="carrierPartyId"/>
             <parameter name="orderStatusId"/>
-            <parameter name="limit" default-value="50" type="Integer"/>
+            <parameter name="limit" default-value="20" type="Integer"/>
             <parameter name="index" default-value="0" type="Integer"/>
         </in-parameters>
         <out-parameters>

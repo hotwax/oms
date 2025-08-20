@@ -564,7 +564,7 @@ under the License.
         </id>
         <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
             <method type="get">
-                <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderGrouped"/>
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderGroups"/>
             </method>
         </resource>
         <resource name="items" description="Get Transfer Order Item details based on grouping, filtering and sorting criteria.">
