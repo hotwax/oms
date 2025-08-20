@@ -336,4 +336,63 @@
         <alias entity-alias="SGP" name="sgpFromDate" field="fromDate"/>
         <alias entity-alias="SGP" name="sgpThruDate" field="thruDate"/>
     </view-entity>
+
+
+    <!-- TODO: Check using the OrderHeaderItemShipGroup that has all the fields similar to this view.
+             This view has an extra check of orderTypeId = 'TRANSFER_ORDER' -->
+    <view-entity entity-name="TransferOrderAndItem" package="co.hotwax.oms.order">
+        <description>View to get Transfer Order details.</description>
+        <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
+        <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
+            <key-map field-name="orderId"/>
+        </member-entity>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="ODRF" entity-name="org.apache.ofbiz.product.facility.Facility" join-from-alias="OISG">
+            <key-map field-name="orderFacilityId" related="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="F" entity-name="org.apache.ofbiz.product.facility.Facility" join-from-alias="OISG">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="PS" entity-name="org.apache.ofbiz.product.store.ProductStore" join-from-alias="OH">
+            <key-map field-name="productStoreId"/>
+        </member-entity>
+        <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
+            <key-map field-name="statusId"/>
+        </member-entity>
+        <alias entity-alias="OH" name="orderId"/>
+        <alias entity-alias="OH" name="orderName"/>
+        <alias entity-alias="OH" name="grandTotal"/>
+        <alias entity-alias="OH" name="orderDate" function="max"/>
+        <alias entity-alias="OH" name="entryDate"/>
+        <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
+        <alias entity-alias="OH" name="orderTypeId"/>
+        <alias entity-alias="OH" name="productStoreId"/>
+        <alias entity-alias="OH" name="statusFlowId"/>
+
+        <alias entity-alias="OI" name="orderItemSeqId"/>
+        <alias entity-alias="OI" name="shipGroupSeqId"/>
+        <alias entity-alias="OI" name="quantity"/>
+        <alias entity-alias="OI" name="unitPrice"/>
+        <alias entity-alias="OI" field="statusId" name="itemStatusId"/>
+        <alias entity-alias="OI" name="productId"/>
+
+        <alias entity-alias="OISG" name="facilityId"/>
+        <alias entity-alias="OISG" name="contactMechId"/>
+        <alias entity-alias="OISG" name="telecomContactMechId"/>
+        <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
+        <alias entity-alias="OISG" name="carrierPartyId"/>
+        <alias entity-alias="OISG" name="orderFacilityId"/>
+
+        <alias entity-alias="ODRF" field="facilityName" name="orderFacilityName"/>
+        <alias entity-alias="F" name="facilityName"/>
+        
+        <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
+        <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+        <entity-condition>
+            <econdition entity-alias="OH" field-name="orderTypeId" value="TRANSFER_ORDER"/>
+        </entity-condition>
+    </view-entity>
 </entities>
