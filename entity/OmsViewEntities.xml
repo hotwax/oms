@@ -309,6 +309,7 @@
         <alias entity-alias="OH" name="orderName"/>
         <alias entity-alias="OH" name="grandTotal"/>
         <alias entity-alias="OH" name="orderDate" function="max"/>
+        <alias entity-alias="OH" name="entryDate"/>
         <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
         <alias entity-alias="OH" name="orderTypeId"/>
         <alias entity-alias="OH" name="productStoreId"/>
