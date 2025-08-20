@@ -514,7 +514,7 @@
             <set field="transferOrderItems" from="[]"/>
 
             <iterate list="orderItems" entry="orderItem">
-                <set field="transferOrderItem" from="[:]"/>
+                <set field="transferOrderItem" from="orderItem.getPlainValueMap(0)"/>
 
                 <!-- Get total Issued quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
@@ -530,9 +530,9 @@
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
 
-                <!-- Put the orderItem map in transferOrderItem and the shippedQuantity and receivedQuantity -->
-                <script>transferOrderItem.putAll(orderItem)</script>
-                <script>transferOrderItem.putAll(shippedQuantity:itemIssuanceList?.first?.quantity, receivedQuantity:shipmentReceiptList?.first?.quantityAccepted)</script>
+                <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
+                <set field="transferOrderItem.shippedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
 
                 <!-- Add the transferOrderItem map to the TransferOrderItems list -->
                 <script>
