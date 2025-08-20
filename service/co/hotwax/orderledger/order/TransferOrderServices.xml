@@ -455,25 +455,26 @@
             <parameter name="orderFacilityId"/>
             <parameter name="shipmentMethodTypeId"/>
             <parameter name="carrierPartyId"/>
-            <parameter name="orderStatusDesc"/>
+            <parameter name="orderStatusId"/>
             <parameter name="fieldsToSelect" default-value="orderId"/>
             <parameter name="limit" default-value="20" type="Integer"/>
             <parameter name="index" default-value="0" type="Integer"/>
+            <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orders" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index" list="orders" distinct="true">
-                <search-form-inputs default-order-by="-orderDate"/>
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index*limit" list="orders" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" ignore-if-empty="true"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="carrierPartyId" ignore-if-empty="true"/>
-                <econdition field-name="orderStatusDesc" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId" ignore-if-empty="true"/>
                 <select-field field-name="${fieldsToSelect}"/>
+                <order-by field-name="${orderByField}"/>
             </entity-find>
         </actions>
     </service>
@@ -491,13 +492,13 @@
             <parameter name="orderStatusId"/>
             <parameter name="limit" default-value="20" type="Integer"/>
             <parameter name="index" default-value="0" type="Integer"/>
+            <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
             <parameter name="transferOrderItems" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index" list="orderItems" distinct="true">
-                <search-form-inputs default-order-by="-orderDate"/>
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index*limit" list="orderItems" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
@@ -506,7 +507,8 @@
                 <econdition field-name="productStoreId" ignore-if-empty="true"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="carrierPartyId" ignore-if-empty="true"/>
-                <econdition field-name="orderStatusDesc" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId" ignore-if-empty="true"/>
+                <order-by field-name="${orderByField}"/>
             </entity-find>
 
             <set field="transferOrderItems" from="[]"/>
