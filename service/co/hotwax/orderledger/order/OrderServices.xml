@@ -245,6 +245,7 @@ under the License.
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
+                            <set field="shipGroup.pickerGroupName" from="existingPicklistShipmentAndRole?.groupName"/>
                             <set field="item" from="orderItem.getPlainValueMap(0)"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
