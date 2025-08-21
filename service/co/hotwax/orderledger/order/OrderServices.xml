@@ -314,11 +314,13 @@ under the License.
                         <parameter name="pickerId"/>
                         <parameter name="pickerFirstName"/>
                         <parameter name="pickerLastName"/>
+                        <parameter name="pickerGroupName"/>
                         <parameter name="items" type="List">
                             <parameter name="item" type="Map">
                                 <parameter name="orderId"/>
                                 <parameter name="orderItemSeqId"/>
                                 <parameter name="shipGroupSeqId"/>
+                                <parameter name="itemStatusId"/>
                                 <parameter name="facilityId"/>
                                 <parameter name="productId"/>
                                 <parameter name="productTypeId"/>
@@ -434,6 +436,7 @@ under the License.
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
+                            <set field="shipGroup.pickerGroupName" from="existingPicklistShipmentAndRole?.groupName"/>
                             <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
                             <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
                             <set field="shipGroup.items" from="[item]"/>
