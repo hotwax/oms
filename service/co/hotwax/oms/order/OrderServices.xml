@@ -576,7 +576,7 @@ under the License.
        - Call service to notify Shopify on item completion
        - Trigger service to send completed order feed to location for further processing by Nifi/ERP systems if needed
     -->
-    <service verb="complete" noun="SalesOrderItemByShipment" authenticate="anonymous-all">
+    <service verb="complete" noun="SalesOrderItemByShipment">
         <description>
             Update the Order Item status to ITEM_COMPLETED for all the items of the Sales Order Shipment.
         </description>
