@@ -193,7 +193,7 @@ under the License.
         <actions>
             <!-- Fetch distinct orders with passed filters -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
-                <search-form-inputs/>
+                <search-form-inputs default-order-by="-orderDate"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
