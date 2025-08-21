@@ -277,6 +277,11 @@
             <key-map field-name="orderId"/>
             <key-map field-name="shipGroupSeqId"/>
         </member-entity>
+        <member-entity entity-alias="OISGIR" entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
         <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
             <key-map field-name="statusId"/>
         </member-entity>
