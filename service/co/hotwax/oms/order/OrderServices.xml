@@ -341,7 +341,7 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
-                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId, excludeOrderFacilityDuration:item.excludeOrderFacilityDuration]"/>
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, rejectToFacilityId: rejectToFacilityId, excludeOrderFacilityDuration:item.excludeOrderFacilityDuration]"/>
                     <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
                         <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
                         <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
@@ -415,6 +415,10 @@ under the License.
                 <field-map field-name="shipGroupSeqId"/>
                 <field-map field-name="orderId" />
             </entity-find-one>
+            <set field="hasParentType" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', currentShipGroup.shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+            <if condition="hasParentType">
+                <set field="rejectToFacilityId" value="PICKUP_REJECTED"/>
+            </if>
             <set field="fromFacilityId" from="currentShipGroup.facilityId"/>
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity,
@@ -573,7 +577,7 @@ under the License.
        - Call service to notify Shopify on item completion
        - Trigger service to send completed order feed to location for further processing by Nifi/ERP systems if needed
     -->
-    <service verb="complete" noun="SalesOrderItemByShipment" authenticate="anonymous-all">
+    <service verb="complete" noun="SalesOrderItemByShipment">
         <description>
             Update the Order Item status to ITEM_COMPLETED for all the items of the Sales Order Shipment.
         </description>
@@ -581,6 +585,10 @@ under the License.
             <parameter name="shipmentId" required="true"/>
         </in-parameters>
         <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment"/>
+            <if condition="shipment.shipmentTypeId != 'SALES_SHIPMENT'">
+                <return error="true" message="Shipment ID: ${shipmentId} is not a Sales Order Shipment."/>
+            </if>
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList" distinct="true">
                 <econdition field-name="shipmentId"/>
                 <select-field field-name="orderId,orderItemSeqId"/>

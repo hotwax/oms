@@ -29,7 +29,7 @@ under the License.
         </method>
         <id name="orderId">
             <method type="get">
-                <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="one" masterName="default"/>
+                <service name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"/>
             </method>
             <method type="put">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="update"/>
@@ -107,11 +107,6 @@ under the License.
                 </method>
             </resource>
         </id>
-        <resource name="pickupScheduledNotification">
-            <method type="post">
-                <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
-            </method>
-        </resource>
     </resource>
     <resource name="returns">
         <method type="get">
