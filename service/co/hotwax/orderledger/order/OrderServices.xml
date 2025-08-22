@@ -307,6 +307,7 @@ under the License.
                         <parameter name="trackingCode"/>
                         <parameter name="carrierPartyId"/>
                         <parameter name="facilityId"/>
+                        <parameter name="facilityName"/>
                         <parameter name="facilityTypeId"/>
                         <parameter name="facilityTypeDescription"/>
                         <parameter name="picklistId"/>
@@ -429,6 +430,7 @@ under the License.
                             <set field="shipGroup.trackingCode" from="orderItemShipment.trackingNumber"/>
                             <set field="shipGroup.carrierPartyId" from="orderItemShipment.carrierPartyId"/>
                             <set field="shipGroup.facilityId" from="orderItemShipment.facilityId"/>
+                            <set field="shipGroup.facilityName" from="orderItemShipment.facilityName"/>
                             <set field="shipGroup.facilityTypeId" from="orderItemShipment.facilityTypeId"/>
                             <set field="shipGroup.facilityTypeDescription" from="orderItemShipment.facilityTypeDesc"/>
                             <set field="shipGroup.picklistId" from="existingPicklistShipmentAndRole?.picklistId"/>

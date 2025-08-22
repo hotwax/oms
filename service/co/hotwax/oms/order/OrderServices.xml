@@ -584,6 +584,10 @@ under the License.
             <parameter name="shipmentId" required="true"/>
         </in-parameters>
         <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment"/>
+            <if condition="shipment.shipmentTypeId != 'SALES_SHIPMENT'">
+                <return error="true" message="Shipment ID: ${shipmentId} is not a Sales Order Shipment."/>
+            </if>
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList" distinct="true">
                 <econdition field-name="shipmentId"/>
                 <select-field field-name="orderId,orderItemSeqId"/>
