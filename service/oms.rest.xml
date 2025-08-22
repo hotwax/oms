@@ -29,7 +29,7 @@ under the License.
         </method>
         <id name="orderId">
             <method type="get">
-                <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="one" masterName="default"/>
+                <service name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"/>
             </method>
             <method type="put">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="update"/>
@@ -54,6 +54,11 @@ under the License.
                     <method type="put">
                         <entity name="org.apache.ofbiz.order.order.OrderItem" operation="update"/>
                     </method>
+                    <resource name="cancel">
+                        <method type="post">
+                            <service name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItem"/>
+                        </method>
+                    </resource>
                     <resource name="reservation">
                         <method type="delete">
                             <service name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"/>
@@ -73,6 +78,11 @@ under the License.
                         </method>
                     </resource>
                 </id>
+                <resource name="cancel">
+                    <method type="post">
+                        <service name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItems"/>
+                    </method>
+                </resource>
             </resource>
             <resource name="shipGroups">
                 <method type="get">
@@ -111,6 +121,8 @@ under the License.
             <method type="post">
                 <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
             </method>
+        <resource name="pickup">
+            <method type="get"><service name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders"/></method>
         </resource>
     </resource>
     <resource name="returns">
