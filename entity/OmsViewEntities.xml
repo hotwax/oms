@@ -261,10 +261,60 @@
         <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
         <alias entity-alias="OISG" name="carrierPartyId"/>
         <alias entity-alias="OISG" name="orderFacilityId"/>
-
+        <alias entity-alias="OISG" name="shippingInstructions"/>
         <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
 
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+    </view-entity>
+
+    <view-entity entity-name="OrderHeaderShipGroupShipment" package="co.hotwax.oms.order">
+        <description>View to get Order details from order header, item, ship group and order status description.</description>
+        <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
+        <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
+            <key-map field-name="orderId"/>
+        </member-entity>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
+            <key-map field-name="statusId"/>
+        </member-entity>
+        <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderShipment" join-from-alias="OISG" join-optional="true">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="S" entity-name="org.apache.ofbiz.shipment.shipment.Shipment" join-from-alias="OS" join-optional="true">
+            <key-map field-name="orderId" related="primaryOrderId"/>
+            <key-map field-name="shipmentId"/>
+        </member-entity>
+        <alias entity-alias="OH" name="orderId"/>
+        <alias entity-alias="OH" name="orderName"/>
+        <alias entity-alias="OH" name="grandTotal"/>
+        <alias entity-alias="OH" name="orderDate"/>
+        <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
+        <alias entity-alias="OH" name="salesChannelEnumId"/>
+        <alias entity-alias="OH" name="orderTypeId"/>
+        <alias entity-alias="OH" field="externalId" name="orderExternalId"/>
+        <alias entity-alias="OH" name="statusFlowId"/>
+        <alias entity-alias="OH" name="productStoreId"/>
+
+        <alias entity-alias="OI" name="statusId"/>
+        <alias entity-alias="OISG" name="shipGroupSeqId"/>
+        <alias entity-alias="OISG" name="facilityId"/>
+        <alias entity-alias="OISG" name="contactMechId"/>
+        <alias entity-alias="OISG" name="telecomContactMechId"/>
+        <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
+        <alias entity-alias="OISG" name="carrierPartyId"/>
+        <alias entity-alias="OISG" name="orderFacilityId"/>
+        <alias entity-alias="OISG" name="shippingInstructions"/>
+
+        <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+
+        <alias entity-alias="S" name="shipmentId"/>
+        <alias entity-alias="S" name="shipmentTypeId"/>
+        <alias entity-alias="S" field="statusId" name="shipmentStatusId"/>
+        <alias entity-alias="S" name="createdDate"/>
     </view-entity>
 
     <view-entity entity-name="UserLoginSecurityGroupAndPermission" package="co.hotwax.security">
