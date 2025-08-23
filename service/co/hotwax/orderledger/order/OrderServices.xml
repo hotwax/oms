@@ -416,6 +416,10 @@ under the License.
 
                 <iterate list="orderItemShipments" entry="orderItemShipment">
                     <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
+                    <if condition="!existingShipGroup.shipmentId">
+                        <set field="nonCancelledItemsShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId &amp;&amp; it.items.find{ it.itemStatusId != 'ITEM_CANCELLED' } }"/>
+                        <set field="existingShipGroup" from="nonCancelledItemsShipGroup ?: existingShipGroup"/>
+                    </if>
                     <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipmentId == orderItemShipment.shipmentId &amp;&amp; it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <if condition="existingShipGroup">
                         <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
