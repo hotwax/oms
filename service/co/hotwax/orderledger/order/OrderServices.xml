@@ -171,6 +171,8 @@ under the License.
                 <description>The facility ID of the Order in OMS.</description>
             </parameter>
             <parameter name="shipmentMethodTypeId" default-value="STOREPICKUP"/>
+            <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
+            <parameter name="shipmentMethodTypeId_not" default-value="N"/>
             <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT,SHIPMENT_PACKED,SHIPMENT_SHIPPED">
                 <description>List of comma separated shipment statuses</description>
             </parameter>
@@ -409,12 +411,17 @@ under the License.
                 <set field="orderDetail.currencyUom" from="orderItemShipments[0].currency"/>
                 <set field="orderDetail.partyId" from="orderItemShipments[0].customerPartyId"/>
                 <set field="shipGroups" from="[]"/>
+                <set field="cancelledItems" from="[]"/>
 
                 <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
                     <econdition field-name="orderId"/>
                 </entity-find>
 
                 <iterate list="orderItemShipments" entry="orderItemShipment">
+                    <if condition="orderItemShipment.itemStatusId == 'ITEM_CANCELLED'">
+                        <set field="cancelledItems" from="cancelledItems + orderItemShipment"/>
+                        <continue/>
+                    </if>
                     <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipmentId == orderItemShipment.shipmentId &amp;&amp; it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <if condition="existingShipGroup">
@@ -443,6 +450,30 @@ under the License.
                             <set field="shipGroup.pickerGroupName" from="existingPicklistShipmentAndRole?.groupName"/>
                             <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
                             <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
+                            <set field="shipGroup.items" from="[item]"/>
+                            <set field="shipGroups" from="shipGroups + shipGroup"/>
+                        </else>
+                    </if>
+                </iterate>
+                <iterate list="cancelledItems" entry="cancelledItem">
+                    <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == cancelledItem.shipGroupSeqId }"/>
+                    <if condition="existingShipGroup">
+                        <set field="item" from="cancelledItem.getPlainValueMap(0)"/>
+                        <set field="item.quantity" from="cancelledItem.itemQuantity"/>
+                        <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
+                        <else>
+                            <set field="shipGroup" from="[:]"/>
+                            <set field="shipGroup.shipGroupSeqId" from="cancelledItem.shipGroupSeqId"/>
+                            <set field="shipGroup.shipmentMethodTypeId" from="cancelledItem.slaShipmentMethodTypeId"/>
+                            <set field="shipGroup.shipmentMethodTypeDesc" from="shipmentMethodTypes.find{ it.shipmentMethodTypeId == orderItemShipment.slaShipmentMethodTypeId }?.description"/>
+                            <set field="shipGroup.carrierPartyId" from="cancelledItem.carrierPartyId"/>
+                            <set field="shipGroup.facilityId" from="cancelledItem.facilityId"/>
+                            <set field="shipGroup.facilityName" from="cancelledItem.facilityName"/>
+                            <set field="shipGroup.facilityTypeId" from="cancelledItem.facilityTypeId"/>
+                            <set field="shipGroup.facilityTypeDescription" from="cancelledItem.facilityTypeDesc"/>
+                            <set field="shipGroup.parentFacilityTypeId" from="cancelledItem.parentFacilityTypeId"/>
+                            <set field="item" from="cancelledItem.getPlainValueMap(0)"/>
+                            <set field="item.quantity" from="cancelledItem.itemQuantity"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
                         </else>
