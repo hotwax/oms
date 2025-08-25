@@ -81,6 +81,11 @@
                 <parameter name="externalId"/>
                 <parameter name="statusId"/>
                 <parameter name="maySplit"/>
+                <parameter name="currencyUom"/>
+                <parameter name="facilityId"/>
+                <parameter name="orderFacilityId"/>
+                <parameter name="carrierPartyId"/>
+                <parameter name="shipmentMethodTypeId"/>
                 <parameter name="items" type="List">
                     <parameter name="orderItemMap" type="Map">
                         <parameter name="orderItemSeqId"/>
@@ -94,6 +99,7 @@
                         <parameter name="maySplit"/>
                         <parameter name="totalIssuedQuantity"/>
                         <parameter name="totalReceivedQuantity"/>
+                        <parameter name="unitPrice"/>
                     </parameter>
                 </parameter>
             </parameter>
@@ -102,7 +108,7 @@
             <set field="order" from="[:]"/>
 
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
-                <select-field field-name="orderId,orderName,externalId,statusId"/>
+                <select-field field-name="orderId,orderName,externalId,statusId,currencyUom,productStoreId,statusFlowId"/>
             </entity-find-one>
 
             <entity-find-related-one value-field="orderHeader" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
@@ -113,9 +119,15 @@
             <!-- Get Order Item details -->
             <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItemList">
                 <econdition field-name="orderId" from="orderId"/>
-                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId"/>
+                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId,orderFacilityId,carrierPartyId,shipmentMethodTypeId,unitPrice"/>
             </entity-find>
-            <set field="order.maySplit" from="orderItemList?.first?.maySplit"/>
+
+            <!-- NOTE: Added the orderFacilityId, facilityId, shipmentMethodTypeId and carrierPartyId of the first order item of the order.-->
+            <set field="orderItemFirst" from="orderItemList?.first"/>
+
+            <set field="order" from="order + [maySplit:orderItemFirst?.maySplit,facilityId:orderItemFirst?.facilityId,
+                    orderFacilityId:orderItemFirst?.orderFacilityId, carrierPartyId:orderItemFirst?.carrierPartyId,
+                    shipmentMethodTypeId:orderItemFirst?.shipmentMethodTypeId]"/>
 
             <set field="order.items" from="[]"/>
             <iterate list="orderItemList" entry="orderItem">
