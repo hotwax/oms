@@ -171,6 +171,8 @@ under the License.
                 <description>The facility ID of the Order in OMS.</description>
             </parameter>
             <parameter name="shipmentMethodTypeId" default-value="STOREPICKUP"/>
+            <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
+            <parameter name="shipmentMethodTypeId_not" default-value="N"/>
             <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT,SHIPMENT_PACKED,SHIPMENT_SHIPPED">
                 <description>List of comma separated shipment statuses</description>
             </parameter>
