@@ -446,4 +446,60 @@
             </iterate>
         </actions>
     </service>
+
+    <service verb="cancel" noun="TransferOrder">
+        <description>Service to cancel Transfer Order.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true">
+                <description>Transfer Order Id to cancel.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+
+            <!-- Check if the Order is in either ORDER_CREATED or ORDER_APPROVED status to cancel the Order. -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId"/>
+            </entity-find-one>
+
+            <if condition="'ORDER_CANCELLED'.equals(orderHeader.statusId)">
+                <return error="true" message="Order ID [${orderId}] is already in Cancelled status. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Check if any Shipment record exists for the given order then return a warning. -->
+            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.Shipment" list="shipments">
+                <econdition field-name="primaryOrderId" from="orderId"/>
+            </entity-find>
+
+            <if condition="shipments">
+                <return type="warning" message="Fulfillment process already started for the order [${orderId}]. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Check if any Shipment Receipt record exists for the order then return a warning. -->
+            <entity-find entity-name="org.apache.ofbiz.shipment.receipt.ShipmentReceipt" list="shipmentReceipts">
+                <econdition field-name="orderId"/>
+            </entity-find>
+
+            <if condition="shipmentReceipts">
+                <return type="warning" message="Receiving process already started for the order [${orderId}]. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Get all the items for the given transfer order id. -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId"/>
+            </entity-find>
+
+            <!-- Iterate the orderItems list -->
+            <iterate list="orderItems" entry="orderItem">
+                <!-- Cancel the orderItem reservations if any -->
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
+                              in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, cancelQuantity:orderItem.quantity]"/>
+
+                <!-- Update the orderItem status, quantity and order status for each item. -->
+                <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId,orderItemSeqId:orderItem.orderItemSeqId,
+                        cancelQuantity:orderItem.quantity,statusId:'ITEM_CANCELLED', statuses:[orderId:orderId,orderItemSeqId:orderItem.orderItemSeqId,statusId:'ITEM_CANCELLED']]"/>
+            </iterate>
+            <!-- Update the OrderHeader status and OrderStatus for the OrderId -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId,statusId:'ORDER_CANCELLED',statuses:[orderId:orderId,statusId:'ORDER_CANCELLED']]"/>
+        </actions>
+    </service>
 </services>

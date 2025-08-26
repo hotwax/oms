@@ -561,6 +561,11 @@ under the License.
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
                 </method>
             </resource>
+            <resource name="cancel">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.cancel#TransferOrder"/>
+                </method>
+            </resource>
         </id>
     </resource>
 
