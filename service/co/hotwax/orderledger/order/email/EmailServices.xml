@@ -109,7 +109,9 @@ under the License.
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.generate#OrderUpdateUrl"
                           in-map="[orderId: orderId]" out-map="context" ignore-error="true" transaction="force-new"/>
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
-            <set field="order.items" from="orderItems"/>
+
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: orderItems]" out-map="orderItemsList" ignore-error="true"/>
+            <set field="order.items" from="orderItemsList"/>
 
             <entity-find-one entity-name="org.apache.ofbiz.common.property.SystemProperty" value-field="catalogBaseUrl">
                 <field-map field-name="systemResourceId" value="catalog"/>
@@ -262,6 +264,47 @@ under the License.
                 url.append("/").append(token).append("?oms=").append(omsBaseUrl);
             </script>
             <set field="orderUpdateUrl" from="url.toString()"/>
+        </actions>
+    </service>
+    <service verb="get" noun="ProductDetails" authenticate="anonymous-all" >
+        <in-parameters>
+            <parameter name="orderItems" type="List"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderItemsList" type="List"/>
+        </out-parameters>
+        <actions>
+            <set field="orderItemsList" from="[]"/>
+            <iterate list="orderItems" entry="item">
+                <set field="productDetails" from="[:]"/>
+                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssocAndFrom" list="product" limit="1">
+                    <econdition field-name="productIdTo" from="item.productId"/>
+                    <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                    <date-filter/>
+                </entity-find>
+
+                <set field="productDetails.productId" from="product.first?.productId"/>
+                <set field="productDetails.productName" from="product.first?.productName"/>
+                <set field="productDetails.productUrlName" from="product.first?.productUrlName"/>
+
+                <entity-find entity-name="co.hotwax.product.feature.ProductFeatureAndAppl" list="color" limit="1">
+                    <econdition field-name="productId" from="item.productId"/>
+                    <econdition field-name="productFeatureTypeId" value="COLOR"/>
+                    <date-filter/>
+                </entity-find>
+                <entity-find entity-name="co.hotwax.product.feature.ProductFeatureAndAppl" list="size" limit="1">
+                    <econdition field-name="productId" from="item.productId"/>
+                    <econdition field-name="productFeatureTypeId" value="SIZE"/>
+                    <date-filter/>
+                </entity-find>
+
+                <set field="orderItemMap" from="new HashMap(item)"/>
+                <set field="orderItemMap.color" from="color.first?.description"/>
+                <set field="orderItemMap.size" from="size.first?.description"/>
+
+                <set field="orderItemMap.productDetails" from="productDetails"/>
+                <set field="orderItemsList" from="orderItemsList + [orderItemMap]"/>
+            </iterate>
         </actions>
     </service>
 </services>
