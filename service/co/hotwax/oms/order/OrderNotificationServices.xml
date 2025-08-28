@@ -22,12 +22,15 @@ under the License.
             <parameter name="orderId" required="true"/>
         </in-parameters>
         <actions>
-            <set field="topicEnumId" value="NEW_BOPIS_ORD"/>
+            <set field="topicEnumId" value="NEW_BOPIS_ODR"/>
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroups" distinct="true">
                 <econdition field-name="orderId"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <select-field field-name="facilityId"/>
             </entity-find>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
+                <field-map field-name="facilityId" from="shipGroups?.first?.facilityId"/>
+            </entity-find-one>
             <if condition="shipGroups">
                 <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumeration" cache="true">
                     <field-map field-name="enumId" from="topicEnumId"/>
@@ -107,7 +110,7 @@ under the License.
             <parameter name="topicName"/>
         </out-parameters>
         <actions>
-            <set field="topicName" from="System.getProperty('ofbiz.instance.url') + '-' + facilityId + '-' + topicEnumId"/>
+            <set field="topicName" from="System.getProperty('ofbiz.instance.name') + '-' + facilityId + '-' + topicEnumId"/>
         </actions>
     </service>
 </services>
