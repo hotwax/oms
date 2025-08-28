@@ -342,4 +342,53 @@
         <alias entity-alias="SGP" name="sgpFromDate" field="fromDate"/>
         <alias entity-alias="SGP" name="sgpThruDate" field="thruDate"/>
     </view-entity>
+    <view-entity entity-name="ProductStoreFacilityDetail" package="co.hotwax.product.store">
+        <member-entity entity-alias="PSF" entity-name="org.apache.ofbiz.product.store.ProductStoreFacility"/>
+        <member-entity entity-alias="PS" entity-name="org.apache.ofbiz.product.store.ProductStore" join-from-alias="PSF">
+            <key-map field-name="productStoreId"/>
+        </member-entity>
+        <member-entity entity-alias="FAC" entity-name="org.apache.ofbiz.product.facility.Facility" join-from-alias="PSF">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="FT" entity-name="org.apache.ofbiz.product.facility.FacilityType" join-from-alias="FAC" join-optional="true">
+            <key-map field-name="facilityTypeId"/>
+        </member-entity>
+
+        <alias-all entity-alias="PSF"/>
+        <alias-all entity-alias="PS">
+            <exclude field="productStoreId"/>
+            <exclude field="externalId"/>
+        </alias-all>
+        <alias-all entity-alias="FAC">
+            <exclude field="facilityId"/>
+            <exclude field="productStoreId"/>
+        </alias-all>
+        <alias entity-alias="PS" name="storeExternalId" field="externalId"/>
+        <alias entity-alias="FT" name="parentFacilityTypeId" field="parentTypeId"/>
+        <entity-condition><date-filter entity-alias="PSF"/></entity-condition>
+    </view-entity>
+    <view-entity entity-name="DecisionRuleAndCondition" package="co.hotwax.common">
+        <member-entity entity-alias="DR" entity-name="co.hotwax.rule.DecisionRule"/>
+        <member-entity entity-alias="RC" entity-name="co.hotwax.rule.RuleCondition" join-from-alias="DR">
+            <key-map field-name="ruleId"/>
+        </member-entity>
+        <alias-all entity-alias="DR">
+            <exclude field="sequenceNum"/>
+        </alias-all>
+        <alias-all entity-alias="RC">
+            <exclude field="createdDate"/>
+            <exclude field="ruleId"/>
+        </alias-all>
+        <alias entity-alias="RC" name="conditionCreatedDate" field="createdDate"/>
+    </view-entity>
+
+    <view-entity entity-name="ProductFeatureAndType" package="co.hotwax.product.feature">
+        <member-entity entity-alias="PF" entity-name="org.apache.ofbiz.product.feature.ProductFeature"/>
+        <member-entity entity-alias="PFT" entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" join-from-alias="PF">
+            <key-map field-name="productFeatureTypeId"/>
+        </member-entity>
+
+        <alias-all entity-alias="PF"/>
+        <alias entity-alias="PFT" name="featureTypeDescription" field="description"/>
+    </view-entity>
 </entities>
