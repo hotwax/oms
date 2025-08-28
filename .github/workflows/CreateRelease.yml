@@ -1,0 +1,136 @@
+name: Create New Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseNumber:
+        description: 'Release number (e.g. v1.2.3)'
+        required: true
+      sourceBranch:
+        description: 'Source branch (e.g. main)'
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.sourceBranch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Validate releaseNumber format
+        run: |
+          if [[ ! "${{ github.event.inputs.releaseNumber }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "releaseNumber must follow the format v<MAJOR>.<MINOR>.<PATCH> (e.g., v1.2.3)"
+            exit 1
+          fi
+
+      - name: Set up Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Derive versions and detect component type
+        id: detect
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.event.inputs.releaseNumber }}"
+          PLAIN_VERSION="${TAG_NAME#v}"  # strip leading v
+
+          MOQUI_COMPONENT=false
+          IS_OFBIZ=false
+          if [[ -f "component.xml" ]]; then 
+            IS_MOQUI=true;
+            echo "Creating release $TAG_NAME for Moqui component"
+          elif [[ -f "ofbiz-component.xml" ]]; then 
+            IS_OFBIZ=true; 
+            echo "Creating release $TAG_NAME for OFBiz plugin"
+          fi
+
+          if [[ "$IS_MOQUI" == false && "$IS_OFBIZ" == false ]]; then
+            echo "Neither component.xml (Moqui) nor ofbiz-component.xml (OFBiz) found. Cannot continue."
+            exit 1
+          fi
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "component_version=$PLAIN_VERSION" >> "$GITHUB_ENV"
+          echo "is_moqui=$IS_MOQUI" >> "$GITHUB_ENV"
+          echo "is_ofbiz=$IS_OFBIZ" >> "$GITHUB_ENV"
+
+      - name: Move upgrade/UpcomingRelease → upgrade/${{ env.tag_name }}
+        shell: bash
+        run: |
+          if [ -d upgrade/UpcomingRelease ]; then
+            git mv upgrade/UpcomingRelease "upgrade/${{ env.tag_name }}"
+          else
+            echo "Directory upgrade/UpcomingRelease does not exist; skipping move."
+          fi
+
+      # ----------------- Moqui branch -----------------
+      - name: Update version in component.xml (Moqui)
+        if: env.is_moqui == 'true'
+        shell: bash
+        run: |
+          sed -i -E '/<component /,/>/ s/(version=")[^"]+/\1${{ env.component_version }}/' component.xml
+
+      - name: Re-create empty upgrade/UpcomingRelease with Moqui UpgradeData.xml
+        if: env.is_moqui == 'true'
+        shell: bash
+        run: |
+          mkdir -p upgrade/UpcomingRelease
+          cat > upgrade/UpcomingRelease/UpgradeData.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <entity-facade-xml type="ext-upgrade">
+          </entity-facade-xml>
+          EOF
+
+      # ----------------- OFBiz branch -----------------
+      - name: Write VERSION file (OFBiz)
+        if: env.is_ofbiz == 'true'
+        shell: bash
+        run: |
+          echo "${{ env.tag_name }}" > VERSION
+          echo "VERSION file content:"
+          cat VERSION
+
+      - name: Re-create empty upgrade/UpcomingRelease with OFBiz UpgradeData.xml
+        if: env.is_ofbiz == 'true'
+        shell: bash
+        run: |
+          mkdir -p upgrade/UpcomingRelease
+          cat > upgrade/UpcomingRelease/UpgradeData.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <entity-engine-xml>
+          </entity-engine-xml>
+          EOF
+
+      # ----------------- Commit & Release -----------------
+      - name: Commit and push changes
+        shell: bash
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Prepare release ${{ env.tag_name }}"
+            git push origin "${{ github.event.inputs.sourceBranch }}"
+          fi
+      - name: Set formatted date
+        run: echo "release_date=$(date +'%d %b %Y')" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.tag_name }}
+          target_commitish: ${{ github.event.inputs.sourceBranch }}
+          name: ${{ env.tag_name }} (${{ env.release_date }})
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

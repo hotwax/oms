@@ -120,7 +120,6 @@
         <alias entity-alias="P" name="partyTypeId"/>
         <alias entity-alias="P" name="statusId"/>
         <alias entity-alias="PR" name="roleTypeId"/>
-        <alias entity-alias="PG" name="groupName"/>
         <alias entity-alias="CSM" name="shipmentMethodCount" field="shipmentMethodTypeId" function="count"/>
     </view-entity>
 
@@ -198,6 +197,7 @@
         <alias name="itemStatusId" field="statusId" entity-alias="OI"/>
         <alias name="shipmentId" entity-alias="S"/>
         <alias name="shipmentStatusId" field="statusId" entity-alias="S"/>
+        <alias name="shipmentTypeId" entity-alias="S"/>
     </view-entity>
 
     <view-entity entity-name="PostalAddressAndGeo" package="co.hotwax.oms.contact">
@@ -261,10 +261,66 @@
         <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
         <alias entity-alias="OISG" name="carrierPartyId"/>
         <alias entity-alias="OISG" name="orderFacilityId"/>
-
+        <alias entity-alias="OISG" name="shippingInstructions"/>
         <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
 
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+    </view-entity>
+
+    <view-entity entity-name="OrderHeaderShipGroupShipment" package="co.hotwax.oms.order">
+        <description>View to get Order details from order header, item, ship group and order status description.</description>
+        <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
+        <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
+            <key-map field-name="orderId"/>
+        </member-entity>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="OISGIR" entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
+            <key-map field-name="statusId"/>
+        </member-entity>
+        <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderShipment" join-from-alias="OI" join-optional="true">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="shipGroupSeqId"/>
+        </member-entity>
+        <member-entity entity-alias="S" entity-name="org.apache.ofbiz.shipment.shipment.Shipment" join-from-alias="OS" join-optional="true">
+            <key-map field-name="orderId" related="primaryOrderId"/>
+            <key-map field-name="shipmentId"/>
+        </member-entity>
+        <alias entity-alias="OH" name="orderId"/>
+        <alias entity-alias="OH" name="orderName"/>
+        <alias entity-alias="OH" name="grandTotal"/>
+        <alias entity-alias="OH" name="orderDate"/>
+        <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
+        <alias entity-alias="OH" name="salesChannelEnumId"/>
+        <alias entity-alias="OH" name="orderTypeId"/>
+        <alias entity-alias="OH" field="externalId" name="orderExternalId"/>
+        <alias entity-alias="OH" name="statusFlowId"/>
+        <alias entity-alias="OH" name="productStoreId"/>
+
+        <alias entity-alias="OI" name="statusId"/>
+        <alias entity-alias="OISG" name="shipGroupSeqId"/>
+        <alias entity-alias="OISG" name="facilityId"/>
+        <alias entity-alias="OISG" name="contactMechId"/>
+        <alias entity-alias="OISG" name="telecomContactMechId"/>
+        <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
+        <alias entity-alias="OISG" name="carrierPartyId"/>
+        <alias entity-alias="OISG" name="orderFacilityId"/>
+        <alias entity-alias="OISG" name="shippingInstructions"/>
+
+        <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+
+        <alias entity-alias="S" name="shipmentId"/>
+        <alias entity-alias="S" name="shipmentTypeId"/>
+        <alias entity-alias="S" field="statusId" name="shipmentStatusId"/>
+        <alias entity-alias="S" name="createdDate"/>
     </view-entity>
 
     <view-entity entity-name="UserLoginSecurityGroupAndPermission" package="co.hotwax.security">
@@ -285,5 +341,54 @@
         <alias entity-alias="SP" name="description"/>
         <alias entity-alias="SGP" name="sgpFromDate" field="fromDate"/>
         <alias entity-alias="SGP" name="sgpThruDate" field="thruDate"/>
+    </view-entity>
+    <view-entity entity-name="ProductStoreFacilityDetail" package="co.hotwax.product.store">
+        <member-entity entity-alias="PSF" entity-name="org.apache.ofbiz.product.store.ProductStoreFacility"/>
+        <member-entity entity-alias="PS" entity-name="org.apache.ofbiz.product.store.ProductStore" join-from-alias="PSF">
+            <key-map field-name="productStoreId"/>
+        </member-entity>
+        <member-entity entity-alias="FAC" entity-name="org.apache.ofbiz.product.facility.Facility" join-from-alias="PSF">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="FT" entity-name="org.apache.ofbiz.product.facility.FacilityType" join-from-alias="FAC" join-optional="true">
+            <key-map field-name="facilityTypeId"/>
+        </member-entity>
+
+        <alias-all entity-alias="PSF"/>
+        <alias-all entity-alias="PS">
+            <exclude field="productStoreId"/>
+            <exclude field="externalId"/>
+        </alias-all>
+        <alias-all entity-alias="FAC">
+            <exclude field="facilityId"/>
+            <exclude field="productStoreId"/>
+        </alias-all>
+        <alias entity-alias="PS" name="storeExternalId" field="externalId"/>
+        <alias entity-alias="FT" name="parentFacilityTypeId" field="parentTypeId"/>
+        <entity-condition><date-filter entity-alias="PSF"/></entity-condition>
+    </view-entity>
+    <view-entity entity-name="DecisionRuleAndCondition" package="co.hotwax.common">
+        <member-entity entity-alias="DR" entity-name="co.hotwax.rule.DecisionRule"/>
+        <member-entity entity-alias="RC" entity-name="co.hotwax.rule.RuleCondition" join-from-alias="DR">
+            <key-map field-name="ruleId"/>
+        </member-entity>
+        <alias-all entity-alias="DR">
+            <exclude field="sequenceNum"/>
+        </alias-all>
+        <alias-all entity-alias="RC">
+            <exclude field="createdDate"/>
+            <exclude field="ruleId"/>
+        </alias-all>
+        <alias entity-alias="RC" name="conditionCreatedDate" field="createdDate"/>
+    </view-entity>
+
+    <view-entity entity-name="ProductFeatureAndType" package="co.hotwax.product.feature">
+        <member-entity entity-alias="PF" entity-name="org.apache.ofbiz.product.feature.ProductFeature"/>
+        <member-entity entity-alias="PFT" entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" join-from-alias="PF">
+            <key-map field-name="productFeatureTypeId"/>
+        </member-entity>
+
+        <alias-all entity-alias="PF"/>
+        <alias entity-alias="PFT" name="featureTypeDescription" field="description"/>
     </view-entity>
 </entities>

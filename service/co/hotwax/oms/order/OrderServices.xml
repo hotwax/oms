@@ -188,6 +188,7 @@ under the License.
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="facilityId" required="true"/>
+            <parameter name="shipmentMethodTypeId"/>
         </in-parameters>
         <out-parameters>
             <parameter name="shipGroupSeqId"/>
@@ -204,6 +205,7 @@ under the License.
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
+                    <econdition field-name="shipmentMethodTypeId" from="shipmentMethodTypeId" ignore-if-empty="true"/>
                     <order-by field-name="shipGroupSeqId DESC"/>
                 </entity-find>
                 <if condition="orderItemShipGroups">
@@ -244,6 +246,7 @@ under the License.
                         <description>Whether to reject other items in the order with the same product in the same facility. Default is N.</description>
                     </parameter>
                     <parameter name="comments"/>
+                    <parameter name="excludeOrderFacilityDuration"/>
                     <parameter name="rejectionReasonId" required="true"/>
                     <parameter name="kitComponents" type="List">
                         <parameter name="kitProductId"/>
@@ -338,7 +341,7 @@ under the License.
                     <econdition-object field="conditionFactory.makeCondition(rejectItemCond)"/>
                 </entity-find>
                 <iterate list="eligibleItems" entry="eligibleItem">
-                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, facilityId: rejectToFacilityId]"/>
+                    <set field="rejectOrderItemMap" from="item + [orderId: eligibleItem.orderId, orderItemSeqId:eligibleItem.orderItemSeqId, rejectToFacilityId: rejectToFacilityId, excludeOrderFacilityDuration:item.excludeOrderFacilityDuration]"/>
                     <if condition="!(orderItem.orderId == eligibleItem.orderId &amp;&amp; orderItem.orderItemSeqId == eligibleItem.orderItemSeqId)">
                         <set field="rejectOrderItemMap.rejectionReasonId" from="relatedRejectReasonId"/>
                         <if condition="orderItem.productId == eligibleItem.productId &amp;&amp; orderItem.orderId != eligibleItem.orderId">
@@ -367,6 +370,7 @@ under the License.
             <parameter name="updateQOH" default-value="false" type="Boolean"/>
             <parameter name="rejectionReasonId" required="true"/>
             <parameter name="comments" />
+            <parameter name="excludeOrderFacilityDuration"/>
             <parameter name="kitComponents" type="List">
                 <parameter name="kitProductId"/>
             </parameter>
@@ -411,6 +415,10 @@ under the License.
                 <field-map field-name="shipGroupSeqId"/>
                 <field-map field-name="orderId" />
             </entity-find-one>
+            <set field="hasParentType" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', currentShipGroup.shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+            <if condition="hasParentType">
+                <set field="rejectToFacilityId" value="PICKUP_REJECTED"/>
+            </if>
             <set field="fromFacilityId" from="currentShipGroup.facilityId"/>
             <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
                           in-map="[orderId: orderId, orderItemSeqId:orderItemSeqId, facilityId: rejectToFacilityId, quantity: orderItem.quantity,
@@ -432,6 +440,23 @@ under the License.
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="rejectionEnum" cache="true">
                 <field-map field-name="enumId" from="rejectionReasonId"/>
             </entity-find-one>
+
+            <!-- 7 Create ExcludedOrderFacility for item -->
+            <if condition="excludeOrderFacilityDuration">
+                <set field="excludeDays" from="excludeOrderFacilityDuration" type="Integer"/>
+                <if condition="excludeDays &gt; 0">
+                    <set field="expiringDateTime" from="ec.user.nowTimestamp + excludeDays"/>
+                    <set field="excludedOrderFacility" from="[
+                        orderId: orderId,
+                        orderItemSeqId: orderItemSeqId,
+                        facilityId: fromFacilityId,
+                        shipGroupSeqId:shipGroupSeqId,
+                        fromDate:ec.user.nowTimestamp,
+                        thruDate:expiringDateTime
+                    ]"/>
+                    <service-call name="create#co.hotwax.facility.ExcludedOrderFacility" in-map="excludedOrderFacility" out-map="excludedOrderFacilityOut"/>
+                </if>
+            </if>
 
             <if condition="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'moqui.basic.EnumerationType', 'enumTypeId', rejectionEnum.enumTypeId, 'parentTypeId', 'REPORT_NO_VAR')">
                 <return message="Order Item [${orderId}: ${orderItemSeqId}] rejected successfully to facility: $rejectToFacilityId}" type="success"/>
@@ -499,6 +524,26 @@ under the License.
                     <service-call name="co.hotwax.poorti.FulfillmentServices.create#PhysicalInventory"
                                   in-map="createPhysicalInventoryMap" out-map="result"/>
 
+                    <!-- Call find or create cycle count service -->
+
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader"
+                                     value-field="orderHeader">
+                        <field-map field-name="orderId" from="orderId"/>
+                    </entity-find-one>
+
+                    <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting"
+                                     value-field="productStoreSetting">
+                        <field-map field-name="settingTypeEnumId" value="REJ_ITM_CC_CRT"/>
+                        <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                    </entity-find-one>
+
+                    <set field="rejectedItemSettingValue" from="productStoreSetting?.settingValue"/>
+
+                    <if condition="rejectedItemSettingValue=='true'">
+                        <service-call name="co.hotwax.cycleCount.InventoryCountServices.findOrCreate#RejectedItemCycleCount"
+                                      in-map="[productId: product.productId, facilityId: fromFacilityId]" out-map="cycleCount"/>
+                    </if>
+
                 </if>
             </iterate>
         </actions>
@@ -523,5 +568,64 @@ under the License.
                 </iterate>
             </if>
         </actions>
+    </service>
+
+    <!-- This service marks order item completed on shipment shipped. Here we are considering that its OMS responsibility to mark item complete on fulfillment done, so we are adding this service in oms -->
+    <!-- Main actions of this service
+       - complete order item
+       - Complete order if all items has been completed
+       - Call service to notify Shopify on item completion
+       - Trigger service to send completed order feed to location for further processing by Nifi/ERP systems if needed
+    -->
+    <service verb="complete" noun="SalesOrderItemByShipment">
+        <description>
+            Update the Order Item status to ITEM_COMPLETED for all the items of the Sales Order Shipment.
+        </description>
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment"/>
+            <if condition="shipment.shipmentTypeId != 'SALES_SHIPMENT'">
+                <return error="true" message="Shipment ID: ${shipmentId} is not a Sales Order Shipment."/>
+            </if>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipmentList" distinct="true">
+                <econdition field-name="shipmentId"/>
+                <select-field field-name="orderId,orderItemSeqId"/>
+            </entity-find>
+            <!-- Adding below handling for the scenario of shipments containing items of multiple orders  -->
+            <set field="orderIdSet" from="new HashSet(orderShipmentList*.orderId)"/>
+
+            <iterate list="orderIdSet" entry="orderId">
+                <filter-map-list list="orderShipmentList" to-list="shipmentOrderItemList">
+                    <field-map field-name="orderId"/>
+                </filter-map-list>
+                <iterate list="shipmentOrderItemList" entry="shipmentOrderItem">
+                    <!-- Update order item status to completed -->
+                    <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
+                                  in-map="[orderId:shipmentOrderItem.orderId, orderItemSeqId:shipmentOrderItem.orderItemSeqId,
+                            statusId:'ITEM_COMPLETED', checkCancelCompleteOrder:false, statusDatetime:ec.user.nowTimestamp]"/>
+                </iterate>
+                <!-- Call checkCancelComplete#Order service to confirm if we need to mark the sales order as completed -->
+                <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId]"/>
+
+                <!-- Now call service to inform Shopify about fulfillment complete.
+                  - Calling this service inline in async mode to inform shopify about fulfillment.
+                -->
+                <entity-find entity-name="co.hotwax.common.WebhookConfig" list="webhookConfig" limit="1">
+                    <econdition field-name="topicEnumId" value="WEBHOOK_SHIP_SHIPPED"/>
+                </entity-find>
+                <if condition="webhookConfig &amp;&amp; webhookConfig.remoteUrl != null">
+                    <service-call name="co.hotwax.sob.fulfillment.FulfillmentFeedServices.post#ShopifyFulfillment" in-map="[shipmentId:shipmentId]" async="true"/>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="send" noun="OrderWebhook" type="oms-rest" location="service/sendOrderWebhook" method="post" transaction-timeout="180" authenticate="anonymous-view">
+        <description>Send order related webhook to remote url</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="topicEnumId" required="true"/>
+        </in-parameters>
     </service>
 </services>

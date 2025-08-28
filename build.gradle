@@ -17,10 +17,10 @@ buildscript {
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
-    dependencies { classpath 'com.github.ben-manes:gradle-versions-plugin:0.21.0' }
+    dependencies { classpath 'com.github.ben-manes:gradle-versions-plugin:0.52.0' }
 }
 dependencyUpdates.resolutionStrategy = { componentSelection { rules -> rules.all { ComponentSelection selection ->
-    boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm'].any { qualifier -> selection.candidate.version ==~ /(?i).*[.-]${qualifier}[.\d-]*/ }
+    boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm', 'b'].any { qualifier -> selection.candidate.version ==~ /(?i).*[.-]${qualifier}[.\d-].*/ }
     if (rejected) selection.reject('Release candidate')
 } } }
 
@@ -35,8 +35,6 @@ tasks.withType(GroovyCompile) { options.compilerArgs << "-proc:none" }
 
 dependencies {
     implementation project(':framework')
-    //mySql Database jar
-    runtimeOnly 'mysql:mysql-connector-java:8.0.33'
 }
 
 // by default the Java plugin runs test on build, change to not do that (only run test if explicit task)

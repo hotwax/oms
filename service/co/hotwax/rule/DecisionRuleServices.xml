@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="clean" noun="RuleGroupRun" authenticate="false" transaction-timeout="600">
+        <description>Deletes RuleGroupRun records older than a specified number of days.</description>
+        <in-parameters><parameter name="daysToKeep" type="Integer" default="60"/></in-parameters>
+        <out-parameters><parameter name="recordsRemoved" type="Long"/></out-parameters>
+        <actions>
+            <script>
+                import org.moqui.context.ExecutionContext
+                import org.moqui.entity.EntityCondition
+                import org.moqui.entity.EntityListIterator
+
+                ExecutionContext ec = context.ec
+                Calendar basisCal = ec.user.getCalendarSafe()
+                basisCal.add(Calendar.DAY_OF_YEAR, (int) - daysToKeep)
+                basisTimestamp = new Timestamp(basisCal.getTimeInMillis())
+                serviceJobRunFind = ec.entity.find("moqui.service.job.ServiceJobRun")
+                        .condition("startTime", EntityCondition.LESS_THAN, basisTimestamp).disableAuthz()
+
+                try (EntityListIterator eli = serviceJobRunFind.iterator()) {
+                    while ((serviceJobRun = eli.next()) != null) {
+                        serviceJobRun.delete()
+                    }
+                }
+            </script>
+            <log message="Removed ${recordsRemoved} RuleGroupRun records."/>
+        </actions>
+    </service>
+    <service verb="scheduleNow" noun="RuleGroup">
+        <in-parameters>
+            <parameter name="ruleGroupId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="jobRunId"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.rule.RuleGroup" value-field="ruleGroup"/>
+            <if condition="!ruleGroup">
+                <return error="true" message="Rule group not found for ruleGroupId [${ruleGroupId}]."/>
+            </if>
+            <if condition="!ruleGroup.jobName">
+                <return error="true" message="Scheduler not configured for rule group ${ruleGroup.groupName} [${ruleGroupId}]."/>
+            </if>
+            <script>
+                jobRunId = ec.service.job(ruleGroup.jobName).run()
+            </script>
+            <return message="Scheduled job run ${jobRunId} for rule group ${ruleGroup.groupName} [${ruleGroupId}]."/>
+        </actions>
+    </service>
+
+    <service verb="run" noun="RuleGroup" transaction-timeout="36000" authenticate="anonymous-all"
+             semaphore="wait" semaphore-parameter="ruleGroupId" semaphore-timeout="3600" semaphore-sleep="60"
+             semaphore-ignore="7200" semaphore-name="RuleGroup">
+        <description>
+            The action initiates the processing or execution sequence for a Rule Group within the system.
+        </description>
+        <in-parameters>
+            <parameter name="ruleGroupId" required="true"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="systemMessageRemoteId" required="true"/>
+            <!--
+            In order to leverage the Service semaphore capabilities provided by the framework, we have chosen to include ruleGroupId as an input parameter.
+            While ruleGroupId already exists in the RuleGroup entity,
+            opting to use it as an input parameter allows us to seamlessly utilize the framework's existing functionality.
+
+            By incorporating ruleGroupId as an input parameter,
+            we can take advantage of the framework's built-in features without the need for additional custom handling.
+            This approach aligns with the established design principles within the framework and ensures a more streamlined and maintainable solution.
+            -->
+        </in-parameters>
+        <actions>
+            <!--
+                validate the rule group and product store association
+            -->
+            <entity-find-one entity-name="co.hotwax.rule.RuleGroup" value-field="ruleGroup"/>
+            <if condition="!ruleGroup">
+                <return error="true" message="Rule group not found for ${ruleGroupId}"/>
+            </if>
+            <if condition="!ruleGroup.productStoreId">
+                <return error="true" message="No productStore associated with rule group ${ruleGroup.groupName} [${ruleGroupId}]"/>
+            </if>
+            <if condition="ruleGroup.productStoreId != productStoreId">
+                <return error="true" message="Rule group ${ruleGroup.groupName} [${ruleGroupId}] is not associated with productStoreId [${productStoreId}]."/>
+            </if>
+            
+            <service-call name="create#co.hotwax.rule.RuleGroupRun" transaction="force-new" ignore-error="true"
+                    in-map="[ruleGroupId:ruleGroupId, productStoreId: productStoreId, startDate:ec.user.nowTimestamp]"
+                    out-map="ruleGroupResult"/>
+
+            <service-call name="co.hotwax.atp.AtpServices.run#ExportProductFacilityDetail"
+                    in-map="[ruleGroupId:ruleGroupId, productStoreId: productStoreId, systemMessageRemoteId: systemMessageRemoteId]"
+                    out-map="result"/>
+            <script>
+                def ruleGroupRunResult = null
+                def hasError = "N"
+                if (ec.message.hasError()) {
+                    hasError = "Y"
+                    ruleGroupRunResult = ec.message.getErrorsString()
+                } else {
+                    ruleGroupRunResult = ec.message.getMessagesString()
+                }
+                if (ruleGroupRunResult &amp;&amp; ruleGroupRunResult.length() &gt; 255) {
+                    ruleGroupRunResult = ruleGroupRunResult.substring(0, 255)
+                }
+                ec.message.clearAll();
+            </script>
+
+            <service-call name="update#co.hotwax.rule.RuleGroupRun" transaction="force-new" ignore-error="true"
+                    in-map="[ruleGroupRunId:ruleGroupResult.ruleGroupRunId, ruleGroupRunResult:ruleGroupRunResult, hasError:hasError, endDate:ec.user.nowTimestamp]"
+                    out-map="ruleGroupResult"/>
+
+            <message type="success">Finished rule group execution for rule group [${ruleGroupId}].</message>
+        </actions>
+    </service>
+
+    <!-- We can achieve this by RuleGroup and ServiceJob, as both the entity belongs to different database so we can;t create join between them -->
+    <service verb="get" noun="RuleGroupSchedule">
+        <in-parameters>
+            <parameter name="ruleGroupId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="schedule" type="Map">
+                <auto-parameters entity-name="moqui.service.job.ServiceJob"/>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.rule.RuleGroup" value-field="ruleGroup"/>
+            <if condition="!ruleGroup">
+                <return error="true" message="RuleGroup not found for specified ruleGroupId [${ruleGroupId}]."/>
+            </if>
+            <if condition="!ruleGroup.jobName">
+                <return message="No schedule found for rule group ${ruleGroup.groupName} [${ruleGroup.ruleGroupId}]/"/>
+            </if>
+            <entity-find-one entity-name="moqui.service.job.ServiceJob" value-field="serviceJob">
+                <field-map field-name="jobName" from="ruleGroup.jobName"/>
+            </entity-find-one>
+            <if condition="serviceJob">
+                <script>
+                    schedule = serviceJob.getMap()
+                    try {
+                        schedule.cronDescription = co.hotwax.util.MaargUtil.getCronDescription(schedule.cronExpression, ec.user.getLocale())
+                        cronExecutionTime = org.moqui.impl.service.ScheduledJobRunner.getExecutionTime(schedule.cronExpression)
+                        nextExecutionTime = cronExecutionTime.nextExecution(java.time.ZonedDateTime.now()).orElse(null)
+                        if (nextExecutionTime != null) {
+                            schedule.nextExecutionDateTime = nextExecutionTime.toInstant().toEpochMilli()
+                        }
+                        schedule.executionTimeZone = TimeZone.getDefault().getID()
+                    } catch (Exception e) {
+                        ec.logger.error("Error getting cron description: ${e.getMessage()}")
+                        schedule.cronDescription = e.getMessage()
+                    }
+                </script>
+            </if>
+        </actions>
+    </service>
+    <service verb="store" noun="RuleGroupSchedule">
+        <in-parameters>
+            <parameter name="ruleGroupId" required="true"/>
+            <parameter name="systemMessageRemoteId" required="true"/>
+            <auto-parameters entity-name="moqui.service.job.ServiceJob" include="nonpk">
+                <exclude field-name="description"/>
+                <exclude field-name="serviceName"/>
+            </auto-parameters>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="jobName"/>
+        </out-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.rule.RuleGroup" value-field="ruleGroup"/>
+            <if condition="!ruleGroup">
+                <return error="true" message="RuleGroup not found for specified ruleGroupId [${ruleGroupId}]."/>
+            </if>
+            <if condition="!ruleGroup.productStoreId">
+                <return message="No productStore associated with rule group ${ruleGroup.groupName} [${ruleGroup.ruleGroupId}]/"/>
+            </if>
+            <if condition="cronExpression">
+                <script>
+                    try {
+                        cron = org.moqui.impl.service.ScheduledJobRunner.getCron(cronExpression)
+                        cron.validate()
+                    } catch (Exception e) {
+                        ec.logger.error("Invalid cron expression: ${e.getMessage()}")
+                        ec.message.addError("Invalid cron expression: ${e.getMessage()}")
+                        return
+                    }
+                </script>
+            </if>
+            <if condition="ruleGroup.jobName">
+                <entity-find-one entity-name="moqui.service.job.ServiceJob" value-field="serviceJob">
+                    <field-map field-name="jobName" from="ruleGroup.jobName"/>
+                </entity-find-one>
+            </if>
+            <set field="description" value="Service job for rule group ${ruleGroup.groupName} [${ruleGroup.ruleGroupId}]"/>
+            <set field="serviceName" value="co.hotwax.rule.DecisionRuleServices.run#RuleGroup"/>
+            <if condition="!serviceJob">
+                <if condition="!paused">
+                    <set field="paused" value="N"/>
+                </if>
+                <set field="jobName" value="ATP_Rule_Group_${ruleGroup.ruleGroupId}"/>
+                <service-call name="create#moqui.service.job.ServiceJob" in-map="context + [jobName: jobName]" out-map="context"/>
+                <!-- Set the JobName in RuleGroup entity -->
+                <set field="ruleGroup.jobName" from="jobName"/>
+                <service-call name="update#co.hotwax.rule.RuleGroup" in-map="[ruleGroupId:ruleGroupId, jobName: jobName]"/>
+                <!--
+                    For rule group scheduling we need only two parameters
+                    - productStoreId - This is to ensure only one rule group is in execution for an ProductStore
+                    - ruleGroupId
+                 -->
+                <service-call name="create#moqui.service.job.ServiceJobParameter" in-map="[jobName: jobName, parameterName: 'ruleGroupId', parameterValue: ruleGroupId]"/>
+                <service-call name="create#moqui.service.job.ServiceJobParameter" in-map="[jobName: jobName, parameterName: 'productStoreId', parameterValue: ruleGroup.productStoreId]"/>
+                <service-call name="create#moqui.service.job.ServiceJobParameter" in-map="[jobName: jobName, parameterName: 'systemMessageRemoteId', parameterValue: systemMessageRemoteId]"/>
+                <return message="Rule group schedule has been created successfully."/>
+                <else>
+                    <service-call name="update#moqui.service.job.ServiceJob" in-map="context + [jobName: serviceJob.jobName]" out-map="context"/>
+                    <return message="Rule group schedule has been updated successfully."/>
+                </else>
+            </if>
+        </actions>
+    </service>
+</services>

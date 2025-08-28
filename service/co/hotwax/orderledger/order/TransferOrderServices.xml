@@ -20,10 +20,15 @@
                 <description>The ID of the status of the Transfer Order Item in OMS.</description>
             </parameter>
             <parameter name="originFacilityId">
-                <description>The ID of the origin facility of the Transfer Order in OMS.</description>
+                <description>The ID of the source facility of the Transfer Order in OMS.</description>
             </parameter>
             <parameter name="destinationFacilityId">
                 <description>The ID of the destination facility of the Transfer Order in OMS.</description>
+            </parameter>
+            <parameter name="excludeOriginFacilityIds" type="List">
+                <description>
+                    The list of source Facility IDs in OMS to exclude for the Transfer Orders.
+                    Eg. To exclude the Rejected TOs in the Receiving App, send the parameter with value as REJECTED_ITM_PARKING.</description>
             </parameter>
             <parameter name="orderName">
                 <description>The order name of Transfer Order.</description>
@@ -52,6 +57,7 @@
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econdition field-name="itemStatusId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" from="excludeOriginFacilityIds" ignore-if-empty="true" operator="not-in"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
@@ -74,6 +80,7 @@
                 <parameter name="orderName"/>
                 <parameter name="externalId"/>
                 <parameter name="statusId"/>
+                <parameter name="maySplit"/>
                 <parameter name="items" type="List">
                     <parameter name="orderItemMap" type="Map">
                         <parameter name="orderItemSeqId"/>
@@ -84,6 +91,7 @@
                         <parameter name="itemDescription"/>
                         <parameter name="cancelQuantity"/>
                         <parameter name="productId"/>
+                        <parameter name="maySplit"/>
                         <parameter name="totalIssuedQuantity"/>
                         <parameter name="totalReceivedQuantity"/>
                     </parameter>
@@ -103,15 +111,17 @@
             <set field="order.status" from="statusItem?.description"/>
 
             <!-- Get Order Item details -->
-            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
-                <econdition field-name="orderId"/>
-                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity"/>
+            <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItemList">
+                <econdition field-name="orderId" from="orderId"/>
+                <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId"/>
             </entity-find>
+            <set field="order.maySplit" from="orderItemList?.first?.maySplit"/>
 
             <set field="order.items" from="[]"/>
-
             <iterate list="orderItemList" entry="orderItem">
-                <entity-find-related-one value-field="orderItem" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
+                <entity-find-one entity-name="moqui.basic.StatusItem" value-field="statusItem" cache="true">
+                    <field-map field-name="statusId" from="orderItem.statusId"/>
+                </entity-find-one>
 
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
 

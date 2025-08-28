@@ -249,4 +249,24 @@
             <service-call name="co.hotwax.oms.contact.ContactMechServices.create#FacilityEmail" in-map="context" out-map="context"/>
         </actions>
     </service>
+    <service verb="get" noun="FacilityContactMechs">
+        <in-parameters>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="contactMechId"/>
+            <parameter name="contactMechTypeId"/>
+            <parameter name="contactMechPurposeTypeId" type="List"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="facilityContactMechs"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactMechs">
+                <econdition field-name="facilityId" from="facilityId"/>
+                <econdition field-name="contactMechId" from="contactMechId" ignore-if-empty="true"/>
+                <econdition field-name="contactMechTypeId" from="contactMechTypeId" ignore-if-empty="true"/>
+                <econdition field-name="contactMechPurposeTypeId" operator="in" from="contactMechPurposeTypeId" ignore-if-empty="true"/>
+                <date-filter/>
+            </entity-find>
+        </actions>
+    </service>
 </services>

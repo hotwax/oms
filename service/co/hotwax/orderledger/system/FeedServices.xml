@@ -96,8 +96,14 @@ under the License.
             </script>
 
             <!-- Create SystemMessage record for the error file path reference -->
+            <!-- Creating the system message in SmsgProduced status and isOutgoing = 'N' because
+                 if send#AllProducedSystemMessage job is scheduled then it will pick all the system messages
+                 in 'SmsgProduced' status and isOutgoing = 'Y' hence the service job will pick these system messages
+                 as well and will fail for these as there is no sendServiceName configured for FeedErrorFile system message type. -->
             <service-call name="create#moqui.service.message.SystemMessage" out-map="context"
-                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath, parentMessageId:systemMessage.systemMessageId]"/>
+                    in-map="[systemMessageTypeId:'FeedErrorFile', messageText:errorJsonFilePath,
+                    parentMessageId:systemMessage.systemMessageId,statusId:'SmsgProduced', isOutgoing:'N',
+                    initDate:ec.user.nowTimestamp]"/>
         </actions>
     </service>
     <service verb="consume" noun="OMSFeedNew" transaction-timeout="1800">
@@ -139,7 +145,7 @@ under the License.
 
                 <if condition="!productUpdateHistory.parentProductId">
                     <set field="product" from="[:]"/>
-    
+
                     <if condition="diff.title">
                         <set field="product.productName" value="diff.title"/>
                     </if>
@@ -152,7 +158,7 @@ under the License.
                     <if condition="diff.hasVariantsThatRequireComponents">
                         <set field="product.requiresComponents" from="diff.hasVariantsThatRequireComponents"/>
                     </if>
-    
+
                     <set field="product.productTypeId" value="FINISHED_GOOD"/>
                     <if condition="!product.requiresShipping">
                         <set field="product.productTypeId" value="DIGITAL_GOOD"/>
@@ -164,7 +170,7 @@ under the License.
                         <set field="product.productTypeId" value="FINISHED_GOOD"/>
                     </if>
                     <set field="product.isVirtual" value="Y"/>
-    
+
                     <set field="product.createdDate" from="ec.user.nowTimestamp"/>
                     <service-call name="co.hotwax.sob.product.ProductHelperServices.get#ProductStoreBrowseRootCategory"
                                   in-map="[productStoreId:shopifyShop.productStoreId]" out-map="catResp"/>
@@ -181,7 +187,7 @@ under the License.
                     <if condition="!productId">
                         <set field="productId" from="prodOut.productId"/>
                     </if>
-    
+
                     <if condition="diff.tags.added">
                         <iterate list="diff.tags.added" entry="kw">
                             <service-call name="create#org.apache.ofbiz.product.product.ProductKeyword"
@@ -279,7 +285,7 @@ under the License.
                             </if>
                         </iterate>
                     </if>
-    
+
                     <if condition="diff.assocs.added">
                         <iterate list="diff.assocs.added" entry="vid">
                             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
@@ -300,212 +306,211 @@ under the License.
                                           in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT']"/>
                         </iterate>
                     </if>
-    
+
                     <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
                                   in-map="[productId:productId, shopId:shopId, shopifyProductId:productUpdateHistory.productId]"/>
                     <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
                                   in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
-                <else>
-                    <set field="product" from="[:]"/>
+                    <else>
+                        <set field="product" from="[:]"/>
 
-                    <if condition="diff.title">
-                        <set field="product.internalName" from="diff.title"/>
-                    </if>
-                    <if condition="diff.price">
-                        <set field="product.price" value="diff.price"/>
-                    </if>
+                        <if condition="diff.title">
+                            <set field="product.internalName" from="diff.title"/>
+                        </if>
+                        <if condition="diff.price">
+                            <set field="product.price" value="diff.price"/>
+                        </if>
 
-                    <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                    <if condition="!diff.requiresShipping">
-                        <set field="product.productTypeId" value="DIGITAL_GOOD"/>
-                    </if>
-                    <if condition="diff.requiresComponents">
-                        <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
-                    </if>
-                    <if condition="diff.isGiftCard">
                         <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                    </if>
-                    <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
-                    <set field="product.isVariant" value="Y"/>
+                        <if condition="!diff.requiresShipping">
+                            <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                        </if>
+                        <if condition="diff.requiresComponents">
+                            <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                        </if>
+                        <if condition="diff.isGiftCard">
+                            <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                        </if>
+                        <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+                        <set field="product.isVariant" value="Y"/>
 
-                    <if condition="diff.identifications">
-                        <set field="product.productVariantSku" from="diff.identifications.sku"/>
-                        <set field="product.barcode" from="diff.identifications.barcode"/>
-                    </if>
+                        <if condition="diff.identifications">
+                            <set field="product.productVariantSku" from="diff.identifications.sku"/>
+                            <set field="product.barcode" from="diff.identifications.barcode"/>
+                        </if>
 
-                    <if condition="diff.price">
-                        <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPriceList">
-                            <econdition field-name="productId" from="productId"/>
-                            <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
-                            <econdition field-name="productPricePurposeId" value="PURCHASE"/>
-                            <econdition field-name="currencyUomId" from="productStore.defaultCurrencyUomId"/>
-                            <econdition field-name="productStoreGroupId" from="productStore.productStoreGroupId"/>
-                            <date-filter/>
-                        </entity-find>
+                        <if condition="diff.price">
+                            <entity-find entity-name="org.apache.ofbiz.product.price.ProductPrice" list="productPriceList">
+                                <econdition field-name="productId" from="productId"/>
+                                <econdition field-name="productPriceTypeId" value="LIST_PRICE"/>
+                                <econdition field-name="productPricePurposeId" value="PURCHASE"/>
+                                <econdition field-name="currencyUomId" from="productStore.defaultCurrencyUomId"/>
+                                <econdition field-name="productStoreGroupId" from="productStore.productStoreGroupId"/>
+                                <date-filter/>
+                            </entity-find>
 
-                        <!-- If productPriceList and price is updated then set the values from the list if not then set the values from the incoming productPrices -->
-                        <if condition="productPriceList"><then>
-                            <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
+                            <!-- If productPriceList and price is updated then set the values from the list if not then set the values from the incoming productPrices -->
+                            <if condition="productPriceList"><then>
+                                <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
                         currencyUomId:productStore.defaultCurrencyUomId, price:diff.price, productStoreGroupId:productStore.productStoreGroupId,
                         fromDate:ec.l10n.format(productPriceList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
-                        </then><else>
-                            <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
+                            </then><else>
+                                <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
                         currencyUomId:productStore.defaultCurrencyUomId, price:diff.price, productStoreGroupId:productStore.productStoreGroupId,
                         fromDate:ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd-HH-mm-ss')]"/>
-                        </else>
-                        </if>
-                    </if>
-
-                    <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
-                        <set field="productIdentifier" from="diff.identifications.sku"/>
-                        <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
-                            <set field="productIdentifier" from="diff.identifications.barcode"/>
-                        </else-if>
-                        <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
-                            <set field="productIdentifier" from="productHistoryEntry.productId"/>
-                        </else-if>
-                    </if>
-
-                    <!-- If productIdentifier present, fetch the product -->
-                    <if condition="productIdentifier">
-                        <set field="product.internalName" from="productIdentifier"/>
-                    </if>
-
-                    <if condition="diff.parentProductId">
-                        <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="paCheck">
-                            <econdition field-name="productId" from="diff.parentProductId"/>
-                            <econdition field-name="productIdTo" from="productId"/>
-                            <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
-                        </entity-find>
-                        <if condition="!paCheck">
-                            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
-                                          in-map="[productIdTo:productId, productId:diff.parentProductId, productAssocTypeId:'PRODUCT_VARIANT']"/>
-                        </if>
-                    </if>
-                    <if condition="productId">
-                        <set field="product.productId" from="productId"/>
-                    </if>
-
-                    <service-call name="store#org.apache.ofbiz.product.product.Product"
-                                  in-map="product"/>
-
-                    <if condition="diff.tags.added">
-                        <iterate list="diff.tags.added" entry="kw">
-                            <service-call name="create#org.apache.ofbiz.product.product.ProductKeyword"
-                                          in-map="[productId:productId, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
-                        </iterate>
-                    </if>
-                    <if condition="diff.tags.removed">
-                        <iterate list="diff.tags.removed" entry="kw">
-                            <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword"
-                                          in-map="[productId:productId, keywordTypeId:'KWT_TAG', keyword:kw]"/>
-                        </iterate>
-                    </if>
-
-                    <if condition="diffMap.features.added">
-                        <iterate list="differenceMap.features.added" entry="featureString">
-                            <script>
-                                def featureParts = featureString.split("/")
-                                def sequenceNum = featureParts[0] as Integer
-                                def productFeatureTypeDesc = featureParts[1].trim()
-                                def featureDesc = featureParts[2].trim()
-                            </script>
-
-                            <!-- Fetch productFeatureTypeId -->
-                            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
-                                <econdition field-name="description" from="productFeatureTypeDesc"/>
-                            </entity-find>
-
-                            <if condition="productFeatureTypes">
-                                <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
-                                <else>
-                                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
-                                                  in-map="[description:productFeatureTypeDesc]"
-                                                  out-map="createdFeatureType" transaction="force-new"/>
-                                    <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
-                                </else>
+                            </else>
                             </if>
+                        </if>
 
-                            <!-- Fetch productFeatureId -->
-                            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
-                                <econdition field-name="description" from="featureDesc"/>
-                                <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                        <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
+                            <set field="productIdentifier" from="diff.identifications.sku"/>
+                            <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
+                                <set field="productIdentifier" from="diff.identifications.barcode"/>
+                            </else-if>
+                            <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
+                                <set field="productIdentifier" from="productHistoryEntry.productId"/>
+                            </else-if>
+                        </if>
+
+                        <!-- If productIdentifier present, fetch the product -->
+                        <if condition="productIdentifier">
+                            <set field="product.internalName" from="productIdentifier"/>
+                        </if>
+
+                        <if condition="diff.parentProductId">
+                            <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="paCheck">
+                                <econdition field-name="productId" from="diff.parentProductId"/>
+                                <econdition field-name="productIdTo" from="productId"/>
+                                <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
                             </entity-find>
-
-                            <if condition="productFeatures">
-                                <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
-                                <else>
-                                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
-                                                  in-map="[productFeatureTypeId:productFeatureTypeId, description:featureDesc]"
-                                                  out-map="createdFeature" transaction="force-new"/>
-                                    <set field="productFeatureId" from="createdFeature.productFeatureId"/>
-                                </else>
+                            <if condition="!paCheck">
+                                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                                              in-map="[productIdTo:productId, productId:diff.parentProductId, productAssocTypeId:'PRODUCT_VARIANT']"/>
                             </if>
+                        </if>
+                        <if condition="productId">
+                            <set field="product.productId" from="productId"/>
+                        </if>
 
-                            <!-- Create ProductFeatureAppl -->
-                            <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                          in-map="[productId:productId,
+                        <service-call name="store#org.apache.ofbiz.product.product.Product"
+                                      in-map="product"/>
+
+                        <if condition="diff.tags.added">
+                            <iterate list="diff.tags.added" entry="kw">
+                                <service-call name="create#org.apache.ofbiz.product.product.ProductKeyword"
+                                              in-map="[productId:productId, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
+                            </iterate>
+                        </if>
+                        <if condition="diff.tags.removed">
+                            <iterate list="diff.tags.removed" entry="kw">
+                                <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword"
+                                              in-map="[productId:productId, keywordTypeId:'KWT_TAG', keyword:kw]"/>
+                            </iterate>
+                        </if>
+
+                        <if condition="diffMap.features.added">
+                            <iterate list="differenceMap.features.added" entry="featureString">
+                                <script>
+                                    def featureParts = featureString.split("/")
+                                    def sequenceNum = featureParts[0] as Integer
+                                    def productFeatureTypeDesc = featureParts[1].trim()
+                                    def featureDesc = featureParts[2].trim()
+                                </script>
+
+                                <!-- Fetch productFeatureTypeId -->
+                                <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                                    <econdition field-name="description" from="productFeatureTypeDesc"/>
+                                </entity-find>
+
+                                <if condition="productFeatureTypes">
+                                    <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                                    <else>
+                                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
+                                                      in-map="[description:productFeatureTypeDesc]"
+                                                      out-map="createdFeatureType" transaction="force-new"/>
+                                        <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
+                                    </else>
+                                </if>
+
+                                <!-- Fetch productFeatureId -->
+                                <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                                    <econdition field-name="description" from="featureDesc"/>
+                                    <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                                </entity-find>
+
+                                <if condition="productFeatures">
+                                    <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                                    <else>
+                                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
+                                                      in-map="[productFeatureTypeId:productFeatureTypeId, description:featureDesc]"
+                                                      out-map="createdFeature" transaction="force-new"/>
+                                        <set field="productFeatureId" from="createdFeature.productFeatureId"/>
+                                    </else>
+                                </if>
+
+                                <!-- Create ProductFeatureAppl -->
+                                <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                              in-map="[productId:productId,
                                productFeatureId:productFeatureId,
                                productFeatureApplTypeId:'SELECTABLE_FEATURE',
                                sequenceNum:sequenceNum]"/>
-                        </iterate>
-                    </if>
-                    <if condition="diff.features.removed">
-                        <iterate list="differenceMap.features.removed" entry="featureString">
-                            <script>
-                                def featureParts = featureString.split("/")
-                                def sequenceNum = featureParts[0] as Integer
-                                def productFeatureTypeDesc = featureParts[1].trim()
-                                def featureDesc = featureParts[2].trim()
-                            </script>
+                            </iterate>
+                        </if>
+                        <if condition="diff.features.removed">
+                            <iterate list="differenceMap.features.removed" entry="featureString">
+                                <script>
+                                    def featureParts = featureString.split("/")
+                                    def sequenceNum = featureParts[0] as Integer
+                                    def productFeatureTypeDesc = featureParts[1].trim()
+                                    def featureDesc = featureParts[2].trim()
+                                </script>
 
-                            <!-- Fetch productFeatureTypeId -->
-                            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
-                                <econdition field-name="description" from="productFeatureTypeDesc"/>
-                            </entity-find>
+                                <!-- Fetch productFeatureTypeId -->
+                                <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
+                                    <econdition field-name="description" from="productFeatureTypeDesc"/>
+                                </entity-find>
 
-                            <if condition="productFeatureTypes">
-                                <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
-                            </if>
+                                <if condition="productFeatureTypes">
+                                    <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
+                                </if>
 
-                            <!-- Fetch productFeatureId -->
-                            <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
-                                <econdition field-name="description" from="featureDesc"/>
-                                <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
-                            </entity-find>
+                                <!-- Fetch productFeatureId -->
+                                <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeature" list="productFeatures">
+                                    <econdition field-name="description" from="featureDesc"/>
+                                    <econdition field-name="productFeatureTypeId" from="productFeatureTypeId"/>
+                                </entity-find>
 
-                            <if condition="productFeatures">
-                                <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
+                                <if condition="productFeatures">
+                                    <set field="productFeatureId" from="productFeatures[0].productFeatureId"/>
 
-                                <!-- Delete ProductFeatureAppl -->
-                                <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                              in-map="[productId:resolvedProductId,
+                                    <!-- Delete ProductFeatureAppl -->
+                                    <service-call name="delete#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                                  in-map="[productId:resolvedProductId,
                                    productFeatureId:productFeatureId,
                                    productFeatureApplTypeId:'SELECTABLE_FEATURE',
                                    sequenceNum:sequenceNum]"/>
+                                </if>
+                            </iterate>
+                        </if>
+
+                        <if condition="diff.identifications">
+                            <if condition="diff.identifications.sku">
+                                <service-call name="create#co.hotwax.product.GoodIdentification"
+                                              in-map="[productId:productId, goodIdentificationTypeId:'SKU', idValue:diff.identifications.sku]"/>
                             </if>
-                        </iterate>
-                    </if>
-
-                    <if condition="diff.identifications">
-                        <if condition="diff.identifications.sku">
-                            <service-call name="create#co.hotwax.product.GoodIdentification"
-                                          in-map="[productId:productId, goodIdentificationTypeId:'SKU', idValue:diff.identifications.sku]"/>
+                            <if condition="diff.identifications.barcode">
+                                <service-call name="create#co.hotwax.product.GoodIdentification"
+                                              in-map="[productId:productId, goodIdentificationTypeId:'UPCA', idValue:diff.identifications.barcode]"/>
+                            </if>
                         </if>
-                        <if condition="diff.identifications.barcode">
-                            <service-call name="create#co.hotwax.product.GoodIdentification"
-                                          in-map="[productId:productId, goodIdentificationTypeId:'UPCA', idValue:diff.identifications.barcode]"/>
-                        </if>
-                    </if>
 
-                    <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
-                                  in-map="[productId:productId, shopId:ec.context.shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:diff.identifications.id]"/>
-                    <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                                  in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
-                </else>
+                        <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
+                                      in-map="[productId:productId, shopId:ec.context.shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:diff.identifications.id]"/>
+                        <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
+                                      in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
+                    </else>
                 </if>
             </iterate>
         </actions>
     </service>
-
 </services>
