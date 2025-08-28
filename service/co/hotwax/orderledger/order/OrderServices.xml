@@ -202,8 +202,8 @@ under the License.
                 <econdition field-name="orderStatusId"/>
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
-                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
-                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keywrod == ''"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                 </econditions>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>
