@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+    <service verb="send" noun="BopisOrderReceivedNotification">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <set field="topicEnumId" value="NEW_BOPIS_ODR"/>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroups" distinct="true">
+                <econdition field-name="orderId"/>
+                <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                <select-field field-name="facilityId"/>
+            </entity-find>
+            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
+                <field-map field-name="facilityId" from="shipGroups?.first?.facilityId"/>
+            </entity-find-one>
+            <if condition="shipGroups">
+                <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumeration" cache="true">
+                    <field-map field-name="enumId" from="topicEnumId"/>
+                </entity-find-one>
+                <if condition="enumeration">
+                    <iterate list="shipGroups" entry="shipGroup">
+                        <service-call name="co.hotwax.oms.order.OrderNotificationServices.build#TopicName" in-map="[facilityId: shipGroup.facilityId, topicEnumId: topicEnumId]" out-map="context"/>
+                        <script>
+                            ec.makeNotificationMessage().topic(topicName).type("info").title(enumeration.enumName)
+                            .message([body: "New order: "+ orderId +" received in " + facility.facilityName + "."]).send()
+                        </script>
+                    </iterate>
+                </if>
+            </if>
+        </actions>
+    </service>
+    <service verb="send" noun="OrderNotification">
+        <in-parameters>
+            <parameter name="topicEnumId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilities" cache="true">
+                <econdition field-name="parentFacilityTypeId" operator="in" value="RETAIL_STORE,WAREHOUSE"/>
+            </entity-find>
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumeration" cache="true">
+                <field-map field-name="enumId" from="topicEnumId"/>
+            </entity-find-one>
+            <iterate list="facilities" entry="facility">
+                <if condition="topicEnumId == 'OPEN_BOPIS_ODR'">
+                    <!-- Send open orders notification for BOPIS orders
+                    The get#PickupOrders service returns open BOPIS orders default hence, not passing any in-parameters.
+                    -->
+                    <service-call name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders" in-map="[facilityId: facility.facilityId]" out-map="result"/>
+                    <if condition="result.ordersCount == 1">
+                        <set field="body" value="One order is open in  ${facility.facilityName}, start preparing for pickup."/>
+                        <else>
+                            <set field="body" value="More than ${result.ordersCount - 1} orders are open in ${facility.facilityName}, start preparing for pickup."/>
+                        </else>
+                    </if>
+                    <else-if condition="topicEnumId == 'READYPICK_BOPIS_ODR'">
+                        <!-- Send ready for pickup notification for BOPIS orders i.e. Packed orders
+                        The get#Shipments service returns total count of shipments
+                        -->
+                        <service-call name="co.hotwax.poorti.FulfillmentServices.get#Shipments" in-map="[orderStatusId: 'ORDER_APPROVED', originFacilityId: facility.facilityId, statusId: 'SHIPMENT_PACKED', shipmentMethodTypeIds: 'STOREPICKUP']"
+                                      out-map="result"/>
+                        <if condition="result.shipmentCount == 1">
+                            <set field="body" value="One order is ready for pickup at ${facility.facilityName}, resend email notification."/>
+                            <else>
+                                <set field="body" value="More than ${result.shipmentCount - 1} orders are ready for pickup at ${facility.facilityName}, resend email notification."/>
+                            </else>
+                        </if>
+                    </else-if><else-if condition="topicEnumId == 'OPEN_SHIPPING_ODR'">
+                    <service-call name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders" in-map="[shipmentMethodTypeId: 'STOREPICKUP', shipmentMethodTypeId_op: 'equals', shipmentMethodTypeId_not: 'Y', facilityId: facility.facilityId]"
+                                  out-map="result"/>
+                    <if condition="result.ordersCount == 1">
+                        <set field="body" value="One order is open in ${facility.facilityName}, start preparing for picking."/>
+                        <else>
+                            <set field="body" value="More than ${ordersCount - 1} orders are open in ${facility.facilityName}, start preparing for picking."/>
+                        </else>
+                    </if>
+                </else-if>
+                </if>
+                <service-call name="co.hotwax.oms.order.OrderNotificationServices.build#TopicName" in-map="[facilityId: facility.facilityId, topicEnumId: topicEnumId]" out-map="context"/>
+                <script>
+                    ec.makeNotificationMessage().topic(topicName).type("info").title(enumeration.enumName)
+                    .message([body: body]).send()
+                </script>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="build" noun="TopicName">
+        <in-parameters>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="topicEnumId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="topicName"/>
+        </out-parameters>
+        <actions>
+            <set field="topicName" from="System.getProperty('ofbiz.instance.name') + '-' + facilityId + '-' + topicEnumId"/>
+        </actions>
+    </service>
+</services>

@@ -57,22 +57,21 @@
             <service-call name="co.hotwax.oms.order.OrderServices.send#OrderWebhook" in-map="[orderId:orderId,topicEnumId:'WEBHOOK_ODR_COMPLETE']" async="true" disable-authz="true"/>
         </actions>
     </seca>
-    <seca id="SendCancellationEmail" service="co.hotwax.poorti.oms.connector.OrderServices.cancel#PickupOrderItems" when="tx-commit">
+    <seca id="SendCancellationEmail" service="co.hotwax.poorti.oms.connector.OrderServices.cancel#PickupOrderItems" when="post-service">
         <condition>
             <expression>orderId &amp;&amp; cancelledItems</expression>
         </condition>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="orderItemShipGroup">
-                <field-map field-name="orderId"/>
-                <field-map field-name="cancelledItems[0].shipGroupSeqId"/>
-            </entity-find-one>
+            <script>
+                orderItemShipGroup = ec.entity.find("org.apache.ofbiz.order.order.OrderItemShipGroup").condition("orderId", orderId, "shipGroupSeqId", cancelledItems[0].shipGroupSeqId).one()
+            </script>
             <set field="hasParentType" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', orderItemShipGroup.shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
             <if condition="!hasParentType">
                 <return/>
             </if>
             <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
             <set field="orderItems" from="cancelledItems"/>
-            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" disable-authz="true"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context"/>
         </actions>
     </seca>
 </secas>
