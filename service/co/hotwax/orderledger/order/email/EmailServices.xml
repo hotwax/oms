@@ -107,22 +107,10 @@ under the License.
             </entity-find>
             <set field="order.orderStatusUrl" from="orderContentAndInfo?.first?.textData"/>
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.generate#OrderUpdateUrl"
-                          in-map="[orderId: orderId]" out-map="context" ignore-error="true" transaction="force-new"/>
+                          in-map="[orderId: orderId]" out-map="context" ignore-error="true"/>
+
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
             <set field="order.items" from="orderItems"/>
-
-            <entity-find-one entity-name="org.apache.ofbiz.common.property.SystemProperty" value-field="catalogBaseUrl">
-                <field-map field-name="systemResourceId" value="catalog"/>
-                <field-map field-name="systemPropertyId" value="${order.productStoreId}.catalogBaseUrl"/>
-            </entity-find-one>
-            <set field="order.catalogBaseUrl" from="catalogBaseUrl?.systemPropertyValue"/>
-
-            <entity-find-one entity-name="org.apache.ofbiz.common.property.SystemProperty" value-field="brandName">
-                <field-map field-name="systemResourceId" value="shopifyemail"/>
-                <field-map field-name="systemPropertyId" value="${order.productStoreId}.shopifyemail.brand.name"/>
-            </entity-find-one>
-            <set field="order.brandName" from="brandName?.systemPropertyValue"/>
-
 
             <set field="partyIdTo" from="order.roles?.find { it.roleTypeId == 'BILL_TO_CUSTOMER' }?.partyId "/>
             <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
