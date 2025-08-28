@@ -115,6 +115,7 @@
                 <econdition field-name="orderId" from="orderId"/>
                 <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId"/>
             </entity-find>
+            <set field="order.maySplit" from="orderItemList?.first?.maySplit"/>
 
             <set field="order.items" from="[]"/>
             <iterate list="orderItemList" entry="orderItem">
