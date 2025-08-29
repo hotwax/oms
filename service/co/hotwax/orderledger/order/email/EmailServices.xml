@@ -24,6 +24,9 @@ under the License.
             <parameter name="orderItemSeqId"/>
             <parameter name="shipmentId"/>
             <parameter name="emailType" required="true"/>
+            <parameter name="additionalFields" type="Map">
+                <description>Used to send additional data for the master payload</description>
+            </parameter>
         </in-parameters>
         <actions>
             <if condition="!orderId &amp;&amp; !shipmentId">
@@ -47,6 +50,11 @@ under the License.
                 </entity-find-one>
                 <set field="orderItems" from="[orderItem]"/>
             </if>
+            <if condition="!orderItems">
+                <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
+                    <econdition field-name="orderId"/>
+                </entity-find>
+            </if>
 
             <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumValue">
                 <field-map field-name="enumId" from="emailType"/>
@@ -60,6 +68,12 @@ under the License.
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="order">
                 <select-field field-name="orderId, productStoreId"/>
             </entity-find-one>
+
+            <if condition="additionalFields">
+                <set field="orderData" from="new HashMap(order)"/>
+                <set field="orderData.additionalFields" from="additionalFields"/>
+                <set field="order" from="orderData"/>
+            </if>
 
             <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="systemMessageType">
                 <field-map field-name="systemMessageTypeId" from="enumValue.relatedEnumId"/>
@@ -124,7 +138,6 @@ under the License.
                 <field-map field-name="systemPropertyId" value="${order.productStoreId}.shopifyemail.brand.name"/>
             </entity-find-one>
             <set field="order.brandName" from="brandName?.systemPropertyValue"/>
-
 
             <set field="partyIdTo" from="order.roles?.find { it.roleTypeId == 'BILL_TO_CUSTOMER' }?.partyId "/>
             <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
@@ -305,6 +318,97 @@ under the License.
                 <set field="orderItemMap.productDetails" from="productDetails"/>
                 <set field="orderItemsList" from="orderItemsList + [orderItemMap]"/>
             </iterate>
+        </actions>
+    </service>
+    <service verb="generate" noun="BopisStoreCloseNotification" authenticate="anonymous-all">
+        <description>
+            Service to send store close notification email for BOPIS orders created or approved, if orderDate is within store operating hours.
+        </description>
+        <in-parameters>
+            <parameter name="orderIds"/>
+            <parameter name="jobName">
+                <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
+            </parameter>
+            <parameter name="sinceDate">
+                <description>Parameter to fetch system messages updated after the specified date.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <!-- Fetch last run time if jobName is provided and sinceDate is not -->
+            <if condition="jobName &amp;&amp; !sinceDate">
+                <entity-find-one entity-name="moqui.service.job.ServiceJobParameter" value-field="lastRunParam">
+                    <field-map field-name="jobName"/>
+                    <field-map field-name="parameterName" value="lastRunTime"/>
+                </entity-find-one>
+                <set field="sinceDate" from="lastRunParam?.parameterValue"/>
+            </if>
+            <set field="sinceDate" value="2025-05-23 00:00:00"/>
+
+            <!-- Find eligible BOPIS orders -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersList" distinct="true">
+                <econdition field-name="orderStatusId" operator="in" value="ORDER_APPROVED,ORDER_CREATED"/>
+                <econdition field-name="orderTypeId" value="SALES_ORDER"/>
+                <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
+                <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <select-field field-name="orderId,orderDate,facilityId"/>
+            </entity-find>
+
+            <if condition="!ordersList">
+                <return error="true" message="No valid BOPIS orders found, not sending store close notification email."/>
+            </if>
+            <script>
+                import java.time.LocalDateTime
+                import java.time.LocalTime
+                import java.sql.Time
+            </script>
+            <iterate list="ordersList" entry="order">
+                <script>
+                    LocalDateTime orderDateTime = order.orderDate.toLocalDateTime()
+                    String dayOfWeek = orderDateTime.getDayOfWeek().toString().toLowerCase()
+                    LocalTime orderTime = orderDateTime.toLocalTime()
+                </script>
+                <entity-find entity-name="co.hotwax.facility.StoreOperatingHours" list="storeHours" limit="1" cache="true">
+                    <econdition field-name="facilityId" from="order.facilityId"/>
+                    <econdition field-name="thruDate" from="null"/>
+                    <order-by field-name="-fromDate"/>
+                </entity-find>
+                <if condition="storeHours">
+                    <script>
+                        String startTimeField = "${dayOfWeek}StartTime"
+                        String capacityField = "${dayOfWeek}Capacity"
+                        def startTime = storeHours[startTimeField]
+                        def capacity = storeHours[capacityField]
+
+                        boolean isValidOrder = false
+                        LocalTime sundayOpenTime = storeHours['sundayStartTime'].get(0).toLocalTime()
+                        long sundayCapacitySeconds = (storeHours['sundayCapacity'].get(0) instanceof Double ? storeHours['sundayCapacity'].get(0).longValue() : Long.parseLong(storeHours['sundayCapacity'].get(0).toString())) / 1000
+                        LocalTime sundayCloseTime = sundayOpenTime.plusSeconds(sundayCapacitySeconds)
+
+                        LocalTime storeOpenTime = startTime.get(0).toLocalTime()
+                        long capacitySeconds = (capacity.get(0) instanceof Double ? capacity.get(0).longValue() : Long.parseLong(capacity.get(0).toString())) / 1000
+                        LocalTime storeCloseTime = storeOpenTime.plusSeconds(capacitySeconds)
+
+                        if ((startTime &amp;&amp; capacity) &amp;&amp; (storeHours['sundayStartTime'] &amp;&amp; storeHours['sundayCapacity'])) {
+                            isValidOrder = orderTime.isAfter(storeCloseTime) || orderTime.isBefore(storeOpenTime)
+                        }
+                    </script>
+
+                    <!-- Calling email service only if order is out of the facility operational hours -->
+                    <if condition="isValidOrder">
+                        <set field="storeHour" from="[openingHoursMtoS:storeOpenTime,colsingHoursMtoS:storeCloseTime,openingHoursSunday:sundayOpenTime,colsingHoursSunday:sundayCloseTime]"/>
+                        <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
+                                      in-map="[orderId: order.orderId, emailType: 'BopisSCloseNotification', additionalFields:storeHour]"/>
+                    </if>
+                </if>
+            </iterate>
+
+            <!-- Update job parameter if jobName is provided -->
+            <if condition="jobName">
+                <service-call name="update#moqui.service.job.ServiceJobParameter"
+                              in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+            <return message="BOPIS store close notification service ran successfully at ${nowDate}."/>
         </actions>
     </service>
 </services>
