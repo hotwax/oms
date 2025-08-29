@@ -334,6 +334,7 @@ under the License.
             </parameter>
         </in-parameters>
         <actions>
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
             <!-- Fetch last run time if jobName is provided and sinceDate is not -->
             <if condition="jobName &amp;&amp; !sinceDate">
                 <entity-find-one entity-name="moqui.service.job.ServiceJobParameter" value-field="lastRunParam">
