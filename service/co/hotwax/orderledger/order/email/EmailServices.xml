@@ -343,7 +343,6 @@ under the License.
                 </entity-find-one>
                 <set field="sinceDate" from="lastRunParam?.parameterValue"/>
             </if>
-            <set field="sinceDate" value="2025-05-23 00:00:00"/>
 
             <!-- Find eligible BOPIS orders -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersList" distinct="true">
