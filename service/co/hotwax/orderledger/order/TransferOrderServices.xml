@@ -474,7 +474,7 @@
             <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="orderCount" type="Integer"/>
+            <parameter name="ordersCount" type="Integer"/>
             <parameter name="orders" type="List"/>
         </out-parameters>
         <actions>
@@ -490,8 +490,8 @@
                 <order-by field-name="${orderByField}"/>
             </entity-find>
 
-            <!-- Set the field orderCount from the orders list. -->
-            <set field="orderCount" from="orders.size()"/>
+            <!-- Set the field ordersCount from the orders list. -->
+            <set field="ordersCount" from="orders_xafind.count()"/>
         </actions>
     </service>
 
