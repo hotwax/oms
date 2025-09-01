@@ -125,8 +125,8 @@ under the License.
 
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
 
-            <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: orderItems]" out-map="orderItemsList" ignore-error="true"/>
-            <set field="order.items" from="orderItemsList"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: orderItems]" out-map="itemsList" ignore-error="true"/>
+            <set field="order.items" from="itemsList.orderItemsList"/>
 
             <entity-find-one entity-name="org.apache.ofbiz.common.property.SystemProperty" value-field="catalogBaseUrl">
                 <field-map field-name="systemResourceId" value="catalog"/>
