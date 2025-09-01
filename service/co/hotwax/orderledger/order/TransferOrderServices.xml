@@ -462,10 +462,11 @@
             <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
+            <parameter name="orderCount" type="Integer"/>
             <parameter name="orders" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index*limit" list="orders" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index * limit" list="orders" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
@@ -476,6 +477,9 @@
                 <select-field field-name="${fieldsToSelect}"/>
                 <order-by field-name="${orderByField}"/>
             </entity-find>
+
+            <!-- Set the field orderCount from the orders list. -->
+            <set field="orderCount" from="orders.size()"/>
         </actions>
     </service>
 
@@ -498,7 +502,7 @@
             <parameter name="transferOrderItems" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index*limit" list="orderItems" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index * limit" list="orderItems" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
