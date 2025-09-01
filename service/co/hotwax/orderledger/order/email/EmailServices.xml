@@ -121,7 +121,8 @@ under the License.
             </entity-find>
             <set field="order.orderStatusUrl" from="orderContentAndInfo?.first?.textData"/>
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.generate#OrderUpdateUrl"
-                          in-map="[orderId: orderId]" out-map="context" ignore-error="true" transaction="force-new"/>
+                          in-map="[orderId: orderId]" out-map="context" ignore-error="true"/>
+
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
 
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: orderItems]" out-map="orderItemsList" ignore-error="true"/>

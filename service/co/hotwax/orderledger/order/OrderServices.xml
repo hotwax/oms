@@ -105,7 +105,7 @@ under the License.
             </if>
 
             <!-- Call reject#OrderItem service to release the reservations and reset the Shipment -->
-            <set field="rejectionReasonId" from="reasonEnum.enumId"/>
+            <set field="rejectionReasonId" from="reasonEnum?.enumId"/>
             <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
                           in-map="context" out-map="outResult"/>
             <set field="cancelledItems" from="outResult.cancelledReservations"/>
@@ -202,8 +202,8 @@ under the License.
                 <econdition field-name="orderStatusId"/>
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
-                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
-                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keywrod == ''"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                 </econditions>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>

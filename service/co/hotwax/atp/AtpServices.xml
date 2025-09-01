@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="run" noun="ExportProductFacilityDetail" authenticate="false" transaction-timeout="7200">
+        <description>Executes product facility rules.</description>
+        <in-parameters>
+            <parameter name="ruleGroupId" type="String" required="true"/>
+            <parameter name="productStoreId" type="String" required="true"/>
+            <parameter name="systemMessageRemoteId" type="String" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="co.hotwax.rule.RuleGroup" value-field="ruleGroup">
+                <field-map field-name="ruleGroupId" from="ruleGroupId"/>
+                <field-map field-name="productStoreId" from="productStoreId"/>
+            </entity-find-one>
+            <if condition="!ruleGroup">
+                <return error="true" message="No rule group found."/>
+            </if>
+
+            <service-call name="co.hotwax.atp.AtpServices.build#RuleTemplate"
+                    in-map="[ruleGroupId: ruleGroupId]"
+                    out-map="templateResult"/>
+            <set field="ruleTemplateBytes" from="templateResult.ruleTemplateBytes"/>
+            <if condition="!ruleTemplateBytes">
+                <return error="true" message="Error in building rule template."/>
+            </if>
+            <script>
+                import org.kie.api.KieServices;
+                import org.kie.internal.utils.KieHelper;
+                import org.kie.api.io.Resource;
+                import org.kie.api.io.ResourceType;
+                import org.kie.api.KieBase;
+                import org.kie.api.KieServices
+                import co.hotwax.common.CommerceUtil
+
+                kieServices = KieServices.Factory.get();
+                kieHelper = new KieHelper();
+                resource = kieServices.getResources().newByteArrayResource(ruleTemplateBytes);
+                kieHelper.addResource(resource, ResourceType.DRL);
+                kieBase = kieHelper.build();
+                kieSession = kieBase.newKieSession();
+                productFacilityDetail = [:]
+            </script>
+
+            <set field="viewSize" value="20" type="Integer"/>
+            <set field="productStoreFilter" value="productStoreIds_s:${ruleGroup.productStoreId}"/>
+            <set field="serviceCtx" from="[viewSize: viewSize, viewIndex: 0, fieldsToSelect: 'productId,isVirtual,isVariant,tags,productFeatures', resultGroupingField: 'groupId', filter: productStoreFilter]"/>
+            <service-call name="co.hotwax.atp.AtpServices.get#Products"
+                          in-map="serviceCtx + [viewIndex: 0]"
+                          out-map="productResult"/>
+            <if condition="!productResult.productDetail || productResult.productDetail.totalCount == 0">
+                <return error="true" message="No products found."/>
+            </if>
+            <set field="productGroups" from="productResult.productDetail.productGroups"/>
+            <set field="totalGroups" from="productResult.productDetail.totalCount"/>
+            <log message="Rule group ${ruleGroupId}: Total ${totalGroups} product groups to process."/>
+
+            <iterate list="productGroups" entry="productGroup">
+                <set field="products" from="productGroup.doclist.docs"/>
+                <set field="virtualProduct" from="products.find { it.isVirtual == 'true' }"/>
+
+                <iterate list="products" entry="product">
+                    <!--skip virtual product-->
+                    <if condition="product.isVirtual == 'true'">
+                        <continue/>
+                    </if>
+                    <!--considering tags are always managed on virtual product, hence copying virtual product tags to it's variant -->
+                    <if condition="product.isVariant == 'true' &amp;&amp; virtualProduct">
+                      <set field="product.tags" from="virtualProduct.tags"/>
+                    </if>
+                    <script>
+                        kieSession.setGlobal("productFacilityDetail", productFacilityDetail);
+                        kieSession.insert(product);
+                        int numberOfRulesFired = kieSession.fireAllRules();
+                    </script>
+                </iterate>
+            </iterate>
+            <set field="csvFilePath" value=""/>
+            <if condition="productFacilityDetail.values()">
+            <service-call name="co.hotwax.atp.AtpServices.prepare#ProductFacilityCsv"
+                          in-map="[products: productFacilityDetail.values(), systemMessageTypeId: 'ExportProductFacilityDetail']"
+                          out-map="result"/>
+            <!--The fileName will be used in subsequent calls in order to keep only one CSV file in a single run. So if fileName is passed, data get appended to the existing file-->
+            <set field="csvFilePath" from="result.csvFilePath"/>
+            <set field="productFacilityDetail" from="[:]"/>
+            </if>
+            <if condition="totalGroups > viewSize">
+            <script>
+                paginationValues = CommerceUtil.getPaginationValues(viewSize, 0, totalGroups)
+                viewIndexLast = paginationValues.viewIndexLast
+                viewIndexList = (1..viewIndexLast).toList()
+            </script>
+            <iterate list="viewIndexList" entry="viewIndex">
+                <service-call name="co.hotwax.atp.AtpServices.get#Products"
+                        in-map="serviceCtx + [viewIndex: viewIndex*viewSize]"
+                        out-map="productResult"/>
+                <if condition="productResult.productDetail &amp;&amp; productResult.productDetail.totalCount > 0">
+                    <set field="productGroups" from="productResult.productDetail.productGroups"/>
+                    <iterate list="productGroups" entry="productGroup">
+                        <set field="products" from="productGroup.doclist.docs"/>
+                        <set field="virtualProduct" from="products.find { it.isVirtual == 'true' }"/>
+                        <iterate list="products" entry="product">
+                            <!--skip virtual product-->
+                            <if condition="product.isVirtual == 'true'">
+                                <continue/>
+                            </if>
+                            <!--considering tags are always managed on virtual product, hence copying virtual product tags to it's variant -->
+                            <if condition="product.isVariant == 'true' &amp;&amp; virtualProduct">
+                                <set field="product.tags" from="virtualProduct.tags"/>
+                            </if>
+                            <script>
+                                kieSession.setGlobal("productFacilityDetail", productFacilityDetail);
+                                kieSession.insert(product);
+                                int numberOfRulesFired = kieSession.fireAllRules();
+                            </script>
+                        </iterate>
+                    </iterate>
+                    <if condition="productFacilityDetail.values()">
+                    <service-call name="co.hotwax.atp.AtpServices.prepare#ProductFacilityCsv"
+                            in-map="[products: productFacilityDetail.values(), systemMessageTypeId: 'ExportProductFacilityDetail', csvFilePath: csvFilePath]"
+                            out-map="result"/>
+                    <set field="csvFilePath" from="result.csvFilePath"/>
+                    <set field="productFacilityDetail" from="[:]"/>
+                    </if>
+                </if>
+            </iterate>
+            </if>
+            <script>
+                kieSession.dispose();
+            </script>
+
+            <!--If no products fall under any rule, no CSV will be created, and there will be no need to attempt to upload it to FTP.-->
+            <if condition="!csvFilePath">
+                <return message="No products falls under any rule in this rule group."/>
+            </if>
+
+            <service-call name="co.hotwax.atp.AtpServices.upload#ProductFacilityCsvToFtp" transaction="force-new"
+                    in-map="[filePath: csvFilePath, systemMessageRemoteId: systemMessageRemoteId]"
+                    out-map="result"/>
+
+            <return message="Product facility rules executed successfully for rule group [${ruleGroupId}]."/>
+        </actions>
+    </service>
+    <service verb="prepare" noun="ProductFacilityCsv" authenticate="false" transaction-timeout="7200">
+        <description>Prepare product facility csv.</description>
+        <in-parameters>
+            <parameter name="products" type="List" required="true"/>
+            <parameter name="csvFilePath" type="String" required="false"/>
+            <parameter name="systemMessageTypeId" required="true">
+                <description>The System Message Type ID for generating product facility csv.</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="csvFilePath" type="String" required="true"/>
+        </out-parameters>
+        <actions>
+            <if condition="!products">
+                <return error="true" message="No products found."/>
+            </if>
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <set field="skipHeader" value="Y"/>
+
+            <!-- Fetch the receivePath from SystemMessageType to prepare the path for creating the file in the receiving system. Ex: Moqui's datamanager directory in runtime.-->
+            <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="systemMessageType"/>
+
+            <if condition="!csvFilePath">
+                <set field="csvFilePathRef" from="ec.resource.expand(systemMessageType.receivePath, null,
+                        [contentRoot: ec.user.getPreference('mantle.content.root') ?: 'dbresource://datamanager', dateTime:ec.l10n.format(nowDate, 'yyyy-MM-dd-HH-mm-ss-SSS')], false)"/>
+                <set field="csvFilePath" from="ec.resource.getLocationReference(csvFilePathRef).getUri().getPath()"/>
+            </if>
+
+            <set field="csvTemplateLocation" value="component://oms/template/ExportProductFacility.csv.ftl"/>
+
+            <!--flag to include/exclude csv header if writing first time or appending the content in the existing file-->
+            <script>
+                File productFacilityDetailFile = new File(csvFilePath)
+                if (!productFacilityDetailFile.parentFile.exists()) productFacilityDetailFile.parentFile.mkdirs()
+
+                //If the file does not exist, add the CSV header; otherwise, skip it.
+                if (!productFacilityDetailFile.exists()) skipHeader = "N"
+
+                Writer writer = new StringWriter()
+                ec.resourceFacade.template(csvTemplateLocation, writer)
+
+                data = writer.toString()
+                if (data) {
+                    try (Writer outFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFilePath, true)))) {
+                        outFile.append(data);
+                    }
+                }
+            </script>
+            <log message="CSV file prepared successfully."/>
+        </actions>
+    </service>
+    <service verb="get" noun="Products" authenticate="false" transaction-timeout="7200">
+        <description>Get products</description>
+        <in-parameters>
+            <parameter name="query"/>
+            <parameter name="fieldsToSelect"/>
+            <parameter name="filter"/>
+            <parameter name="resultGroupingField"/>
+            <parameter name="groupLimit" default-value="10000"/>
+            <parameter name="viewIndex" type="Integer"/>
+            <parameter name="viewSize" type="Integer"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="productDetail" type="Map"/>
+        </out-parameters>
+        <actions>
+            <set field="productDetail" from="[:]"/>
+            <set field="filterConditions" value="docType:PRODUCT"/>
+            <if condition="filter">
+                <set field="filterConditions" value="${filterConditions} AND ${filter}"/>
+            </if>
+            <set field="params" from="[rows: (viewSize ?: 10), start: (viewIndex ?: 0)]"/>
+            <if condition="resultGroupingField">
+                <set field="params" from="params + ['group': true, 'group.field': resultGroupingField, 'group.limit': (groupLimit ?: 10), 'group.ngroups': true]"/>
+            </if>
+            <set field="queryObject" from="[query: (query ?: '*:*'), filter: filterConditions ?: [], params: params]"/>
+            <if condition="fieldsToSelect">
+                <set field="queryObject.fields" from="fieldsToSelect"/>
+            </if>
+            <service-call name="co.hotwax.search.SearchServices.run#SolrQuery" in-map="[json:queryObject]" out-map="outResult"/>
+            <if condition="outResult">
+                <if condition="resultGroupingField &amp;&amp; outResult.grouped">
+                    <then>
+                        <set field="productDetail.productGroups" from="outResult.grouped[resultGroupingField].groups"/>
+                        <set field="productDetail.totalCount" from="outResult.grouped[resultGroupingField].ngroups"/>
+                    </then>
+                    <else>
+                        <set field="productDetail.products" from="outResult.response.docs"/>
+                        <set field="productDetail.totalCount" from="outResult.response.numFound"/>
+                    </else>
+                </if>
+            </if>
+            <log message="${viewSize} products are fetched successfully from index ${viewIndex}."/>
+        </actions>
+    </service>
+
+    <service verb="build" noun="RuleTemplate">
+        <in-parameters>
+            <parameter name="ruleGroupId" type="String" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="ruleTemplateBytes"/>
+        </out-parameters>
+        <actions>
+            <set field="templateLocation" value="component://oms/drl/ProductFacilityRuleTemplate.drl.ftl"/>
+            <script>
+                Writer writer = new StringWriter()
+                ec.resourceFacade.template(templateLocation, writer)
+
+                ruleTemplateBytes = writer.toString().getBytes();
+                ec.logger.info("Rule group ${ruleGroupId}: Rule Template:" +writer.toString())
+            </script>
+        </actions>
+    </service>
+    <service verb="upload" noun="ProductFacilityCsvToFtp" authenticate="false" transaction-timeout="7200">
+        <description>Upload product facility csv.</description>
+        <in-parameters>
+            <parameter name="systemMessageRemoteId" required="true">
+                <description>The System Message Remote ID to upload product facility csv to ftp location.</description>
+            </parameter>
+            <parameter name="filePath" type="String" required="true">
+                <description>The path of csv file to upload.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <if condition="!filePath">
+                <return error="true" message="No file path found."/>
+            </if>
+            <service-call name="create#moqui.service.message.SystemMessage" transaction="force-new"
+                          in-map="[systemMessageTypeId : 'ExportProductFacilityDetail', systemMessageRemoteId: systemMessageRemoteId, statusId:'SmsgProduced', isOutgoing:'Y', messageText: filePath, initDate:ec.user.nowTimestamp]"
+                          out-map="result"/>
+            <set field="systemMessageId" from="result.systemMessageId"/>
+            <service-call name="co.hotwax.ofbiz.SystemMessageServices.send#SystemMessageFileSftp" transaction="force-new"
+                          in-map="[systemMessageId : systemMessageId]"
+                          out-map="result"/>
+            <service-call name="update#moqui.service.message.SystemMessage" transaction="force-new"
+                          in-map="[systemMessageId : systemMessageId, statusId: 'SmsgSent']"
+                          out-map="result"/>
+            <log message="CSV file uploaded successfully."/>
+        </actions>
+    </service>
+</services>

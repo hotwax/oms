@@ -124,6 +124,13 @@ under the License.
         </resource>
         <resource name="pickup">
             <method type="get"><service name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders"/></method>
+            <id name="orderId">
+                <resource name="notification">
+                    <method type="post">
+                        <service name="co.hotwax.oms.order.OrderNotificationServices.send#BopisOrderReceivedNotification"/>
+                    </method>
+                </resource>
+            </id>
         </resource>
     </resource>
     <resource name="returns">
@@ -135,7 +142,7 @@ under the License.
         </method>
     </resource>
 
-    <resource name="productStores">
+    <resource name="productStores" description="Deprecated (since maarg 4.4.0): Use admin/productStores">
         <method type="get">
             <entity name="org.apache.ofbiz.product.store.ProductStore" operation="list"/>
         </method>
@@ -149,7 +156,7 @@ under the License.
             <method type="put">
                 <entity name="org.apache.ofbiz.product.store.ProductStore" operation="update"/>
             </method>
-            <resource name="settings">
+            <resource name="settings" description="Deprecated (since maarg 4.4.0): Use admin/productStores/${productStoreId}/settings">
                 <method type="get">
                     <entity name="org.apache.ofbiz.product.store.ProductStoreSetting" operation="list"/>
                 </method>
