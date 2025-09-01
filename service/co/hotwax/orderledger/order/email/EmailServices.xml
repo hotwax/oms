@@ -121,7 +121,7 @@ under the License.
             </entity-find>
             <set field="order.orderStatusUrl" from="orderContentAndInfo?.first?.textData"/>
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.generate#OrderUpdateUrl"
-                          in-map="[orderId: orderId]" out-map="context" ignore-error="true"/>
+                          in-map="[orderId: orderId]" out-map="context" ignore-error="true" transaction="force-new"/>
 
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
 
@@ -157,7 +157,7 @@ under the License.
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:order.orderId, communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, orderId: order.orderId, partyIdTo: partyIdTo, toString: emailAddress]"/>
+                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress]"/>
         </actions>
     </service>
 
