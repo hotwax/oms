@@ -86,6 +86,7 @@ under the License.
                 // Using master-detail relationship to fetch all order details
                 order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderId).oneMaster("default")
             </script>
+            <set field="order.orderDate" from="order.orderDate.toString()"/>
             <iterate list="order.shipGroups" entry="shipGroup">
                 <if condition="orderItems?.first.shipGroupSeqId == shipGroup.shipGroupSeqId">
                     <set field="facilityId" from="shipGroup.facilityId"/>
@@ -156,8 +157,9 @@ under the License.
             <service-call name="org.moqui.impl.SystemMessageServices.queue#SystemMessage"
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
-            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[orderId:order.orderId, communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress]"/>
+            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
+                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress]" out-map="communicationEvent"/>
+            <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:order.orderId, communicationEventId:communicationEvent.communicationEventId]"/>
         </actions>
     </service>
 
