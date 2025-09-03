@@ -84,7 +84,7 @@
         <method type="get"><service name="co.hotwax.search.SearchServices.autoComplete#SolrFacet"/></method>
     </resource>
     <resource name="checkOmsConnection" description="Deprecated (since maarg 4.4.0): Use admin/oms/healthCheck">
-        <method type="get"><service name="co.hotwax.common.CommonServices.check#OmsConnection"/></method>
+        <method type="get"><service name="co.hotwax.util.UtilityServices.check#OmsConnection"/></method>
     </resource>
     <resource name="serviceJobRuns" description="Deprecated (since maarg 4.4.0): Use admin/serviceJobs">
         <id name="jobName"><!--admin/serviceJobs/${jobName}/runs -->
