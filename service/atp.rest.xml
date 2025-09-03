@@ -4,7 +4,7 @@
           description="">
 
     <resource name="login" require-authentication="anonymous-all" description="Deprecated (since maarg 4.4.0): Use admin/login">
-        <method type="post"><service name="co.hotwax.util.UserServices.login#User"/></method>
+        <method type="post"><service name="co.hotwax.auth.AuthServices.login#User"/></method>
     </resource>
     <resource name="user" description="Deprecated (since maarg 4.4.0): Use admin/user">
         <resource name="profile" description="Deprecated (since maarg 4.4.0): Use admin/user/profile">
