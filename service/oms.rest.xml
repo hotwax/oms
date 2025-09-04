@@ -589,8 +589,15 @@ under the License.
                 <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderItems"/>
             </method>
         </resource>
+        <resource name="orderItem">
+            <method type="put">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.update#TransferOrderItem"/>
+            </method>
+            <method type="post">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.add#TransferOrderItem"/>
+            </method>
+        </resource>
     </resource>
-
     <resource name="entityData">
         <method type="post">
             <service name="co.hotwax.oms.common.CommonServices.get#EntityData"/>
