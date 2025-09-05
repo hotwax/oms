@@ -886,4 +886,114 @@ under the License.
             <log level="info" message="Updated and indexed product: ${productId}"/>
         </actions>
     </service>
+
+    <service verb="store" noun="ProductAverageCost">
+        <description>Creates ProductAverageCost record by calculating the Weighted Average Cost of a product, expires old ProductAverageCost records, and updates InventoryItem.unitCost.
+        </description>
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost"/>
+        </in-parameters>
+        <actions>
+            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem" in-map="[productId:productId,
+                facilityId:facilityId]" out-map="findOrCreateResult"/>
+            <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem"/>
+
+            <!-- Set ownerPartyId -->
+            <set field="ownerPartyId" from="inventoryItem.ownerPartyId"/>
+            <if condition="!ownerPartyId">
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility">
+                    <field-map field-name="facilityId" from="inventoryItem.facilityId"/>
+                </entity-find-one>
+                <set field="ownerPartyId" from="facility?.ownerPartyId"/>
+            </if>
+
+            <!-- Sum up totalQuantity and totalPrice -->
+            <set field="totalQuantity" from="inventoryItem.quantityOnHandTotal ?: 0.0"/>
+            <set field="totalPrice" from="BigDecimal.ZERO"/>
+            <if condition="inventoryItem.lastReceivedUnitCost">
+                <set field="totalPrice" from="totalQuantity * inventoryItem.lastReceivedUnitCost"/>
+            </if>
+
+            <!-- Find active ProductAverageCost records -->
+            <entity-find entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" list="productAverageCosts">
+                <econdition field-name="productId" from="inventoryItem.productId"/>
+                <econdition field-name="facilityId" from="inventoryItem.facilityId"/>
+                <econdition field-name="productAverageCostTypeId" value="WEIGHTED_AVG_COST"/>
+                <econdition field-name="organizationPartyId" from="ownerPartyId"/>
+                <date-filter/>
+                <order-by field-name="-createdStamp"/>
+            </entity-find>
+
+            <!-- Expire old ProductAverageCosts -->
+            <iterate list="productAverageCosts" entry="productAverageCost">
+                <set field="productAverageCost.thruDate" from="ec.user.nowTimestamp"/>
+                <service-call name="update#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCost"/>
+            </iterate>
+
+            <!-- Get latest ProductAverageCost -->
+            <set field="latestCostRecord" from="productAverageCosts?.first" />
+            <set field="oldWeightedAvgCost" from="latestCostRecord?.averageCost ?: 0.0"/>
+            <set field="oldQoh" from="totalQuantity - affectedQuantity"/>
+
+            <!-- Calculate oldTotalCost -->
+            <set field="oldTotalCost" from="oldWeightedAvgCost * oldQoh"/>
+
+            <!-- Resolve unitCost (priority: inventoryItem.unitCost → orderItem.unitPrice → shipment link → lastReceivedUnitCost) -->
+            <set field="unitCost" from="inventoryItem.unitCost ?: 0.0"/>
+            <if condition="unitCost == 0.0 &amp;&amp; orderId &amp;&amp; orderItemSeqId">
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                    <field-map field-name="orderId"/>
+                    <field-map field-name="orderItemSeqId"/>
+                </entity-find-one>
+                <set field="unitCost" from="orderItem?.unitPrice ?: 0.0"/>
+            </if>
+            <if condition="unitCost == 0.0 &amp;&amp; shipmentId &amp;&amp; shipmentItemSeqId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
+                    <econdition field-name="shipmentId"/>
+                    <econdition field-name="shipmentItemSeqId"/>
+                </entity-find>
+                <set field="orderShipment" from="orderShipments?.first"/>
+                <if condition="orderShipment">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                        <field-map field-name="orderId" from="orderShipment.orderId"/>
+                        <field-map field-name="orderItemSeqId" from="orderShipment.orderItemSeqId"/>
+                    </entity-find-one>
+                    <set field="unitCost" from="orderItem?.unitPrice ?: 0.0"/>
+                </if>
+            </if>
+            <if condition="unitCost == 0.0 &amp;&amp; inventoryItem.lastReceivedUnitCost">
+                <set field="unitCost" from="inventoryItem.lastReceivedUnitCost"/>
+            </if>
+
+            <!-- Weighted Average Cost calculation -->
+            <set field="newTotalCost" from="unitCost * affectedQuantity"/>
+            <set field="totalNewQuantity" from="oldQoh + affectedQuantity"/>
+            <set field="totalCost" from="oldTotalCost + newTotalCost"/>
+            <set field="weightedAvgCost" from="(totalNewQuantity &gt; 0) ? (totalCost.divide(totalNewQuantity as BigDecimal, 2, java.math.RoundingMode.HALF_UP)) : 0.0"/>
+
+            <!-- Create new ProductAverageCost record -->
+            <set field="productAverageCostMap" from="[
+                productAverageCostTypeId: 'WEIGHTED_AVG_COST',
+                organizationPartyId: ownerPartyId,
+                productId: inventoryItem.productId,
+                facilityId: inventoryItem.facilityId,
+                fromDate: ec.user.nowTimestamp,
+                averageCost: weightedAvgCost,
+                affectedQuantity: affectedQuantity,
+                quantityOnHand: totalQuantity,
+                orderId: orderId,
+                orderItemSeqId: orderItemSeqId,
+                shipmentId: shipmentId,
+                shipmentItemSeqId: shipmentItemSeqId,
+                receiptId: receiptId
+            ]"/>
+            <service-call name="create#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCostMap"/>
+
+            <!-- Update InventoryItem with new unitCost -->
+            <set field="inventoryItem.unitCost" from="weightedAvgCost"/>
+            <service-call name="update#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItem"/>
+        </actions>
+    </service>
 </services>
