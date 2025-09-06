@@ -71,7 +71,7 @@
             </if>
             <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
             <set field="orderItems" from="cancelledItems"/>
-            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" async="true" transaction="force-new" ignore-error="true"/>
         </actions>
     </seca>
 </secas>
