@@ -20,7 +20,7 @@ under the License.
     <service verb="send" noun="EmailOnOrderEvents">
         <in-parameters>
             <parameter name="orderId"/>
-            <parameter name="orderItems"/>
+            <parameter name="orderItems" type="List"/>
             <parameter name="orderItemSeqId"/>
             <parameter name="shipmentId"/>
             <parameter name="emailType" required="true"/>
