@@ -563,6 +563,7 @@
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
             <parameter name="quantity" required="true"/>
+            <parameter name="grandTotal" required="true"/>
         </in-parameters>
         <actions>
 
@@ -578,7 +579,10 @@
             </if>
 
             <!-- Update the OrderItem quantity with the incoming quantity -->
-            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId,orderItemSeqId:orderItemSeqId,quantity:quantity]"/>
+            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, quantity:quantity]"/>
+            
+            <!--Update the grandTotal in the OrderHeader -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
         </actions>
     </service>
 
@@ -587,6 +591,9 @@
             <parameter name="orderId" required="true"/>
             <parameter name="productId" required="true"/>
             <parameter name="quantity" default-value="1" type="Integer"/>
+            <parameter name="shipGroupSeqId" required="true"/>
+            <parameter name="unitPrice" required="true"/>
+            <parameter name="grandTotal" required="true"/>
         </in-parameters>
         <actions>
 
@@ -602,10 +609,14 @@
             </if>
 
             <!-- Set the OrderItem map to create OrderItem record -->
-            <set field="orderItem" from="[orderId:orderId,quantity:quantity,productId:productId, statusId:'ITEM_CREATED', statuses:[orderId:orderId,statusId:'ITEM_CREATED']]"/>
+            <set field="orderItem" from="[orderId:orderId,quantity:quantity,productId:productId, statusId:'ITEM_CREATED', unitPrice:unitPrice, shipGroupSeqId:shipGroupSeqId,
+                 statuses:[orderId:orderId,statusId:'ITEM_CREATED']]"/>
 
             <!-- Create the OrderItem with the incoming product. -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem"/>
+
+            <!--Update the grandTotal in the OrderHeader -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
         </actions>
     </service>
 
