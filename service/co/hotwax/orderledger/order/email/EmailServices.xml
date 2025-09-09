@@ -166,7 +166,7 @@ under the License.
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject]" out-map="communicationEvent"/>
+                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress]" out-map="communicationEvent"/>
             <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:order.orderId, communicationEventId:communicationEvent.communicationEventId]"/>
         </actions>
     </service>
@@ -333,6 +333,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
+            <parameter name="productStoreId"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
             </parameter>
@@ -358,6 +359,7 @@ under the License.
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderDate,facilityId"/>
             </entity-find>
 
@@ -424,6 +426,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
+            <parameter name="productStoreId"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
             </parameter>
@@ -449,6 +452,7 @@ under the License.
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
                 <select-field field-name="orderId"/>
             </entity-find>
 
