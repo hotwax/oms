@@ -4,11 +4,11 @@
           description="">
 
     <resource name="login" require-authentication="anonymous-all" description="Deprecated (since maarg 4.4.0): Use admin/login">
-        <method type="post"><service name="co.hotwax.common.UserServices.login#User"/></method>
+        <method type="post"><service name="co.hotwax.auth.AuthServices.login#User"/></method>
     </resource>
     <resource name="user" description="Deprecated (since maarg 4.4.0): Use admin/user">
         <resource name="profile" description="Deprecated (since maarg 4.4.0): Use admin/user/profile">
-            <method type="get"><service name="co.hotwax.common.UserServices.getUserProfile"/></method>
+            <method type="get"><service name="co.hotwax.util.UserServices.getUserProfile"/></method>
         </resource>
         <resource name="getAvailableTimeZones" description="Deprecated (since maarg 4.4.0): Use admin/user/getAvailableTimeZones">
             <method type="get"><service name="co.hotwax.common.CommonServices.getAvailableTimeZones"/></method>
@@ -84,7 +84,7 @@
         <method type="get"><service name="co.hotwax.search.SearchServices.autoComplete#SolrFacet"/></method>
     </resource>
     <resource name="checkOmsConnection" description="Deprecated (since maarg 4.4.0): Use admin/oms/healthCheck">
-        <method type="get"><service name="co.hotwax.common.CommonServices.check#OmsConnection"/></method>
+        <method type="get"><service name="co.hotwax.util.UtilityServices.check#OmsConnection"/></method>
     </resource>
     <resource name="serviceJobRuns" description="Deprecated (since maarg 4.4.0): Use admin/serviceJobs">
         <id name="jobName"><!--admin/serviceJobs/${jobName}/runs -->
