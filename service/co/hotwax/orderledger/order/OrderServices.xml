@@ -105,7 +105,7 @@ under the License.
             </if>
 
             <!-- Call reject#OrderItem service to release the reservations and reset the Shipment -->
-            <set field="rejectionReasonId" from="reasonEnum"/>
+            <set field="rejectionReasonId" from="reasonEnum?.enumId"/>
             <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
                           in-map="context" out-map="outResult"/>
             <set field="cancelledItems" from="outResult.cancelledReservations"/>
@@ -171,6 +171,8 @@ under the License.
                 <description>The facility ID of the Order in OMS.</description>
             </parameter>
             <parameter name="shipmentMethodTypeId" default-value="STOREPICKUP"/>
+            <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
+            <parameter name="shipmentMethodTypeId_not" default-value="N"/>
             <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT,SHIPMENT_PACKED,SHIPMENT_SHIPPED">
                 <description>List of comma separated shipment statuses</description>
             </parameter>
@@ -193,15 +195,15 @@ under the License.
         <actions>
             <!-- Fetch distinct orders with passed filters -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
-                <search-form-inputs/>
+                <search-form-inputs default-order-by="-orderDate"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
-                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
-                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keywrod == ''"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                 </econditions>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,facilityId"/>
@@ -214,11 +216,22 @@ under the License.
                 <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
                 <!-- Fetch items for this order -->
+                <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" list="eligibleShipGroups">
+                    <search-form-inputs/>
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="facilityId" ignore-if-empty="true"/>
+                    <select-field field-name="shipGroupSeqId"/>
+                </entity-find>
+
+                <!-- Extract eligible shipGroupSeqIds -->
+                <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
+
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
                     <search-form-inputs input-fields-map="[statusId: statusId]" />
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" ignore-if-empty="true"/>
                     <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                    <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
                     <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
                         statusId,shippingInstructions,facilityId"/>
                 </entity-find>
@@ -245,6 +258,7 @@ under the License.
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
+                            <set field="shipGroup.pickerGroupName" from="existingPicklistShipmentAndRole?.groupName"/>
                             <set field="item" from="orderItem.getPlainValueMap(0)"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
@@ -306,18 +320,22 @@ under the License.
                         <parameter name="trackingCode"/>
                         <parameter name="carrierPartyId"/>
                         <parameter name="facilityId"/>
+                        <parameter name="facilityName"/>
                         <parameter name="facilityTypeId"/>
                         <parameter name="facilityTypeDescription"/>
+                        <parameter name="parentFacilityTypeId"/>
                         <parameter name="picklistId"/>
                         <parameter name="picklistDate"/>
                         <parameter name="pickerId"/>
                         <parameter name="pickerFirstName"/>
                         <parameter name="pickerLastName"/>
+                        <parameter name="pickerGroupName"/>
                         <parameter name="items" type="List">
                             <parameter name="item" type="Map">
                                 <parameter name="orderId"/>
                                 <parameter name="orderItemSeqId"/>
                                 <parameter name="shipGroupSeqId"/>
+                                <parameter name="itemStatusId"/>
                                 <parameter name="facilityId"/>
                                 <parameter name="productId"/>
                                 <parameter name="productTypeId"/>
@@ -404,12 +422,17 @@ under the License.
                 <set field="orderDetail.currencyUom" from="orderItemShipments[0].currency"/>
                 <set field="orderDetail.partyId" from="orderItemShipments[0].customerPartyId"/>
                 <set field="shipGroups" from="[]"/>
+                <set field="cancelledItems" from="[]"/>
 
                 <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
                     <econdition field-name="orderId"/>
                 </entity-find>
 
                 <iterate list="orderItemShipments" entry="orderItemShipment">
+                    <if condition="orderItemShipment.itemStatusId == 'ITEM_CANCELLED'">
+                        <set field="cancelledItems" from="cancelledItems + orderItemShipment"/>
+                        <continue/>
+                    </if>
                     <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <set field="existingPicklistShipmentAndRole" from="picklistShipmentAndRoles.find{ it.shipmentId == orderItemShipment.shipmentId &amp;&amp; it.shipGroupSeqId == orderItemShipment.shipGroupSeqId }"/>
                     <if condition="existingShipGroup">
@@ -426,15 +449,42 @@ under the License.
                             <set field="shipGroup.trackingCode" from="orderItemShipment.trackingNumber"/>
                             <set field="shipGroup.carrierPartyId" from="orderItemShipment.carrierPartyId"/>
                             <set field="shipGroup.facilityId" from="orderItemShipment.facilityId"/>
+                            <set field="shipGroup.facilityName" from="orderItemShipment.facilityName"/>
                             <set field="shipGroup.facilityTypeId" from="orderItemShipment.facilityTypeId"/>
                             <set field="shipGroup.facilityTypeDescription" from="orderItemShipment.facilityTypeDesc"/>
+                            <set field="shipGroup.parentFacilityTypeId" from="orderItemShipment.parentFacilityTypeId"/>
                             <set field="shipGroup.picklistId" from="existingPicklistShipmentAndRole?.picklistId"/>
                             <set field="shipGroup.picklistDate" from="existingPicklistShipmentAndRole?.picklistDate"/>
                             <set field="shipGroup.pickerId" from="existingPicklistShipmentAndRole?.partyId"/>
                             <set field="shipGroup.pickerFirstName" from="existingPicklistShipmentAndRole?.firstName"/>
                             <set field="shipGroup.pickerLastName" from="existingPicklistShipmentAndRole?.lastName"/>
+                            <set field="shipGroup.pickerGroupName" from="existingPicklistShipmentAndRole?.groupName"/>
                             <set field="item" from="orderItemShipment.getPlainValueMap(0)"/>
                             <set field="item.quantity" from="orderItemShipment.itemQuantity"/>
+                            <set field="shipGroup.items" from="[item]"/>
+                            <set field="shipGroups" from="shipGroups + shipGroup"/>
+                        </else>
+                    </if>
+                </iterate>
+                <iterate list="cancelledItems" entry="cancelledItem">
+                    <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == cancelledItem.shipGroupSeqId }"/>
+                    <if condition="existingShipGroup">
+                        <set field="item" from="cancelledItem.getPlainValueMap(0)"/>
+                        <set field="item.quantity" from="cancelledItem.itemQuantity"/>
+                        <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
+                        <else>
+                            <set field="shipGroup" from="[:]"/>
+                            <set field="shipGroup.shipGroupSeqId" from="cancelledItem.shipGroupSeqId"/>
+                            <set field="shipGroup.shipmentMethodTypeId" from="cancelledItem.slaShipmentMethodTypeId"/>
+                            <set field="shipGroup.shipmentMethodTypeDesc" from="shipmentMethodTypes.find{ it.shipmentMethodTypeId == orderItemShipment.slaShipmentMethodTypeId }?.description"/>
+                            <set field="shipGroup.carrierPartyId" from="cancelledItem.carrierPartyId"/>
+                            <set field="shipGroup.facilityId" from="cancelledItem.facilityId"/>
+                            <set field="shipGroup.facilityName" from="cancelledItem.facilityName"/>
+                            <set field="shipGroup.facilityTypeId" from="cancelledItem.facilityTypeId"/>
+                            <set field="shipGroup.facilityTypeDescription" from="cancelledItem.facilityTypeDesc"/>
+                            <set field="shipGroup.parentFacilityTypeId" from="cancelledItem.parentFacilityTypeId"/>
+                            <set field="item" from="cancelledItem.getPlainValueMap(0)"/>
+                            <set field="item.quantity" from="cancelledItem.itemQuantity"/>
                             <set field="shipGroup.items" from="[item]"/>
                             <set field="shipGroups" from="shipGroups + shipGroup"/>
                         </else>
@@ -463,7 +513,7 @@ under the License.
 
                     <if condition="billingEmailContactMech">
                         <!-- Get the BillTo Email Address Details -->
-                        <entity-find-related-one value-field="billingEmailOrderContactMech" relationship-name="org.apache.ofbiz.party.contact.ContactMech" to-value-field="billingEmailContactMech"/>
+                        <entity-find-related-one value-field="billingEmailContactMech" relationship-name="org.apache.ofbiz.party.contact.ContactMech" to-value-field="billToEmailContactMech"/>
                     </if>
 
                     <if condition="billingPhoneContactMechId">
@@ -475,7 +525,7 @@ under the License.
                 </if>
 
                 <set field="orderDetail.billingAddress" from="billingAddressMap ? billingAddressMap.getMap() : [:] "/>
-                <set field="orderDetail.billingEmail" from="billingEmailContactMech?.infoString"/>
+                <set field="orderDetail.billingEmail" from="billToEmailContactMech?.infoString"/>
                 <set field="orderDetail.billingPhone" from="billingPhoneDetails"/>
 
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderAttribute" list="orderAttributes">

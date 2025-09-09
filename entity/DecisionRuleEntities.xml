@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<entities xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/entity-definition-3.xsd">
+    <entity entity-name="RuleGroup" package="co.hotwax.rule" short-alias="ruleGroup">
+        <description>Represents a group for organizing rules.</description>
+        <field name="ruleGroupId" type="id" is-pk="true"><description>Unique identifier for the group</description></field>
+        <field name="productStoreId" type="id"><description>Unique identifier for the product store</description></field>
+        <field name="groupName" type="text-medium"><description>Name of the group.</description></field>
+        <field name="groupTypeEnumId" type="id"><description>Type of the group.</description></field>
+        <field name="statusId" type="id" enable-audit-log="true"><description>Status identifier for the rule group.</description></field>
+        <field name="sequenceNum" type="number-integer" enable-audit-log="true"><description>Sequence number for ordering.</description></field>
+        <field name="jobName" type="text-medium"><description>moqui.service.job.Service reference</description></field>
+        <field name="description" type="text-long"><description>Description or additional information about the group.</description></field>
+        <field name="createdByUser" type="id-long"><description>User login ID of the creator</description></field>
+        <field name="createdDate" type="date-time"><description>Date and time when the group was created</description></field>
+        <field name="lastModifiedDate" type="date-time"><description>Date and time when the group was updated</description></field>
+        <!--
+        Need to establish this relationship again once we start using a single DB instead of separate DBs for the Moqui and OFBiz applications.
+         As of now, commenting this out to keep entities in the Moqui DB only.
+        <relationship type="one-nofk" fk-name="RG_PROD_STR" related="org.apache.ofbiz.product.store.ProductStore" short-alias="productStore">
+            <key-map field-name="productStoreId"/>
+        </relationship>-->
+        <relationship type="one-nofk" related="moqui.service.job.ServiceJob" short-alias="schedule">
+            <key-map field-name="jobName"/>
+        </relationship>
+        <relationship type="one" fk-name="RG_STATUS" related="moqui.basic.StatusItem" short-alias="status">
+            <key-map field-name="statusId"/>
+        </relationship>
+        <relationship type="one" fk-name="RG_TYPE_ENUM" title="RuleGroupType" related="moqui.basic.Enumeration" short-alias="ruleGroupType">
+            <key-map field-name="groupTypeEnumId" related="enumId"/>
+        </relationship>
+        <relationship type="many" related="co.hotwax.rule.DecisionRule" short-alias="decisionRules">
+            <key-map field-name="ruleGroupId"/>
+        </relationship>
+        <master>
+            <detail relationship="decisionRules"/>
+        </master>
+        <master name="defaultSchedule">
+            <detail relationship="decisionRules"/>
+            <detail relationship="schedule"/>
+        </master>
+        <master name="schedule">
+            <detail relationship="schedule"/>
+        </master>
+        <!--CreateByUser relationship not added, due to different databases -->
+    </entity>
+    <entity entity-name="DecisionRule" package="co.hotwax.rule" short-alias="rule">
+        <description>Represents a rule, defining conditions and actions logic.</description>
+        <field name="ruleId" type="id" is-pk="true"><description>Unique identifier for the rule.</description></field>
+        <field name="ruleGroupId" type="id"><description>Unique identifier for the rule group.</description></field>
+        <field name="ruleName" type="text-medium"><description>Name of the rule.</description></field>
+        <field name="statusId" type="id" enable-audit-log="true"><description>Status of the rule.</description></field>
+        <field name="sequenceNum" type="number-integer" enable-audit-log="true"><description>Sequence number for ordering.</description></field>
+        <field name="createdDate" type="date-time"><description>Date and time when the rule was created.</description></field>
+        <field name="createdByUser" type="id-long"><description>User login ID of the creator.</description></field>
+        <relationship type="one" fk-name="RULE_STATUS" related="moqui.basic.StatusItem" short-alias="status">
+            <key-map field-name="statusId"/>
+        </relationship>
+        <relationship type="one" fk-name="RULE_GROUP" related="co.hotwax.rule.RuleGroup" short-alias="ruleGroup">
+            <key-map field-name="ruleGroupId"/>
+        </relationship>
+        <relationship type="many" related="co.hotwax.rule.RuleCondition" short-alias="ruleConditions">
+            <key-map field-name="ruleId"/>
+        </relationship>
+        <relationship type="many" related="co.hotwax.rule.RuleAction" short-alias="ruleActions">
+            <key-map field-name="ruleId"/>
+        </relationship>
+        <master>
+            <detail relationship="ruleConditions"><detail relationship="ruleConditionType"/></detail>
+            <detail relationship="ruleActions"><detail relationship="ruleActionType"/></detail>
+        </master>
+    </entity>
+    <entity entity-name="RuleCondition" package="co.hotwax.rule" short-alias="ruleCondition">
+        <description>Defines conditions used in rules.</description>
+        <field name="ruleId" type="id" is-pk="true"><description>Unique identifier for the rule.</description></field>
+        <field name="conditionSeqId" type="id" is-pk="true"><description>Unique identifier for the rule inventory condition.</description></field>
+        <field name="conditionTypeEnumId" type="id"><description>Type of condition (Filter/ Order by)</description></field>
+        <field name="fieldName" type="text-medium" enable-audit-log="true"><description>Input parameter for the condition.</description></field>
+        <field name="operator" type="text-medium" enable-audit-log="true"><description>Operator used in the condition.</description></field>
+        <field name="fieldValue" type="text-long" enable-audit-log="true"><description>Value of the condition.</description></field>
+        <field name="sequenceNum" type="number-integer" enable-audit-log="true"><description>Sequence number for ordering.</description></field>
+        <field name="createdDate" type="date-time"><description>Date and time when the condition was created.</description></field>
+        <relationship type="one" fk-name="RULE_COND_TYPEENUM" title="RuleConditionType" related="moqui.basic.Enumeration" short-alias="ruleConditionType">
+            <key-map field-name="conditionTypeEnumId" related="enumId"/>
+        </relationship>
+        <relationship type="one" fk-name="RULE_COND_RULE" related="co.hotwax.rule.DecisionRule" short-alias="decisionRule">
+            <key-map field-name="ruleId"/>
+        </relationship>
+        <master>
+            <detail relationship="ruleConditionType"/>
+        </master>
+    </entity>
+    <entity entity-name="RuleAction" package="co.hotwax.rule" short-alias="ruleAction">
+        <description>Specifies actions to be performed when a rule is triggered during processing.</description>
+        <field name="ruleId" type="id" is-pk="true"><description>Unique identifier for the rule.</description></field>
+        <field name="actionSeqId" type="id" is-pk="true"><description>Unique identifier for the action.</description></field>
+        <field name="actionTypeEnumId" type="id" enable-audit-log="true"><description>Type of action to be performed.</description></field>
+        <field name="fieldName" type="text-medium" enable-audit-log="true"><description>Field on which action is to be performed.</description></field>
+        <field name="fieldValue" type="text-long" enable-audit-log="true"><description>Value or details of the action.</description></field>
+        <field name="sequenceNum" type="number-integer" enable-audit-log="true"><description>Sequence number for ordering.</description></field>
+        <field name="createdDate" type="date-time"><description>Date and time when the action was created.</description></field>
+        <relationship type="one" fk-name="RULE_ACTION_RULE" related="co.hotwax.rule.DecisionRule" short-alias="decisionRule">
+            <key-map field-name="ruleId"/>
+        </relationship>
+        <relationship type="one" fk-name="RULE_ACTION_TYPEENUM" title="RuleActionType" related="moqui.basic.Enumeration" short-alias="ruleActionType">
+            <key-map field-name="actionTypeEnumId" related="enumId"/>
+        </relationship>
+        <master>
+            <detail relationship="ruleActionType"/>
+        </master>
+    </entity>
+    <!-- A relationship was not added in 'RuleGroupRun' to avoid potential deletion operation blockages due to foreign key constraints.-->
+    <entity entity-name="RuleGroupRun" package="co.hotwax.rule" short-alias="ruleGroupRuns">
+        <description>Represents the execution and results of rule group runs, including information about errors and outcomes.</description>
+        <field name="ruleGroupRunId" type="id" is-pk="true"><description>Unique identifier for the rule group run.</description></field>
+        <field name="ruleGroupId" type="id"><description>Unique identifier for the rule group.</description></field>
+        <field name="productStoreId" type="id"><description>Unique identifier for the product store.</description></field>
+        <field name="createdByUser" type="id-long"><description>User login ID of the creator.</description></field>
+        <field name="hasError" type="text-indicator"><description>Indicator for the presence of errors.</description></field>
+        <field name="startDate" type="date-time"><description>Start date of the rule group run.</description></field>
+        <field name="endDate" type="date-time"><description>End date of the rule group run.</description></field>
+        <field name="ruleGroupRunResult" type="text-long"><description>Result or outcome of the rule group run.</description></field>
+        <index name="IDX_RG_RN">
+            <index-field name="ruleGroupId"/>
+        </index>
+    </entity>
+</entities>
+

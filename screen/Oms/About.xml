@@ -18,7 +18,7 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="jobRunDetail"><default-response url="//system/ServiceJob/JobRuns/JobRunDetail"/></transition>
     <transition name="serviceJobDetail"><default-response url="//system/ServiceJob/Jobs/ServiceJobDetail"/></transition>
     <transition name="releaseJobLock">
-        <service-call name="co.hotwax.common.CommonServices.release#ServiceJobRunLock"/>
+        <service-call name="co.hotwax.util.UtilityServices.release#ServiceJobRunLock"/>
         <default-response url="." type="url"/>
     </transition>
     <actions>
@@ -46,6 +46,15 @@ along with this software (see the LICENSE.md file). If not, see
             <set field="commitSHA" from="versionMap.head"/>
         </if>
         <script>
+            import co.hotwax.mdm.ScheduledDataManagerRunner;
+            ScheduledDataManagerRunner mdmRunner = ec.factory.getTool("MDM", ScheduledDataManagerRunner)
+            mdmPriorityWorkerPool = null;
+            mdmNormalWorkerPool = null;
+            if (mdmRunner != null ) {
+                mdmPriorityWorkerPool = mdmRunner.getPool('PRIORITY');
+                mdmNormalWorkerPool = mdmRunner.getPool('NORMAL');
+            }
+
             def calendar = java.util.Calendar.getInstance()
             calendar.add(java.util.Calendar.MINUTE, -20)
             maxLockTimestamp = new java.sql.Timestamp(calendar.getTimeInMillis())
@@ -150,6 +159,13 @@ along with this software (see the LICENSE.md file). If not, see
                     <row-col xs="7"><label text="${ec.l10n.format(smap.Disk.Usable, '#,##0.00')} MiB"/></row-col></container-row>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Total" type="strong"/></row-col>
                     <row-col xs="7"><label text="${ec.l10n.format(smap.Disk.Total, '#,##0.00')} MiB"/></row-col></container-row>
+                <label text="Worker Pool" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Active: ${workerPool.getActiveCount()} Cur: ${workerPool.getPoolSize()} Max: ${workerPool.getMaximumPoolSize()}"
+                                           style="${workerPool.getActiveCount() == workerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Cur: ${workerPool.queue.size()} Rem: ${workerPool.queue.remainingCapacity()}"
+                                           style="${workerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (workerPool.queue.size() &gt; workerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
             </row-col><row-col md="4">
                 <container-row><row-col xs="5"><label text="System" type="strong"/></row-col>
                     <row-col xs="7"><label text="Load: ${ec.l10n.format(loadPercent, '00.0')}%" style="${loadPercent &lt; 70 ? 'text-success' : (loadPercent &lt; 90 ? 'text-warn' : 'text-danger' )}"/></row-col></container-row>
@@ -171,6 +187,13 @@ along with this software (see the LICENSE.md file). If not, see
                 <label text="Moqui Framework" type="strong"/>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Version" type="strong"/></row-col>
                     <row-col xs="7"><label text="${ec.factory.moquiVersion}"/></row-col></container-row>
+                <label text="Service Job Pool" type="strong"/>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Active: ${jobWorkerPool.getActiveCount()} Cur: ${jobWorkerPool.getPoolSize()} Max: ${jobWorkerPool.getMaximumPoolSize()}"
+                                           style="${jobWorkerPool.getActiveCount() == jobWorkerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
+                    <row-col xs="7"><label text="Cur: ${jobWorkerPool.queue.size()} Rem: ${jobWorkerPool.queue.remainingCapacity()}"
+                                           style="${jobWorkerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (jobWorkerPool.queue.size() &gt; jobWorkerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
             </row-col><row-col md="4">
                 <label text="Web Server" type="strong"/>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Local IP" type="strong"/></row-col>
@@ -192,21 +215,22 @@ along with this software (see the LICENSE.md file). If not, see
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
                     <row-col xs="7"><label text="${smap.JavaStats.ThreadCount} (${smap.JavaStats.PeakThreadCount} peak)"/></row-col></container-row>
 
-                <label text="Worker Pool" type="strong"/>
+                <label text="MDM Priority Pool" type="strong"/>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
-                    <row-col xs="7"><label text="Active: ${workerPool.getActiveCount()} Cur: ${workerPool.getPoolSize()} Max: ${workerPool.getMaximumPoolSize()}"
-                                           style="${workerPool.getActiveCount() == workerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                <row-col xs="7">
+                    <label condition="mdmPriorityWorkerPool" text="Active: ${mdmPriorityWorkerPool.getActiveCount()} Cur: ${mdmPriorityWorkerPool.getPoolSize()} Max: ${mdmPriorityWorkerPool.getMaximumPoolSize()}"
+                               style="${mdmPriorityWorkerPool.getActiveCount() == mdmPriorityWorkerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
-                    <row-col xs="7"><label text="Cur: ${workerPool.queue.size()} Rem: ${workerPool.queue.remainingCapacity()}"
-                                           style="${workerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (workerPool.queue.size() &gt; workerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
-
-                <label text="Service Job Pool" type="strong"/>
+                    <row-col xs="7"><label condition="mdmPriorityWorkerPool" text="Cur: ${mdmPriorityWorkerPool.queue.size()} Rem: ${mdmPriorityWorkerPool.queue.remainingCapacity()}"
+                                           style="${mdmPriorityWorkerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (mdmPriorityWorkerPool.queue.size() &gt; mdmPriorityWorkerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
+                <label text="MDM Normal Pool" type="strong"/>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Threads" type="strong"/></row-col>
-                    <row-col xs="7"><label text="Active: ${jobWorkerPool.getActiveCount()} Cur: ${jobWorkerPool.getPoolSize()} Max: ${jobWorkerPool.getMaximumPoolSize()}"
-                                           style="${jobWorkerPool.getActiveCount() == jobWorkerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
+                    <row-col xs="7">
+                        <label condition="mdmNormalWorkerPool" text="Active: ${mdmNormalWorkerPool.getActiveCount()} Cur: ${mdmNormalWorkerPool.getPoolSize()} Max: ${mdmNormalWorkerPool.getMaximumPoolSize()}"
+                               style="${mdmNormalWorkerPool.getActiveCount() == mdmNormalWorkerPool.getMaximumPoolSize() ? 'text-warning' : ''}"/></row-col></container-row>
                 <container-row><row-col xs="1"/><row-col xs="4"><label text="Queue" type="strong"/></row-col>
-                    <row-col xs="7"><label text="Cur: ${jobWorkerPool.queue.size()} Rem: ${jobWorkerPool.queue.remainingCapacity()}"
-                                           style="${jobWorkerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (jobWorkerPool.queue.size() &gt; jobWorkerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
+                    <row-col xs="7"><label condition="mdmNormalWorkerPool" text="Cur: ${mdmNormalWorkerPool.queue.size()} Rem: ${mdmNormalWorkerPool.queue.remainingCapacity()}"
+                                           style="${mdmNormalWorkerPool.queue.remainingCapacity() == 0 ? 'text-danger' : (mdmNormalWorkerPool.queue.size() &gt; mdmNormalWorkerPool.queue.remainingCapacity() ? 'text-warning' : '')}"/></row-col></container-row>
             </row-col></container-row>
         </box-body><box-body-nopad>
             <form-list name="DatasourceList" list="smap.DataSources" skip-form="true">
