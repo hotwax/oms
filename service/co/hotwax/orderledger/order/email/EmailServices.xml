@@ -457,7 +457,7 @@ under the License.
             </entity-find>
 
             <if condition="!ordersList">
-                <return error="true" message="No valid BOPIS orders found, not sending store close notification email."/>
+                <return error="true" message="No valid BOPIS orders found, not sending notification email."/>
             </if>
             <iterate list="ordersList" entry="order">
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
@@ -469,7 +469,7 @@ under the License.
                 <service-call name="update#moqui.service.job.ServiceJobParameter"
                               in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
             </if>
-            <return message="BOPIS store close notification service ran successfully at ${nowDate}."/>
+            <return message="New BOPIS Order Notification Service Ran Successfully At ${nowDate}."/>
         </actions>
     </service>
 </services>
