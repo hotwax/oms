@@ -137,7 +137,7 @@ under the License.
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopTypeMapping" value-field="shopifyShopTypeMapping" cache="true">
                 <field-map field-name="mappedTypeId" value="SHOPIFY_EMAIL"/>
                 <field-map field-name="mappedKey" from="order.productStoreId"/>
-                <field-map field-name="shopId" from="shopifyShop?.first?.shopId"/>
+                <field-map field-name="shopId" from="shopifyShop?.get(0)?.shopId"/>
             </entity-find-one>
             <set field="order.brandName" from="shopTypeMapping?.get(0)?.mappedValue"/>
 
@@ -327,7 +327,7 @@ under the License.
             </iterate>
         </actions>
     </service>
-    <service verb="generate" noun="BopisStoreCloseNotification" authenticate="anonymous-all">
+    <service verb="send" noun="BopisStoreCloseNotification" authenticate="anonymous-all">
         <description>
             Service to send store close notification email for BOPIS orders created or approved, if orderDate is within store operating hours.
         </description>
@@ -420,7 +420,7 @@ under the License.
             <return message="BOPIS store close notification service ran successfully at ${nowDate}."/>
         </actions>
     </service>
-    <service verb="generate" noun="NewBopisOrderNotif" authenticate="anonymous-all">
+    <service verb="send" noun="NewBopisOrderNotif" authenticate="anonymous-all">
         <description>
             Service to send notification email for approved BOPIS orders.
         </description>
