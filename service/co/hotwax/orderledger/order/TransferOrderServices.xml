@@ -86,6 +86,7 @@
                 <parameter name="orderFacilityId"/>
                 <parameter name="carrierPartyId"/>
                 <parameter name="shipmentMethodTypeId"/>
+                <parameter name="grandTotal"/>
                 <parameter name="items" type="List">
                     <parameter name="orderItemMap" type="Map">
                         <parameter name="orderItemSeqId"/>
@@ -108,7 +109,7 @@
             <set field="order" from="[:]"/>
 
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
-                <select-field field-name="orderId,orderName,externalId,statusId,currencyUom,productStoreId,statusFlowId"/>
+                <select-field field-name="orderId,orderName,externalId,statusId,currencyUom,productStoreId,statusFlowId,grandTotal"/>
             </entity-find-one>
 
             <entity-find-related-one value-field="orderHeader" relationship-name="moqui.basic.StatusItem" to-value-field="statusItem" cache="true"/>
