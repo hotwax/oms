@@ -793,14 +793,23 @@ under the License.
             <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
             <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
-            <set field="updateProductMap.isVariant" value="Y"/>
-            <set field="updateProductMap.isVirtual" value="N"/>
             <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap" transaction="force-new"/>
 
             <set field="productId" from="existingProduct.productId"/>
 
+            <!-- Fetch GoodIdentification records for the product to check if already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentifications">
+                <econdition field-name="productId"/>
+                <date-filter/>
+            </entity-find>
             <!-- Insert GoodIdentification for Barcode -->
             <if condition="productVariantJson.barcode">
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'UPCA' }"/>
+                <if condition="goodIdentification">
+                    <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                  in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: goodIdentification.idValue,
+                    thruDate: ec.user.nowTimestamp]"/>
+                </if>
                 <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
                               in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode]"
                               transaction="force-new"/>
@@ -808,6 +817,12 @@ under the License.
 
             <!-- Insert GoodIdentification for SKU -->
             <if condition="productVariantJson.sku">
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'SKU' }"/>
+                <if condition="goodIdentification">
+                    <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                  in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: goodIdentification.idValue,
+                    thruDate: ec.user.nowTimestamp]"/>
+                </if>
                 <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
                               in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku]"
                               transaction="force-new"/>
@@ -818,6 +833,12 @@ under the License.
 
             <!-- Insert GoodIdentification for ERP_ID -->
             <if condition="productVariantJson.ERP_ID">
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'ERP_ID' }"/>
+                <if condition="goodIdentification">
+                    <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                  in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: goodIdentification.idValue,
+                    thruDate: ec.user.nowTimestamp]"/>
+                </if>
                 <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
                               in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID]"
                               transaction="force-new"/>
@@ -862,7 +883,7 @@ under the License.
 
                     <!-- Create ProductFeatureAppl -->
                     <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'SELECTABLE_FEATURE']"
+                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"
                                   transaction="force-new"/>
                 </iterate>
             </if>
