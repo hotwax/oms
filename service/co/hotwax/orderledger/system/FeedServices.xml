@@ -154,7 +154,7 @@ under the License.
                             // Process previous virtual group
                             if (virtualProduct) {
                                 variantIds = []
-                                virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VirtualProduct")
+                                virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                                     .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
                                     .call()
 
@@ -163,7 +163,7 @@ under the License.
 
                                 // Compare all variants
                                 for (Map variant : variants) {
-                                    result = ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VariantProduct")
+                                    result = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VariantProduct")
                                         .parameters([variantJson: variant, systemMessageId: systemMessageId, shopId: shopId])
                                         .call()
 
@@ -175,7 +175,7 @@ under the License.
                                 // Compare metafields
                                 for (Map metafield : metafields) {
                                     metafield.put("productId", virtualProduct.id)
-                                    ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VirtualProduct")
+                                    ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                                         .parameters([productJson: metafield, systemMessageId: systemMessageId, shopId: shopId])
                                         .call()
                                 }
@@ -249,7 +249,7 @@ under the License.
                     // Final group
                     if (virtualProduct) {
                         def variantIds = []
-                        def virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VirtualProduct")
+                        def virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                             .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
                             .call()
 
@@ -257,7 +257,7 @@ under the License.
                         virtualProductId = virtualResult?.virtualProductId
 
                         for (Map variant: variants) {
-                            def result = ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VariantProduct")
+                            def result = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VariantProduct")
                                 .parameters([variantJson: variant, systemMessageId: systemMessageId, shopId: shopId])
                                 .call()
                             if (forCreate && variant?.id) {
@@ -267,7 +267,7 @@ under the License.
 
                         for (Map metafield: metafields) {
                             metafield.put("productId", virtualProduct.id)
-                            ec.service.sync().name("co.hotwax.orderledger.product.ProductUpdateServices.compare#VirtualProduct")
+                            ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                                 .parameters([productJson: metafield, systemMessageId: systemMessageId, shopId: shopId])
                                 .call()
                         }
