@@ -189,6 +189,10 @@ under the License.
                     <!-- If not then create a new ProductAssoc record -->
                     <if condition="!productAssocs">
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                        <else>
+                            <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:productAssocs.first?.fromDate,sequenceNum:productVariantJson.sequenceNum]"/>
+                            <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                        </else>
                     </if>
                     <return/>
                 </then>
