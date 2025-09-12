@@ -974,59 +974,66 @@ under the License.
             <if condition="!productUpdateHistory">
                 <set field="forCreate" from="true"/>
                 <script><![CDATA[
-                // core product hash
-                def parts = [
-                    productJson.handle ?: '',
-                    (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
-                    (productJson.isGiftCard ?: '').toString(),
-                    productJson.title ?: '',
-                    (productJson.featureMedia?.preview?.image?.url ?: '')
-                ]
-                def productCoreDetailsHash = hash(parts.join('||'))
+                    // core product hash
+                    def parts = [
+                        productJson.handle ?: '',
+                        (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
+                        (productJson.isGiftCard ?: '').toString(),
+                        productJson.title ?: '',
+                        (productJson.featureMedia?.preview?.image?.url ?: '')
+                    ]
+                    def productCoreDetailsHash = hash(parts.join('||'))
 
-                // tags as List
-                def tags = ((productJson.tags ?: [])*.toString()).sort()
-                def tagsHash = hash(tags)
+                    // tags as List
+                    def tagsRaw = productJson.tags
+                    def tags = []
 
-                // features as List of position/name/value
-                def features = []
-                (productJson.options ?: []).each { opt ->
-                    def position = opt.position
-                    def name = opt.name
-                    (opt.optionValues ?: []).each { val ->
-                        features << "${position}/${name}/${val.name}"
+                    if (tagsRaw instanceof String) {
+                        tags = tagsRaw.split(',')*.trim().findAll { it }
+                    } else if (tagsRaw instanceof List) {
+                        tags = tagsRaw.collect { it.toString().trim() }.findAll { it }
                     }
-                }
-                features = features.collect { it.toString() }.sort()
-                def featuresHash = hash(features)
+                    tags = tags.sort()
+                    def tagsHash = hash(tags)
 
-                // identifications map
-                def identifications = [id: productJson.id]
-                def identificationsHash = hash(identifications)
+                    // features as List of position/name/value
+                    def features = []
+                    (productJson.options ?: []).each { opt ->
+                        def position = opt.position
+                        def name = opt.name
+                        (opt.optionValues ?: []).each { val ->
+                            features << "${position}/${name}/${val.name}"
+                        }
+                    }
+                    features = features.collect { it.toString() }.sort()
+                    def featuresHash = hash(features)
 
-                // Build initial diffMap with added lists (so consumer sees same schema)
-                def diffMap = [
-                    id: productJson.id,
-                    handle: productJson.handle,
-                    title: productJson.title,
-                    featureImageUrl: productJson.featureMedia?.preview?.image?.url,
-                    isGiftCard: productJson.isGiftCard,
-                    hasVariantsThatRequireComponents: productJson.hasVariantsThatRequiresComponents,
-                    tags: [added: tags, removed: []],
-                    features: [added: features, removed: []],
-                    identifications: [added: [identifications], removed: []]
-                ]
+                    // identifications map
+                    def identifications = [id: productJson.id]
+                    def identificationsHash = hash(identifications)
 
-                // prepare JSON-serialized fields for storage (so DB has JSON text)
-                productCoreDetailsHash = productCoreDetailsHash
-                tagsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
-                featuresJson = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
-                identificationsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
-                diffMapJson = ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
-                tagsHash = tagsHash
-                featuresHash = featuresHash
-                identificationsHash = identificationsHash
-            ]]></script>
+                    // Build initial diffMap with added lists (so consumer sees same schema)
+                    def diffMap = [
+                        id: productJson.id,
+                        handle: productJson.handle,
+                        title: productJson.title,
+                        featureImageUrl: productJson.featureMedia?.preview?.image?.url,
+                        isGiftCard: productJson.isGiftCard,
+                        hasVariantsThatRequireComponents: productJson.hasVariantsThatRequiresComponents,
+                        tags: [added: tags, removed: []],
+                        features: [added: features, removed: []],
+                        identifications: identifications
+                    ]
+
+                    // prepare JSON-serialized fields for storage (so DB has JSON text)
+                    productCoreDetailsHash = productCoreDetailsHash
+                    tagsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
+                    featuresJson = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
+                    identificationsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
+                    diffMapJson = ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                    featuresHash = featuresHash
+                    identificationsHash = identificationsHash
+                ]]></script>
 
                 <set field="createProductUpdateHistoryMap" from="[:]"/>
                 <set field="createProductUpdateHistoryMap.productId" from="virtualProductId"/>
@@ -1070,7 +1077,14 @@ under the License.
             }
 
             // --- Tags ---
-            def newTags = (productJson.tags ?: []).collect { it.toString() }.sort()
+            def newTagsRaw = productJson.tags
+            def newTags = []
+            if (newTagsRaw instanceof String) {
+                newTags = newTagsRaw.split(',')*.trim().findAll { it }
+            } else if (newTagsRaw instanceof List) {
+                newTags = newTagsRaw.collect { it.toString().trim() }.findAll { it }
+            }
+            newTags = newTags.sort()
             def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
             def addedTags = (newTags - oldTags).collect { it.toString() }
             def removedTags = (oldTags - newTags).collect { it.toString() }
@@ -1100,17 +1114,15 @@ under the License.
             // --- Identifications ---
             def newIdent = [id: productJson.id]
             def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
-            if (newIdent != oldIdent) {
-                differenceMap.identifications = [added: [newIdent], removed: oldIdent ? [oldIdent] : []]
+            if (!oldIdent.equals(newIdent)) {
+                differenceMap.identifications = newIdent
             }
             def identificationsHash = hash(newIdent)
 
             // --- Persist if changed ---
             if (!differenceMap.isEmpty()) {
-                diffMap.putAll(differenceMap)
-
                 // prepare JSON serialized fields for storage
-                def updateMap = [
+                updateMap = [
                     productId: virtualProductId,
                     shopId: shopId,
                     systemMessageId: systemMessageId,
@@ -1220,7 +1232,7 @@ under the License.
                         (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
                         (variantJson.inventoryItem?.id ?: '').toString(),
                         (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
-                        (variantJson.inventoryItem?.measurement?.weight?.value ?: '').toString()
+                        (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
                     ]
                     createProductUpdateHistoryMap.productCoreDetailsHash = hash(parts.join('||'))
                 ]]></script>
@@ -1236,29 +1248,27 @@ under the License.
                 ]]></script>
 
                 <script><![CDATA[
-                    def identifications = [
-                        sku    : variantJson.sku ?: '',
-                        barcode: variantJson.barcode ?: '',
-                        id     : variantJson.id ?: ''
-                    ]
+                    def identifications = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantJson.id ?: '']
                     createProductUpdateHistoryMap.identifications = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
+                    createProductUpdateHistoryMap.identificationsHash = hash(identifications)
                 ]]></script>
 
                 <set field="createProductUpdateHistoryMap.price" from="variantJson.price"/>
-                <set field="createProductUpdateHistoryMap.parentProductId" from="variantJson.product?.id"/>
+                <set field="createProductUpdateHistoryMap.parentProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id)"/>
 
                 <script><![CDATA[
                     def diffMap = [
                         id             : variantJson.id,
+                        parentProductId : co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id),
                         sku            : variantJson.sku,
                         title          : variantJson.title,
                         price          : variantJson.price,
                         requiresShipping  :  (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
                         requiresComponents: (variantJson.requiresComponents ?: '').toString(),
                         isGiftCard        : (variantJson.product?.isGiftCard ?: '').toString(),
-                        featureMediaUrl   : (variantJson.featureMedia?.preview?.image?.url ?: ''),
+                        featureImageUrl   : (variantJson.featureMedia?.preview?.image?.url ?: ''),
                         weightUnit        : (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
-                        weightValue       : (variantJson.inventoryItem?.measurement?.weight?.value ?: '').toString(),
+                        weightValue       : (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString(),
                         inventoryItemId   : (variantJson.inventoryItem?.id ?: '').toString(),
                         identifications: identifications,
                         features       : [added: features, removed: []],
@@ -1278,9 +1288,9 @@ under the License.
                 diffMap.inventoryItemId = (variantJson.inventoryItem?.id ?: '').toString()
 
                 // --- Identifications ---
-                def newIdent = [sku: variantJson.sku, barcode: variantJson.barcode, id: variantJson.id]
+                def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantJson.id ?: '']
                 def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
-                if (newIdent != oldIdent) {
+                if (!oldIdent.equals(newIdent)) {
                     diffMap.identifications = newIdent
                 }
                 def identHash = hash(newIdent)
@@ -1292,7 +1302,7 @@ under the License.
                 }
 
                 // --- Assocs ---
-                def newAssoc = variantJson?.product?.id?.toString()
+                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id?.toString())
                 if (newAssoc != productUpdateHistory.parentProductId) {
                     diffMap.parentProductId = newAssoc
                 }
@@ -1329,7 +1339,7 @@ under the License.
                     (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
                     (variantJson.inventoryItem?.id ?: '').toString(),
                     (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
-                    (variantJson.inventoryItem?.measurement?.weight?.value ?: '').toString()
+                    (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
                 ]
                 def newCoreHash = hash(parts.join('||'))
                 if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
@@ -1339,9 +1349,9 @@ under the License.
                     diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
-                    diffMap.featureMediaUrl = (variantJson.featureMedia?.preview?.image?.url ?: '')
+                    diffMap.featureImageUrl = (variantJson.featureMedia?.preview?.image?.url ?: '')
                     diffMap.weightUnit = (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString()
-                    diffMap.weightValue = (variantJson.inventoryItem?.measurement?.weight?.value ?: '').toString()
+                    diffMap.weightValue = (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
                 }
 
                 // --- Persist updates ---
