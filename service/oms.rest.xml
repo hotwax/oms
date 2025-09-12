@@ -573,6 +573,11 @@ under the License.
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
                 </method>
             </resource>
+            <resource name="shipgroups">
+                <method type="get">
+                    <entity name="co.hotwax.order.OrderHeaderAndShipGroup" operation="list"/>
+                </method>
+            </resource>
         </id>
     </resource>
 
