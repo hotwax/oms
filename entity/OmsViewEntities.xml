@@ -479,4 +479,24 @@
         <alias entity-alias="TDCW" name="sundayStartTime"/>
         <alias entity-alias="TDCW" name="sundayCapacity"/>
     </view-entity>
+
+    <view-entity entity-name="OrderHeaderAndShipGroup" package="co.hotwax.order">
+        <description>View to get Order Header and Ship Group details.</description>
+        <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OH">
+            <key-map field-name="orderId"/>
+        </member-entity>
+
+        <alias entity-alias="OH" name="orderId"/>
+        <alias entity-alias="OH" name="orderName"/>
+        <alias entity-alias="OH" name="statusFlowId"/>
+        <alias entity-alias="OH" name="statusId"/>
+        <alias entity-alias="OH" name="currencyUom"/>
+
+        <alias entity-alias="OISG" name="shipGroupSeqId"/>
+        <alias entity-alias="OISG" name="carrierPartyId"/>
+        <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
+        <alias entity-alias="OISG" name="orderFacilityId"/>
+        <alias entity-alias="OISG" name="facilityId"/>
+    </view-entity>
 </entities>

@@ -583,6 +583,11 @@ under the License.
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.cancel#TransferOrder"/>
                 </method>
             </resource>
+            <resource name="shipgroups">
+                <method type="get">
+                    <entity name="co.hotwax.order.OrderHeaderAndShipGroup" operation="list"/>
+                </method>
+            </resource>
         </id>
         <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
             <method type="get">
