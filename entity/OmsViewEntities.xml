@@ -449,4 +449,34 @@
             <econdition entity-alias="OH" field-name="orderTypeId" value="TRANSFER_ORDER"/>
         </entity-condition>
     </view-entity>
+
+    <view-entity entity-name="StoreOperatingHours" package="co.hotwax.facility">
+        <description>View to for store operating hours from FacilityCalendar, TechDataCalendar, and TechDataCalendarWeek.</description>
+        <member-entity entity-alias="FC" entity-name="org.apache.ofbiz.product.facility.FacilityCalendar"/>
+        <member-entity entity-alias="TDC" entity-name="org.apache.ofbiz.manufacturing.techdata.TechDataCalendar" join-from-alias="FC">
+            <key-map field-name="calendarId"/>
+        </member-entity>
+        <member-entity entity-alias="TDCW" entity-name="org.apache.ofbiz.manufacturing.techdata.TechDataCalendarWeek" join-from-alias="TDC">
+            <key-map field-name="calendarWeekId"/>
+        </member-entity>
+        <alias entity-alias="FC" name="calendarId"/>
+        <alias entity-alias="FC" name="facilityId"/>
+        <alias entity-alias="FC" name="fromDate"/>
+        <alias entity-alias="FC" name="thruDate"/>
+        <alias entity-alias="TDC" name="description"/>
+        <alias entity-alias="TDCW" name="mondayStartTime"/>
+        <alias entity-alias="TDCW" name="mondayCapacity"/>
+        <alias entity-alias="TDCW" name="tuesdayStartTime"/>
+        <alias entity-alias="TDCW" name="tuesdayCapacity"/>
+        <alias entity-alias="TDCW" name="wednesdayStartTime"/>
+        <alias entity-alias="TDCW" name="wednesdayCapacity"/>
+        <alias entity-alias="TDCW" name="thursdayStartTime"/>
+        <alias entity-alias="TDCW" name="thursdayCapacity"/>
+        <alias entity-alias="TDCW" name="fridayStartTime"/>
+        <alias entity-alias="TDCW" name="fridayCapacity"/>
+        <alias entity-alias="TDCW" name="saturdayStartTime"/>
+        <alias entity-alias="TDCW" name="saturdayCapacity"/>
+        <alias entity-alias="TDCW" name="sundayStartTime"/>
+        <alias entity-alias="TDCW" name="sundayCapacity"/>
+    </view-entity>
 </entities>
