@@ -563,8 +563,8 @@
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="quantity" required="true"/>
-            <parameter name="grandTotal" required="true"/>
+            <parameter name="quantity" required="true" type="Integer"/>
+            <parameter name="unitPrice" required="true" type="Integer"/>
         </in-parameters>
         <actions>
 
@@ -581,7 +581,7 @@
 
             <!-- Update the OrderItem quantity with the incoming quantity -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, quantity:quantity]"/>
-            
+
             <!--Update the grandTotal in the OrderHeader -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
         </actions>
@@ -593,8 +593,7 @@
             <parameter name="productId" required="true"/>
             <parameter name="quantity" default-value="1" type="Integer"/>
             <parameter name="shipGroupSeqId" required="true"/>
-            <parameter name="unitPrice" required="true"/>
-            <parameter name="grandTotal" required="true"/>
+            <parameter name="unitPrice" required="true" type="Integer"/>
         </in-parameters>
         <actions>
 
@@ -615,6 +614,9 @@
 
             <!-- Create the OrderItem with the incoming product. -->
             <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem"/>
+
+            <!-- Set the grandTotal field from the unitPrice and quantity -->
+            <set field="grandTotal" from="orderHeader.first.grandTotal + (unitPrice * quantity)"/>
 
             <!--Update the grandTotal in the OrderHeader -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
