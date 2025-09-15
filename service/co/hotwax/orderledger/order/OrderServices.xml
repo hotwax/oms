@@ -227,7 +227,7 @@ under the License.
                 <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
 
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
-                    <search-form-inputs input-fields-map="[statusId: statusId, shipmentMethodTypeId: shipmentMethodTypeId]" />
+                    <search-form-inputs input-fields-map="[statusId: statusId]" />
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" ignore-if-empty="true"/>
 <!--                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>-->
