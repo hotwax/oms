@@ -579,10 +579,39 @@
                 <return type="warning" message="Order [${orderId}] not in CREATED status. Cannot edit ordered quantity"/>
             </if>
 
+            <!-- Fetch the orderItem detail for the incoming orderItemSeqId -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId"/>
+                <field-map field-name="orderItemSeqId"/>
+            </entity-find-one>
+
+            <!-- If no orderItem for the incoming orderItemSeqId then return error -->
+            <if condition="!orderItem">
+                <return error="true" message="OrderItem [${orderItemSeqId}] not found for Order [${orderId}]"/>
+            </if>
+
+            <set from="orderItem.quantity" field="currentQuantity"/>
+            <set from="orderHeader.first.grandTotal" field="grandTotal"/>
+
+            <!-- Calculate difference in quantity and prepare the adjustment for grandTotal -->
+            <if condition="quantity &lt; currentQuantity">
+                <!-- Reduce grandTotal -->
+                <set field="diffQty" from="currentQuantity - quantity"/>
+                <set field="adjustment" from="diffQty * unitPrice"/>
+                <set field="grandTotal" from="grandTotal - adjustment"/>
+            </if>
+
+            <if condition="quantity &gt; currentQuantity">
+                <!-- Increase grandTotal -->
+                <set field="diffQty" from="quantity - currentQuantity"/>
+                <set field="adjustment" from="diffQty * unitPrice"/>
+                <set field="grandTotal" from="grandTotal + adjustment"/>
+            </if>
+
             <!-- Update the OrderItem quantity with the incoming quantity -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, quantity:quantity]"/>
 
-            <!--Update the grandTotal in the OrderHeader -->
+            <!-- Update the grandTotal in the OrderHeader -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
         </actions>
     </service>
