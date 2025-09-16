@@ -190,6 +190,10 @@ under the License.
                     <if condition="!productAssocs">
                         <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                         <else>
+                            <log message="=================ProductAssoc update=================="/>
+                            <log message="=================productVariantJson.productId========${productVariantJson.productId}=========="/>
+                            <log message="=================productAssocs.first?.fromDate========${productAssocs.first?.fromDate}=========="/>
+                            <log message="=================productVariantJson.sequenceNum=======${productVariantJson.sequenceNum}==========="/>
                             <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:productAssocs.first?.fromDate,sequenceNum:productVariantJson.sequenceNum]"/>
                             <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                         </else>
