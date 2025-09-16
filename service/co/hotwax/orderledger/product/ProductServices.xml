@@ -1056,7 +1056,7 @@ under the License.
                         title: productJson.title,
                         featureImageUrl: productJson.featureMedia?.preview?.image?.url,
                         isGiftCard: productJson.isGiftCard,
-                        hasVariantsThatRequireComponents: productJson.hasVariantsThatRequiresComponents,
+                        hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
                         tags: [added: tags, removed: []],
                         features: [added: features, removed: []],
                         identifications: identifications

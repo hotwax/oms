@@ -423,7 +423,9 @@ under the License.
                     <if condition="catResp.categoryId">
                         <set field="product.primaryProductCategoryId" from="catResp.categoryId"/>
                     </if>
-                    <set field="product.internalName" from="'V_' + diff.handle"/>
+                    <if condition="diff.handle">
+                        <set field="product.internalName" from="'V_' + diff.handle"/>
+                    </if>
 
                     <if condition="productId">
                         <set field="product.productId" from="productId"/>
@@ -548,8 +550,10 @@ under the License.
                                 <field-map field-name="shopId" from="shopId"/>
                                 <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
                             </entity-find-one>
-                            <service-call name="store#org.apache.ofbiz.product.product.ProductAssoc"
-                                          in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                            <if condition="shopifyShopProduct">
+                                <service-call name="store#org.apache.ofbiz.product.product.ProductAssoc"
+                                              in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                            </if>
                         </iterate>
                     </if>
                     <if condition="diff.assocs?.removed">
@@ -558,13 +562,15 @@ under the License.
                                 <field-map field-name="shopId" from="shopId"/>
                                 <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
                             </entity-find-one>
-                            <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
-                                <econdition field-name="productId" from="productId"/>
-                                <econdition field-name="productIdTo" from="shopifyShopProduct.productId"/>
-                                <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
-                                <date-filter/>
-                            </entity-find>
-                            <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                            <if condition="shopifyShopProduct">
+                                <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                                    <econdition field-name="productId" from="productId"/>
+                                    <econdition field-name="productIdTo" from="shopifyShopProduct.productId"/>
+                                    <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                                    <date-filter/>
+                                </entity-find>
+                                <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                            </if>
                         </iterate>
                     </if>
                     <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
@@ -584,7 +590,7 @@ under the License.
                             <set field="product.productName" from="diff.title"/>
                         </if>
                         <if condition="diff.price">
-                            <set field="product.price" value="diff.price"/>
+                            <set field="product.price" from="diff.price"/>
                         </if>
                         <if condition="diff.featureImageUrl">
                             <set field="product.detailImageUrl" from="diff.featureImageUrl"/>
@@ -640,7 +646,7 @@ under the License.
                             <if condition="productPriceList"><then>
                                 <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
                                         currencyUomId:productStore.defaultCurrencyUomId, price:diff.price, productStoreGroupId:productStore.primaryStoreGroupId,
-                                        fromDate:ec.l10n.format(productPriceList[0].fromDate, 'yyyy-MM-dd HH:mm:ss.SSS')]"/>
+                                        fromDate:productPriceList[0].fromDate]"/>
                             </then><else>
                                 <set field="product.prices" from="[productPriceTypeId:'LIST_PRICE', productPricePurposeId:'PURCHASE',
                                         currencyUomId:productStore.defaultCurrencyUomId, price:diff.price, productStoreGroupId:productStore.primaryStoreGroupId,
