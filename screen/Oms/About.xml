@@ -19,7 +19,10 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="serviceJobDetail"><default-response url="//system/ServiceJob/Jobs/ServiceJobDetail"/></transition>
     <transition name="releaseJobLock">
         <service-call name="co.hotwax.util.UtilityServices.release#ServiceJobRunLock"/>
-        <default-response url="." type="url"/>
+        <default-response url="."/>
+    </transition>
+    <transition name="ComponentUpgradeStep">
+        <default-response url="//Oms/ComponentUpgrade" />
     </transition>
     <actions>
         <set field="smap" from="ec.factory.getStatusMap(true)"/>
@@ -74,7 +77,9 @@ along with this software (see the LICENSE.md file). If not, see
                                 <label condition="!'HEAD'.equals(versionMap?.branch)" text="Branch" type="strong"/>
                                 <label condition="'HEAD'.equals(versionMap?.branch)" text="Tag" type="strong"/>
                             </row-col>
-                            <row-col xs="7"><label text="${componentRelease}"/></row-col>
+                            <row-col xs="7"><label text="${componentRelease}"/>
+                            <link url="ComponentUpgradeStep" icon="fa fa-external-link" link-type="anchor" tooltip="Upgrade Step" target-window="_blank"/>
+                            </row-col>
                             <row-col xs="5">
                                 <label condition="commitSHA"  text="Commit SHA" type="strong"/>
                             </row-col>
