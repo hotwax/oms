@@ -391,6 +391,7 @@ under the License.
                     </iterate>
                 </if>
             </if>
+            <log message="==============variantProductAssocs====================${variantProductAssocs}========="/>
             <set field="isVirtualUpdated" from="parentProductKeywords || parentProductFeatureAppls || parentProductDeleteProductKeywords || parentProductDeleteFeatureAppls || parentProductUpdatedInfo"/>
             <set field="anyVariantUpdated" from="variantProductFeatureAppls || variantProductDeleteFeatureAppls || variantProductIdentifications || variantProductPrices || variantProductAssocs || variantProductUpdatedInfo"/>
             <set field="indexVariants" from="anyVariantUpdated"/>
@@ -398,6 +399,7 @@ under the License.
                 <set field="isVirtualUpdated" from="true"/>
             </if>
 
+            <log message="==============anyVariantUpdated====================${anyVariantUpdated}========="></log>
             <if condition="isVirtualUpdated || anyVariantUpdated">
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
                 <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
@@ -746,6 +748,7 @@ under the License.
                         <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${productVariantJson.productId}]"/>
                     </else>
                     </if>
+                    <log message="==========assocs=============${assocs}======="/>
                     <if condition="shopifyShopProduct"><then>
                         <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[productId:productVariantJson.productId, shopId:shopifyShopProduct.shopId, shopifyProductId:shopifyShopProduct.shopifyProductId,shopifyInventoryItemId:shopifyShopProduct.shopifyInventoryItemId]"/>
                     </then><else>
