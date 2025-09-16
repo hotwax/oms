@@ -116,6 +116,7 @@ under the License.
 
             <!-- Get the ShopifyShopProduct record and remove it from productJson -->
             <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+            <set field="productJson.brandName" from="productJson.remove('vendor')"/>
 
             <!-- Call prepare#ProductCreate service to get the json for creating product -->
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productJson]"
@@ -630,6 +631,7 @@ under the License.
 
             <!-- Set the shopifyShopProduct record form the productJson -->
             <set field="shopifyShopProduct" from="productJson.remove('shopifyShopProduct')"/>
+            <set field="productJson.brandName" from="productJson.remove('vendor')"/>
 
             <!-- If the productId is not null, then update the product and ShopifyShopProduct record-->
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductUpdate" in-map="[productJson:productJson]" out-map="prepareProductUpdateOutput"/>
