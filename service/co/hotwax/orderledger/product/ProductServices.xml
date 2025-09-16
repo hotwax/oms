@@ -940,7 +940,7 @@ under the License.
             <!-- Set ownerPartyId -->
             <set field="ownerPartyId" from="inventoryItem.ownerPartyId"/>
             <if condition="!ownerPartyId">
-                <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility">
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
                     <field-map field-name="facilityId" from="inventoryItem.facilityId"/>
                 </entity-find-one>
                 <set field="ownerPartyId" from="facility?.ownerPartyId"/>
@@ -960,7 +960,7 @@ under the License.
                 <econdition field-name="productAverageCostTypeId" value="WEIGHTED_AVG_COST"/>
                 <econdition field-name="organizationPartyId" from="ownerPartyId"/>
                 <date-filter/>
-                <order-by field-name="-createdStamp"/>
+                <order-by field-name="-fromDate"/>
             </entity-find>
 
             <!-- Expire old ProductAverageCosts -->
