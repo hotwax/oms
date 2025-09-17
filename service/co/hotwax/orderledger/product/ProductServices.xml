@@ -946,12 +946,8 @@ under the License.
                 <set field="ownerPartyId" from="facility?.ownerPartyId"/>
             </if>
 
-            <!-- Sum up totalQuantity and totalPrice -->
+            <!-- Set totalQuantity -->
             <set field="totalQuantity" from="inventoryItem.quantityOnHandTotal ?: 0.0"/>
-            <set field="totalPrice" from="BigDecimal.ZERO"/>
-            <if condition="inventoryItem.lastReceivedUnitCost">
-                <set field="totalPrice" from="totalQuantity * inventoryItem.lastReceivedUnitCost"/>
-            </if>
 
             <!-- Find active ProductAverageCost records -->
             <entity-find entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" list="productAverageCosts">
