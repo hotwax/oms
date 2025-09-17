@@ -99,17 +99,17 @@
     </view-entity>
 
     <view-entity entity-name="CarrierShipmentMethodCount" package="co.hotwax.shipment">
-        <member-entity entity-alias="P" entity-name="Party"/>
-        <member-entity entity-alias="PG" entity-name="PartyGroup" join-from-alias="P">
+        <member-entity entity-alias="P" entity-name="org.apache.ofbiz.party.party.Party"/>
+        <member-entity entity-alias="PG" entity-name="org.apache.ofbiz.party.party.PartyGroup" join-from-alias="P">
             <key-map field-name="partyId"/>
         </member-entity>
-        <member-entity entity-alias="PR" entity-name="PartyRole" join-from-alias="P">
+        <member-entity entity-alias="PR" entity-name="org.apache.ofbiz.party.party.PartyRole" join-from-alias="P">
             <key-map field-name="partyId"/>
             <entity-condition>
                 <econdition entity-alias="PR" field-name="roleTypeId" value="CARRIER"/>
             </entity-condition>
         </member-entity>
-        <member-entity entity-alias="CSM" entity-name="CarrierShipmentMethod" join-from-alias="PR" join-optional="true">
+        <member-entity entity-alias="CSM" entity-name="org.apache.ofbiz.shipment.shipment.CarrierShipmentMethod" join-from-alias="PR" join-optional="true">
             <key-map field-name="partyId"/>
             <key-map field-name="roleTypeId"/>
         </member-entity>
@@ -325,11 +325,11 @@
 
     <view-entity entity-name="UserLoginSecurityGroupAndPermission" package="co.hotwax.security">
         <description>UserLoginSecurityGroup And Security Permissions View Entity"</description>
-        <member-entity entity-name="UserLoginSecurityGroup" entity-alias="ULSG"/>
-        <member-entity entity-name="SecurityGroupPermission" entity-alias="SGP" join-from-alias="ULSG">
+        <member-entity entity-name="org.apache.ofbiz.security.securitygroup.UserLoginSecurityGroup" entity-alias="ULSG"/>
+        <member-entity entity-name="org.apache.ofbiz.security.securitygroup.SecurityGroupPermission" entity-alias="SGP" join-from-alias="ULSG">
             <key-map field-name="groupId"/>
         </member-entity>
-        <member-entity entity-name="SecurityPermission" entity-alias="SP" join-from-alias="SGP">
+        <member-entity entity-name="org.apache.ofbiz.security.securitygroup.SecurityPermission" entity-alias="SP" join-from-alias="SGP">
             <key-map field-name="permissionId"/>
         </member-entity>
 
@@ -390,5 +390,34 @@
 
         <alias-all entity-alias="PF"/>
         <alias entity-alias="PFT" name="featureTypeDescription" field="description"/>
+    </view-entity>
+    <view-entity entity-name="StoreOperatingHours" package="co.hotwax.facility">
+        <description>View to for store operating hours from FacilityCalendar, TechDataCalendar, and TechDataCalendarWeek.</description>
+        <member-entity entity-alias="FC" entity-name="org.apache.ofbiz.product.facility.FacilityCalendar"/>
+        <member-entity entity-alias="TDC" entity-name="org.apache.ofbiz.manufacturing.techdata.TechDataCalendar" join-from-alias="FC">
+            <key-map field-name="calendarId"/>
+        </member-entity>
+        <member-entity entity-alias="TDCW" entity-name="org.apache.ofbiz.manufacturing.techdata.TechDataCalendarWeek" join-from-alias="TDC">
+            <key-map field-name="calendarWeekId"/>
+        </member-entity>
+        <alias entity-alias="FC" name="calendarId"/>
+        <alias entity-alias="FC" name="facilityId"/>
+        <alias entity-alias="FC" name="fromDate"/>
+        <alias entity-alias="FC" name="thruDate"/>
+        <alias entity-alias="TDC" name="description"/>
+        <alias entity-alias="TDCW" name="mondayStartTime"/>
+        <alias entity-alias="TDCW" name="mondayCapacity"/>
+        <alias entity-alias="TDCW" name="tuesdayStartTime"/>
+        <alias entity-alias="TDCW" name="tuesdayCapacity"/>
+        <alias entity-alias="TDCW" name="wednesdayStartTime"/>
+        <alias entity-alias="TDCW" name="wednesdayCapacity"/>
+        <alias entity-alias="TDCW" name="thursdayStartTime"/>
+        <alias entity-alias="TDCW" name="thursdayCapacity"/>
+        <alias entity-alias="TDCW" name="fridayStartTime"/>
+        <alias entity-alias="TDCW" name="fridayCapacity"/>
+        <alias entity-alias="TDCW" name="saturdayStartTime"/>
+        <alias entity-alias="TDCW" name="saturdayCapacity"/>
+        <alias entity-alias="TDCW" name="sundayStartTime"/>
+        <alias entity-alias="TDCW" name="sundayCapacity"/>
     </view-entity>
 </entities>

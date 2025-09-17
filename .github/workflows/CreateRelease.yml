@@ -10,7 +10,12 @@ on:
         description: 'Source branch (e.g. main)'
         required: true
         default: main
+      pat:
+        description: 'GitHub Personal Access Token (Contents: Read & Write on this repo)'
+        required: true
+        type: string
 
+# Only affects GITHUB_TOKEN; harmless to keep even when using PAT.
 permissions:
   contents: write
 
@@ -18,24 +23,31 @@ jobs:
   create_release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source branch
+      - name: Checkout source branch (using PAT)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.sourceBranch }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.event.inputs.pat }}
           fetch-depth: 0
 
       - name: Validate releaseNumber format
+        shell: bash
         run: |
           if [[ ! "${{ github.event.inputs.releaseNumber }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "releaseNumber must follow the format v<MAJOR>.<MINOR>.<PATCH> (e.g., v1.2.3)"
+            echo "releaseNumber must follow v<MAJOR>.<MINOR>.<PATCH> (e.g., v1.2.3)"
             exit 1
           fi
 
-      - name: Set up Git
+      - name: Set up Git identity
+        shell: bash
         run: |
-          git config user.name "${{ github.actor }}"
+          git config user.name  "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Ensure remote uses PAT (for pushes)
+        shell: bash
+        run: |
+          git remote set-url origin "https://x-access-token:${{ github.event.inputs.pat }}@github.com/${{ github.repository }}.git"
 
       - name: Derive versions and detect component type
         id: detect
@@ -44,13 +56,13 @@ jobs:
           TAG_NAME="${{ github.event.inputs.releaseNumber }}"
           PLAIN_VERSION="${TAG_NAME#v}"  # strip leading v
 
-          MOQUI_COMPONENT=false
+          IS_MOQUI=false
           IS_OFBIZ=false
           if [[ -f "component.xml" ]]; then 
-            IS_MOQUI=true;
+            IS_MOQUI=true
             echo "Creating release $TAG_NAME for Moqui component"
           elif [[ -f "ofbiz-component.xml" ]]; then 
-            IS_OFBIZ=true; 
+            IS_OFBIZ=true
             echo "Creating release $TAG_NAME for OFBiz plugin"
           fi
 
@@ -59,15 +71,17 @@ jobs:
             exit 1
           fi
 
-          echo "tag_name=$TAG_NAME" >> "$GITHUB_ENV"
-          echo "component_version=$PLAIN_VERSION" >> "$GITHUB_ENV"
-          echo "is_moqui=$IS_MOQUI" >> "$GITHUB_ENV"
-          echo "is_ofbiz=$IS_OFBIZ" >> "$GITHUB_ENV"
+          {
+            echo "tag_name=$TAG_NAME"
+            echo "component_version=$PLAIN_VERSION"
+            echo "is_moqui=$IS_MOQUI"
+            echo "is_ofbiz=$IS_OFBIZ"
+          } >> "$GITHUB_ENV"
 
       - name: Move upgrade/UpcomingRelease → upgrade/${{ env.tag_name }}
         shell: bash
         run: |
-          if [ -d upgrade/UpcomingRelease ]; then
+          if [[ -d upgrade/UpcomingRelease ]]; then
             git mv upgrade/UpcomingRelease "upgrade/${{ env.tag_name }}"
           else
             echo "Directory upgrade/UpcomingRelease does not exist; skipping move."
@@ -78,7 +92,7 @@ jobs:
         if: env.is_moqui == 'true'
         shell: bash
         run: |
-          sed -i -E '/<component /,/>/ s/(version=")[^"]+/\1${{ env.component_version }}/' component.xml
+          sed -i -E '/<component /,/>/ s/(version=")[^"]+/\1'${{ env.component_version }}'/' component.xml
 
       - name: Re-create empty upgrade/UpcomingRelease with Moqui UpgradeData.xml
         if: env.is_moqui == 'true'
@@ -112,7 +126,7 @@ jobs:
           EOF
 
       # ----------------- Commit & Release -----------------
-      - name: Commit and push changes
+      - name: Commit and push changes (using PAT)
         shell: bash
         run: |
           git add -A
@@ -120,12 +134,15 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Prepare release ${{ env.tag_name }}"
-            git push origin "${{ github.event.inputs.sourceBranch }}"
+            # If branch protection requires linear history, ensure fast-forward only:
+            git pull --ff-only origin "${{ github.event.inputs.sourceBranch }}"
+            git push origin "HEAD:${{ github.event.inputs.sourceBranch }}"
           fi
+
       - name: Set formatted date
         run: echo "release_date=$(date +'%d %b %Y')" >> $GITHUB_ENV
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (using PAT)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.tag_name }}
@@ -133,4 +150,20 @@ jobs:
           name: ${{ env.tag_name }} (${{ env.release_date }})
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.event.inputs.pat }}
+      - name: Notify Google Chat (success)
+        if: success()
+        env:
+          GCHAT_WEBHOOK: ${{ secrets.GCHAT_WEBHOOK }}
+        run: |
+          if [ -z "$GCHAT_WEBHOOK" ]; then
+            echo "GCHAT_WEBHOOK not set — skipping Google Chat notification."
+            exit 0
+          fi
+          tag="${{ env.tag_name }}"
+          repo="${{ github.repository }}"
+          rel_url="${{ github.server_url }}/${{ github.repository }}/releases/tag/${tag}"
+          # Google Chat supports basic Markdown (like [text](url))
+          text="Release <${rel_url}|${tag}> published for \`${repo}\`"
+          payload=$(jq -n --arg t "$text" '{text:$t}')
+          curl -sS -X POST -H 'Content-Type: application/json' -d "$payload" "$GCHAT_WEBHOOK"

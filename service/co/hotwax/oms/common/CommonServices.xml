@@ -18,64 +18,6 @@ under the License.
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
-    <!--@Deprecated use OmsUtil.hasParentType method -->
-    <service verb="check" noun="ParentType">
-        <description>
-            This service checks whether a given Entity belongs to a specific type hierarchy.
-            It determines if the Entity type or any of its parent types match the specified parentTypeId.
-            The search recurses up the hierarchy, checking up to four levels deep.
-        </description>
-        <in-parameters>
-            <parameter name="entityName" required="true"/>
-            <parameter name="primaryKey" required="true"/>
-            <parameter name="childType" required="true"/>
-            <parameter name="parentTypeField" required="true"/>
-            <parameter name="parentType" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="hasParentType" type="Boolean">
-                <description>
-                    true if the Entity childType or one of its parent types matches parentTypeId; otherwise, false.
-                </description>
-            </parameter>
-        </out-parameters>
-        <actions>
-            <set field="hasParentType" value="false" type="Boolean"/>
-            <entity-find-one entity-name="${entityName}" value-field="entityValue" cache="true">
-                <field-map field-name="${primaryKey}" from="childType"/>
-            </entity-find-one>
-            <if condition="!entityValue">
-                <return/>
-            </if>
-            <set field="parentTypeId" value="${entityValue.get(parentTypeField)}" />
-            <if condition="entityValue &amp;&amp; (parentType == entityValue.get(primaryKey)  || parentType == parentTypeId)">
-                <set field="hasParentType" value="true" type="Boolean"/>
-                <return/>
-            </if>
-            <set field="childType" value="${entityValue.get(parentTypeField)}"/>
-
-            <set field="depth" value="4" type="Integer"/>
-            <script>
-                while(depth > 0) {
-            </script>
-            <entity-find-one entity-name="${entityName}" value-field="entityTypeValue" cache="true">
-                <field-map field-name="${primaryKey}" from="childType"/>
-            </entity-find-one>
-            <if condition="entityTypeValue &amp;&amp; !entityTypeValue.get(parentTypeField)">
-                <return/>
-            </if>
-            <if condition="parentType.equals(entityTypeValue?.get(parentTypeField))">
-                <set field="hasParentType" value="true" type="Boolean"/>
-                <return/>
-            </if>
-            <set field="childType" from="entityTypeValue?.get(parentTypeField)"/>
-            <script>
-                depth--;
-                }
-            </script>
-        </actions>
-    </service>
-
     <service verb="get" noun="EntityData">
         <description>
             This service used when we have to fetch filtered data by date from entity.
