@@ -457,8 +457,8 @@
             <parameter name="carrierPartyId"/>
             <parameter name="orderStatusId"/>
             <parameter name="fieldsToSelect" default-value="orderId"/>
-            <parameter name="limit" default-value="20" type="Integer"/>
-            <parameter name="index" default-value="0" type="Integer"/>
+            <parameter name="pageSize" default-value="20" type="Integer"/>
+            <parameter name="pageIndex" default-value="0" type="Integer"/>
             <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
@@ -466,7 +466,7 @@
             <parameter name="orders" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index * limit" list="orders" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="pageSize" offset="pageIndex * pageSize" list="orders" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
@@ -494,15 +494,15 @@
             <parameter name="shipmentMethodTypeId"/>
             <parameter name="carrierPartyId"/>
             <parameter name="orderStatusId"/>
-            <parameter name="limit" default-value="20" type="Integer"/>
-            <parameter name="index" default-value="0" type="Integer"/>
+            <parameter name="pageSize" default-value="20" type="Integer"/>
+            <parameter name="pageIndex" default-value="0" type="Integer"/>
             <parameter name="orderByField" default-value="-orderDate"/>
         </in-parameters>
         <out-parameters>
             <parameter name="transferOrderItems" type="List"/>
         </out-parameters>
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="limit" offset="index * limit" list="orderItems" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="pageSize" offset="pageIndex * pageSize" list="orderItems" distinct="true">
                 <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
