@@ -1063,7 +1063,6 @@ under the License.
                     ]
 
                     // prepare JSON-serialized fields for storage (so DB has JSON text)
-                    productCoreDetailsHash = productCoreDetailsHash
                     tagsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
                     featuresJson = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
                     identificationsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
@@ -1263,7 +1262,7 @@ under the License.
                     def parts = [
                         (variantJson.position ?: '').toString(),
                         variantJson.title ?: '',
-                        (variantJson.featureMedia?.preview?.image?.url ?: ''),
+                        (variantJson?.image?.url ?: ''),
                         (variantJson.requiresComponents ?: '').toString(),
                         (variantJson.product?.isGiftCard ?: '').toString(),
                         (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
@@ -1303,7 +1302,7 @@ under the License.
                         requiresShipping  :  (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
                         requiresComponents: (variantJson.requiresComponents ?: '').toString(),
                         isGiftCard        : (variantJson.product?.isGiftCard ?: '').toString(),
-                        featureImageUrl   : (variantJson.featureMedia?.preview?.image?.url ?: ''),
+                        featureImageUrl   : (variantJson.image?.url ?: ''),
                         weightUnit        : (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
                         weightValue       : (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString(),
                         inventoryItemId   : (variantJson.inventoryItem?.id ?: '').toString(),
@@ -1370,7 +1369,7 @@ under the License.
                 def parts = [
                     (variantJson.position ?: '').toString(),
                     variantJson.title ?: '',
-                    (variantJson.featureMedia?.preview?.image?.url ?: ''),
+                    (variantJson.image?.url ?: ''),
                     (variantJson.requiresComponents ?: '').toString(),
                     (variantJson.product?.isGiftCard ?: '').toString(),
                     (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
@@ -1386,7 +1385,7 @@ under the License.
                     diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
-                    diffMap.featureImageUrl = (variantJson.featureMedia?.preview?.image?.url ?: '')
+                    diffMap.featureImageUrl = (variantJson.image?.url ?: '')
                     diffMap.weightUnit = (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString()
                     diffMap.weightValue = (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
                 }

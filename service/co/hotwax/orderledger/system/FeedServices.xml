@@ -125,19 +125,18 @@ under the License.
             <set field="metafields" from="[]"/>
             <set field="virtualProductId" value=""/>
             <script><![CDATA[
-                import org.moqui.impl.context.ContextJavaUtil
                 import java.nio.charset.StandardCharsets
-                import groovy.json.JsonOutput
-                import java.security.MessageDigest
+                import org.apache.commons.codec.digest.DigestUtils
                 import org.moqui.impl.context.ContextJavaUtil
 
-                def sha256 = { obj ->
-                    def canonical = (obj instanceof String) ? obj :
-                                    (obj instanceof Collection || obj instanceof Map) ? JsonOutput.toJson(obj) :
-                                    obj.toString()
-                    MessageDigest md = MessageDigest.getInstance("SHA-256")
-                    byte[] hash = md.digest(canonical.getBytes("UTF-8"))
-                    hash.encodeHex().toString()
+                def hash = { listOrMap ->
+                if (listOrMap instanceof Map) {
+                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                } else if (listOrMap instanceof List) {
+                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                } else {
+                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                }
                 }
                 try(InputStream inputStream = ec.resource.getLocationStream(inputPath);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
@@ -183,7 +182,7 @@ under the License.
                                 // Assocs handling
                                 if (variantIds) {
                                     sortedAssocs = variantIds.sort()
-                                    assocsHash = sha256(sortedAssocs)
+                                    assocsHash = hash(sortedAssocs)
 
                                     productUpdateHistory = ec.entity.find("co.hotwax.product.ProductUpdateHistory")
                                         .condition("productId", virtualProductId)
@@ -205,21 +204,22 @@ under the License.
                                         shopId: shopId,
                                         differenceMap: existingDiffMap
                                     ]
-
+            ec.logger.info("\n\nNani aur poti ne thana hain bhoot kaal me jana ${forCreate}: ${existingAssocsSorted}, ${sortedAssocs}\n\n");
                                     if (forCreate) {
                                         existingDiffMap.assocs = [added: sortedAssocs, removed: []]
-                                        updateParams.assocs = sortedAssocs
+                                        updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
                                         updateParams.assocsHash = assocsHash
                                     } else {
-                                        existingAssocs = (productUpdateHistory?.assocs ?: "[]") as List
+                                        existingAssocs = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.assocs ?: "[]", List.class)
                                         existingAssocsSorted = existingAssocs.collect { it.toString() }.sort()
                                         existingAssocsHash = productUpdateHistory?.assocsHash
 
+
                                         if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                            added = sortedAssocs - existingAssocsSorted
-                                            removed = existingAssocsSorted - sortedAssocs
+                                            added = (sortedAssocs - existingAssocsSorted).collect { it.toString() }
+                                            removed = (existingAssocsSorted - sortedAssocs).collect { it.toString() }
                                             existingDiffMap.assocs = [added: added, removed: removed]
-                                            updateParams.assocs = sortedAssocs
+                                            updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
                                             updateParams.assocsHash = assocsHash
                                         } else {
                                             existingDiffMap.assocs = [added: [], removed: []]
@@ -274,7 +274,7 @@ under the License.
 
                         if (variantIds) {
                             sortedAssocs = variantIds.sort()
-                            assocsHash = sha256(sortedAssocs)
+                            assocsHash = hash(sortedAssocs)
 
                             productUpdateHistory = ec.entity.find("co.hotwax.product.ProductUpdateHistory")
                                 .condition("productId", virtualProductId)
@@ -299,10 +299,10 @@ under the License.
 
                             if (forCreate) {
                                 existingDiffMap.assocs = [added: sortedAssocs, removed: []]
-                                updateParams.assocs = sortedAssocs
+                                updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
                                 updateParams.assocsHash = assocsHash
                             } else {
-                                existingAssocs = (productUpdateHistory?.assocs ?: "[]") as List
+                                existingAssocs = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.assocs ?: "[]", List.class)
                                 existingAssocsSorted = existingAssocs.collect { it.toString() }.sort()
                                 existingAssocsHash = productUpdateHistory?.assocsHash
 
@@ -404,9 +404,7 @@ under the License.
                     </if>
 
                     <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                    <if condition="!diff.isGiftCard">
-                        <set field="product.productTypeId" value="DIGITAL_GOOD"/>
-                    </if>
+                    <!-- Read from first variant for requireShipping if false then set to DIGITAL_GOOD -->
                     <if condition="diff.hasVariantsThatRequiresComponents">
                         <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
                     </if>
@@ -435,9 +433,15 @@ under the License.
                     <set field="productId" from="productId ?: prodOut.productId"/>
 
                     <if condition="diff.tags?.added">
+                        <entity-find entity-name="org.apache.ofbiz.product.product.ProductKeyword" list="productKeywords">
+                            <econdition field-name="productId" from="productId"/>
+                            <econdition field-name="keywordTypeId" value="KWT_TAG"/>
+                        </entity-find>
                         <iterate list="diff.tags.added" entry="kw">
-                            <service-call name="store#org.apache.ofbiz.product.product.ProductKeyword"
-                                          in-map="[productId:productId, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
+                            <if condition="!productKeywords?.find{ it.keyword == kw }">
+                                <service-call name="store#org.apache.ofbiz.product.product.ProductKeyword"
+                                              in-map="[productId:productId, keywordTypeId:'KWT_TAG', statusId:'KW_APPROVED', keyword:kw]"/>
+                            </if>
                         </iterate>
                     </if>
                     <if condition="diff.tags?.removed">
@@ -496,7 +500,7 @@ under the License.
                             <service-call name="store#org.apache.ofbiz.product.feature.ProductFeatureAppl"
                                           in-map="[productId:productId,
                                productFeatureId:productFeatureId,
-                               productFeatureApplTypeId:'SELECTABLE_FEATURE',
+                               productFeatureApplTypeId:'STANDARD_FEATURE',
                                sequenceNum:sequenceNum]"/>
                         </iterate>
                     </if>
@@ -534,7 +538,7 @@ under the License.
                                 <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" value-field="productFeatureAppl">
                                     <field-map field-name="productId"/>
                                     <field-map field-name="productFeatureId"/>
-                                    <field-map field-name="productFeatureApplTypeId" value="SELECTABLE_FEATURE"/>
+                                    <field-map field-name="productFeatureApplTypeId" value="STANDARD_FEATURE"/>
                                 </entity-find-one>
                                 <if condition="productFeatureAppl">
                                     <!-- Delete ProductFeatureAppl -->
@@ -545,15 +549,23 @@ under the License.
                     </if>
 
                     <if condition="diff.assocs?.added">
+                        <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                            <econdition field-name="productId" from="productId"/>
+                            <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                            <date-filter/>
+                        </entity-find>
                         <iterate list="diff.assocs?.added" entry="vid">
-                            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
-                                <field-map field-name="shopId" from="shopId"/>
-                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
-                            </entity-find-one>
-                            <if condition="shopifyShopProduct">
-                                <service-call name="store#org.apache.ofbiz.product.product.ProductAssoc"
-                                              in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                            <if condition="productAssocs?.find{ it.productIdTo == co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid) }">
+                                <continue/>
                             </if>
+                                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                                    <field-map field-name="shopId" from="shopId"/>
+                                    <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
+                                </entity-find-one>
+                                <if condition="shopifyShopProduct">
+                                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                                                  in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                                </if>
                         </iterate>
                     </if>
                     <if condition="diff.assocs?.removed">
@@ -578,11 +590,9 @@ under the License.
                         <field-map field-name="shopId" from="shopId"/>
                     </entity-find-one>
                     <if condition="!shopifyShopProduct">
-                        <service-call name="store#co.hotwax.shopify.ShopifyShopProduct"
+                        <service-call name="create#co.hotwax.shopify.ShopifyShopProduct"
                                       in-map="[productId:productId, shopId:shopId, shopifyProductId:productUpdateHistory.productId]"/>
                     </if>
-                    <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                                  in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
                     <else>
                         <set field="product" from="[:]"/>
 
@@ -597,13 +607,13 @@ under the License.
                         </if>
 
                         <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                        <if condition="!diff.requiresShipping">
+                        <if condition="diff.requiresShipping == false">
                             <set field="product.productTypeId" value="DIGITAL_GOOD"/>
                         </if>
-                        <if condition="diff.requiresComponents">
+                        <if condition="diff.requiresComponents == true">
                             <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
                         </if>
-                        <if condition="diff.isGiftCard">
+                        <if condition="diff.isGiftCard == true">
                             <set field="product.productTypeId" value="FINISHED_GOOD"/>
                         </if>
                         <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
@@ -616,10 +626,10 @@ under the License.
                             <set field="product.primaryProductCategoryId" from="catResp.categoryId"/>
                         </if>
 
-                        <if condition="diff.identifications">
-                            <set field="product.productVariantSku" from="diff.identifications.sku"/>
-                            <set field="product.barcode" from="diff.identifications.barcode"/>
-                        </if>
+<!--                        <if condition="diff.identifications">-->
+<!--                            <set field="product.productVariantSku" from="diff.identifications.sku"/>-->
+<!--                            <set field="product.barcode" from="diff.identifications.barcode"/>-->
+<!--                        </if>-->
                         <if condition="diff.weightUnit">
                             <service-call name="co.hotwax.sob.shopify.ShopifyHelperServices.get#ShopifyShopTypeMapping" in-map="[shopId:shopId, mappedTypeId:'SHOPIFY_WEIGHT_UNIT', mappedKey:diff.weightUnit]" out-map="weightUnitMapping"/>
                             <if condition="weightUnitMapping">
@@ -641,6 +651,7 @@ under the License.
                                 <econdition field-name="productStoreGroupId" from="productStore.primaryStoreGroupId"/>
                                 <date-filter/>
                             </entity-find>
+                            <log message="\n\n -+_+_+_ ${productPriceList} +_+_ ${diff.price} +_+_+_+_+ \n\n"/>
 
                             <!-- If productPriceList and price is updated then set the values from the list if not then set the values from the incoming productPrices -->
                             <if condition="productPriceList"><then>
@@ -654,7 +665,7 @@ under the License.
                             </else>
                             </if>
                         </if>
-
+                        <log message="\n\n- = = == -${product.prices} -= -= -  \n \n\n"/>
                         <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
                             <set field="productIdentifier" from="diff.identifications?.sku"/>
                             <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
@@ -690,7 +701,7 @@ under the License.
                                     <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
                                 </entity-find>
                                 <if condition="!paCheck">
-                                    <service-call name="store#org.apache.ofbiz.product.product.ProductAssoc"
+                                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
                                                   in-map="[productIdTo:productId, productId:virtualProduct.productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate: ec.user.nowTimestamp]"/>
                                 </if>
                             </if>
@@ -758,7 +769,7 @@ under the License.
                                 <service-call name="store#org.apache.ofbiz.product.feature.ProductFeatureAppl"
                                               in-map="[productId:productId,
                                productFeatureId:productFeatureId,
-                               productFeatureApplTypeId:'SELECTABLE_FEATURE',
+                               productFeatureApplTypeId:'STANDARD_FEATURE',
                                sequenceNum:sequenceNum]"/>
                             </iterate>
                         </if>
@@ -796,12 +807,12 @@ under the License.
                                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" list="productFeatureAppls">
                                         <econdition field-name="productId" from="productId"/>
                                         <econdition field-name="productFeatureId" from="productFeatureId"/>
-                                        <econdition field-name="productFeatureApplTypeId" value="SELECTABLE_FEATURE"/>
+                                        <econdition field-name="productFeatureApplTypeId" value="STANDARD_FEATURE"/>
                                     </entity-find>
                                     <entity-find-one entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" value-field="productFeatureAppl">
                                         <field-map field-name="productId"/>
                                         <field-map field-name="productFeatureId"/>
-                                        <field-map field-name="productFeatureApplTypeId" value="SELECTABLE_FEATURE"/>
+                                        <field-map field-name="productFeatureApplTypeId" value="STANDARD_FEATURE"/>
                                     </entity-find-one>
                                     <if condition="productFeatureAppl">
                                         <!-- Delete ProductFeatureAppl -->
@@ -812,13 +823,39 @@ under the License.
                         </if>
 
                         <if condition="diff.identifications">
+                            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentifications">
+                                <econdition field-name="productId"/>
+                                <date-filter/>
+                            </entity-find>
                             <if condition="diff.identifications.sku">
-                                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                                              in-map="[productId:productId, goodIdentificationTypeId:'SKU', idValue:diff.identifications.sku]"/>
+                                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'SKU' }"/>
+                                <if condition="goodIdentification">
+                                    <if condition="goodIdentification.idValue &amp;&amp; !goodIdentification.idValue.equals(diff.identifications.sku)">
+                                        <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: goodIdentification.idValue, fromDate: goodIdentification.fromDate, thruDate: ec.user.nowTimestamp]"/>
+                                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: diff.identifications.sku, fromDate: ec.user.nowTimestamp]"/>
+                                    </if>
+                                    <else>
+                                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: diff.identifications.sku, fromDate: ec.user.nowTimestamp]"/>
+                                    </else>
+                                </if>
                             </if>
                             <if condition="diff.identifications.barcode">
-                                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                                              in-map="[productId:productId, goodIdentificationTypeId:'UPCA', idValue:diff.identifications.barcode]"/>
+                                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'UPCA' }"/>
+                                <if condition="goodIdentification">
+                                    <if condition="goodIdentification.idValue &amp;&amp; !goodIdentification.idValue.equals(diff.identifications.barcode)">
+                                        <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: goodIdentification.idValue, fromDate: goodIdentification.fromDate, thruDate: ec.user.nowTimestamp]"/>
+                                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: diff.identifications.barcode, fromDate: ec.user.nowTimestamp]"/>
+                                    </if>
+                                    <else>
+                                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: diff.identifications.barcode, fromDate: ec.user.nowTimestamp]"/>
+                                    </else>
+                                </if>
                             </if>
                         </if>
                         <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
@@ -829,9 +866,10 @@ under the License.
                             <service-call name="create#co.hotwax.shopify.ShopifyShopProduct"
                                           in-map="[productId:productId, shopId:shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(diff.inventoryItemId)]"/>
                         </if>
-                        <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                                      in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
                     </else>
+                    <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
+                                  in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
+                    <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
                 </if>
         </actions>
     </service>
