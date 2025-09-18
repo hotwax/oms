@@ -930,7 +930,6 @@ under the License.
             <parameter name="shopId" required="true"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="diffMap" required="true" type="Map"/>
             <parameter name="forCreate" type="Boolean"/>
             <parameter name="virtualProductId"/>
         </out-parameters>
@@ -940,13 +939,13 @@ under the License.
                 import org.moqui.impl.context.ContextJavaUtil
 
                 def hash = { listOrMap ->
-                if (listOrMap instanceof Map) {
-                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
-                } else if (listOrMap instanceof List) {
-                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
-                } else {
-                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
-                }
+                    if (listOrMap instanceof Map) {
+                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                    } else if (listOrMap instanceof List) {
+                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                    } else {
+                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                    }
                 }
             </script>
 
@@ -1014,10 +1013,11 @@ under the License.
                     // core product hash
                     def parts = [
                         productJson.handle ?: '',
+                        productJson.vendor ?: '',
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
-                        (productJson.featureMedia?.preview?.image?.url ?: '')
+                        (productJson.featuredMedia?.preview?.image?.url ?: '')
                     ]
                     def productCoreDetailsHash = hash(parts.join('||'))
 
@@ -1035,14 +1035,19 @@ under the License.
 
                     // features as List of position/name/value
                     def features = []
+                    def sequence = 1
                     (productJson.options ?: []).each { opt ->
                         def position = opt.position
                         def name = opt.name
                         (opt.optionValues ?: []).each { val ->
-                            features << "${position}/${name}/${val.name}"
+                            features << "${sequence++}/${position}/${name}/${val.name}"
                         }
                     }
-                    features = features.collect { it.toString() }.sort()
+                    features = features.collect { it.toString() }.sort { a, b ->
+                        def sequenceNumberA = a.split('/')[0].toInteger()
+                        def sequenceNumberB = b.split('/')[0].toInteger()
+                        return sequenceNumberA <=> sequenceNumberB
+                    }
                     def featuresHash = hash(features)
 
                     // identifications map
@@ -1053,8 +1058,9 @@ under the License.
                     def diffMap = [
                         id: productJson.id,
                         handle: productJson.handle,
+                        vendor: productJson.vendor,
                         title: productJson.title,
-                        featureImageUrl: productJson.featureMedia?.preview?.image?.url,
+                        featureImageUrl: productJson.featuredMedia?.preview?.image?.url,
                         isGiftCard: productJson.isGiftCard,
                         hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
                         tags: [added: tags, removed: []],
@@ -1085,31 +1091,31 @@ under the License.
                 <set field="createProductUpdateHistoryMap.differenceMap" from="diffMapJson"/>
 
                 <service-call name="create#co.hotwax.product.ProductUpdateHistory" in-map="createProductUpdateHistoryMap" transaction="force-new"/>
-
-                <set field="diffMap" from="diffMap"/>
                 <return/>
             </if>
 
             <!-- Update case -->
-            <set field="diffMap" from="[:]"/>
             <set field="differenceMap" from="[:]"/>
             <script><![CDATA[
             // --- Core Product Hash ---
             def parts = [
                 productJson.handle ?: '',
+                productJson.vendor ?: '',
                 (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                 (productJson.isGiftCard ?: '').toString(),
                 productJson.title ?: '',
-                (productJson.featureMedia?.preview?.image?.url ?: '')
+                (productJson.featuredMedia?.preview?.image?.url ?: '')
             ]
+            ec.logger.info("\n\n --${productId} --${productJson}+++\n\n-- ${productJson.featuredMedia?.preview?.image?.url}----------------------- \n\n");
             def newCoreHash = hash(parts.join('||'))
             if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
                 differenceMap.productCoreDetailsHash = newCoreHash
                 differenceMap.title = productJson.title
+                differenceMap.vendor = productJson.vendor
                 differenceMap.handle = productJson.handle
                 differenceMap.isGiftCard = productJson.isGiftCard
                 differenceMap.hasVariantsThatRequireComponents = productJson.hasVariantsThatRequiresComponents
-                differenceMap.featureImageUrl = productJson.featureMedia?.preview?.image?.url
+                differenceMap.featureImageUrl = productJson.featuredMedia?.preview?.image?.url
             }
 
             // --- Tags ---
@@ -1131,14 +1137,19 @@ under the License.
 
             // --- Features ---
             def newFeatures = []
+            def sequence = 1
             (productJson.options ?: []).each { opt ->
                 def pos = opt.position
                 def name = opt.name
                 (opt.optionValues ?: []).each { val ->
-                    newFeatures << "${pos}/${name}/${val.name}"
+                    newFeatures << "${sequence++}/${pos}/${name}/${val.name}"
                 }
             }
-            newFeatures = newFeatures.collect { it.toString() }.sort()
+            newFeatures = newFeatures.collect { it.toString() }.sort { a, b ->
+                def sequenceNumberA = a.split('/')[0].toInteger()
+                def sequenceNumberB = b.split('/')[0].toInteger()
+                return sequenceNumberA <=> sequenceNumberB
+            }
             def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
             def addedFeatures = (newFeatures - oldFeatures).collect { it.toString() }
             def removedFeatures = (oldFeatures - newFeatures).collect { it.toString() }
@@ -1183,8 +1194,7 @@ under the License.
             <parameter name="shopId" required="true"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="diffMap" required="true" type="Map"/>
-            <parameter name="variantProductId" type="String"/>
+            <parameter name="variantProductId"/>
         </out-parameters>
         <actions>
             <script>
@@ -1192,13 +1202,13 @@ under the License.
                 import org.moqui.impl.context.ContextJavaUtil
 
                 def hash = { listOrMap ->
-                if (listOrMap instanceof Map) {
-                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
-                } else if (listOrMap instanceof List) {
-                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
-                } else {
-                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
-                }
+                    if (listOrMap instanceof Map) {
+                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                    } else if (listOrMap instanceof List) {
+                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                    } else {
+                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                    }
                 }
             </script>
 

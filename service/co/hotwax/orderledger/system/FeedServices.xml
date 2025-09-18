@@ -118,8 +118,6 @@ under the License.
             <parameter name="shopId" required="true"/>
         </in-parameters>
         <actions>
-            <set field="parentMap" from="[:]"/>
-            <set field="virtualProductId" type="String" from="null"/>
             <set field="virtualProduct" from="[:]"/>
             <set field="variants" from="[]"/>
             <set field="metafields" from="[]"/>
@@ -130,13 +128,13 @@ under the License.
                 import org.moqui.impl.context.ContextJavaUtil
 
                 def hash = { listOrMap ->
-                if (listOrMap instanceof Map) {
-                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
-                } else if (listOrMap instanceof List) {
-                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
-                } else {
-                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
-                }
+                    if (listOrMap instanceof Map) {
+                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                    } else if (listOrMap instanceof List) {
+                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                    } else {
+                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                    }
                 }
                 try(InputStream inputStream = ec.resource.getLocationStream(inputPath);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
@@ -204,7 +202,6 @@ under the License.
                                         shopId: shopId,
                                         differenceMap: existingDiffMap
                                     ]
-            ec.logger.info("\n\nNani aur poti ne thana hain bhoot kaal me jana ${forCreate}: ${existingAssocsSorted}, ${sortedAssocs}\n\n");
                                     if (forCreate) {
                                         existingDiffMap.assocs = [added: sortedAssocs, removed: []]
                                         updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
@@ -249,7 +246,7 @@ under the License.
                     // Final group
                     if (virtualProduct) {
                         def variantIds = []
-                        def virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
+                        virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                             .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
                             .call()
 
@@ -310,7 +307,7 @@ under the License.
                                     added = sortedAssocs - existingAssocsSorted
                                     removed = existingAssocsSorted - sortedAssocs
                                     existingDiffMap.assocs = [added: added, removed: removed]
-                                    updateParams.assocs = sortedAssocs
+                                    updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
                                     updateParams.assocsHash = assocsHash
                                 } else {
                                     existingDiffMap.assocs = [added: [], removed: []]
@@ -393,6 +390,9 @@ under the License.
                     <if condition="diff.title">
                         <set field="product.productName" from="diff.title"/>
                     </if>
+                    <if condition="diff.vendor">
+                        <set field="product.brandName" from="diff.vendor"/>
+                    </if>
                     <if condition="diff.featureImageUrl">
                         <set field="product.detailImageUrl" from="diff.featureImageUrl"/>
                     </if>
@@ -455,14 +455,9 @@ under the License.
                         <iterate list="diff.features.added" entry="featureString">
                             <script>
                                 def featureParts = featureString.split("/")
-                                if (featureParts.size() == 2) {
-                                    productFeatureTypeDesc = featureParts[0].trim()
-                                    featureDesc = featureParts[1].trim()
-                                } else {
-                                    sequenceNum = featureParts[0] as Integer
-                                    productFeatureTypeDesc = featureParts[1].trim()
-                                    featureDesc = featureParts[2].trim()
-                                }
+                                sequenceNum = featureParts[1] as Integer
+                                productFeatureTypeDesc = featureParts[2].trim()
+                                featureDesc = featureParts[3].trim()
                             </script>
 
                             <!-- Fetch productFeatureTypeId -->
@@ -508,14 +503,9 @@ under the License.
                         <iterate list="diff.features.removed" entry="featureString">
                             <script>
                                 def featureParts = featureString.split("/")
-                                if (featureParts.size() == 2) {
-                                    productFeatureTypeDesc = featureParts[0].trim()
-                                    featureDesc = featureParts[1].trim()
-                                } else {
-                                    sequenceNum = featureParts[0] as Integer
-                                    productFeatureTypeDesc = featureParts[1].trim()
-                                    featureDesc = featureParts[2].trim()
-                                }
+                                sequenceNum = featureParts[1] as Integer
+                                productFeatureTypeDesc = featureParts[2].trim()
+                                featureDesc = featureParts[3].trim()
                             </script>
 
                             <!-- Fetch productFeatureTypeId -->
@@ -555,15 +545,15 @@ under the License.
                             <date-filter/>
                         </entity-find>
                         <iterate list="diff.assocs?.added" entry="vid">
-                            <if condition="productAssocs?.find{ it.productIdTo == co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid) }">
-                                <continue/>
-                            </if>
-                                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
-                                    <field-map field-name="shopId" from="shopId"/>
-                                    <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
-                                </entity-find-one>
-                                <if condition="shopifyShopProduct">
-                                    <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                                <field-map field-name="shopId" from="shopId"/>
+                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
+                            </entity-find-one>
+                            <if condition="shopifyShopProduct">
+                                <if condition="productAssocs?.find{ it.productIdTo == shopifyShopProduct.productId }">
+                                    <continue/>
+                                </if>
+                                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
                                                   in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
                                 </if>
                         </iterate>
@@ -626,10 +616,6 @@ under the License.
                             <set field="product.primaryProductCategoryId" from="catResp.categoryId"/>
                         </if>
 
-<!--                        <if condition="diff.identifications">-->
-<!--                            <set field="product.productVariantSku" from="diff.identifications.sku"/>-->
-<!--                            <set field="product.barcode" from="diff.identifications.barcode"/>-->
-<!--                        </if>-->
                         <if condition="diff.weightUnit">
                             <service-call name="co.hotwax.sob.shopify.ShopifyHelperServices.get#ShopifyShopTypeMapping" in-map="[shopId:shopId, mappedTypeId:'SHOPIFY_WEIGHT_UNIT', mappedKey:diff.weightUnit]" out-map="weightUnitMapping"/>
                             <if condition="weightUnitMapping">
@@ -867,10 +853,10 @@ under the License.
                                           in-map="[productId:productId, shopId:shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(diff.inventoryItemId)]"/>
                         </if>
                     </else>
-                    <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                                  in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
-                    <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
                 </if>
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
+                          in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
+            <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
         </actions>
     </service>
 </services>
