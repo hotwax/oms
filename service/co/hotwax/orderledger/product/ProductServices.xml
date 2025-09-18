@@ -1237,48 +1237,6 @@ under the License.
 
             <set field="variantProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.id)"/>
 
-            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop">
-                <field-map field-name="shopId" from="shopId"/>
-            </entity-find-one>
-            <if condition="!shopifyShop">
-                <return error="true" type="warning" message="No shopify shop found for the shopId: ${shopId}."/>
-            </if>
-
-            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore">
-                <field-map field-name="productStoreId" from="shopifyShop.productStoreId"/>
-                <select-field field-name="productStoreId"/>
-                <select-field field-name="productIdentifierEnumId,defaultCurrencyUomId,primaryStoreGroupId"/>
-            </entity-find-one>
-            <if condition="!productStore">
-                <return error="true" type="warning" message="No ProductStore found for the productStoreId: ${shopifyShop.productStoreId}."/>
-            </if>
-            <if condition="!productStore.productIdentifierEnumId">
-                <return error="true" message="No productIdentifierEnumId found for the productStoreId: ${shopifyShop.productStoreId}"/>
-            </if>
-
-            <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
-                <set field="productIdentifier" from="variantJson.sku"/>
-                <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
-                    <set field="productIdentifier" from="variantJson.barcode"/>
-                </else-if>
-                <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
-                    <set field="productIdentifier" from="variantJson.id"/>
-                </else-if>
-            </if>
-
-            <if condition="productIdentifier">
-                <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="products">
-                    <econdition field-name="internalName" from="productIdentifier"/>
-                </entity-find>
-                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
-                    <field-map field-name="productId" from="products?.first?.productId"/>
-                    <field-map field-name="shopId" from="shopId"/>
-                </entity-find-one>
-                <if condition="shopifyShopProduct">
-                    <set field="variantProductId" from="shopifyShopProduct.shopifyProductId"/>
-                </if>
-            </if>
-
             <entity-find-one entity-name="ProductUpdateHistory" value-field="productUpdateHistory">
                 <field-map field-name="productId" from="variantProductId"/>
                 <field-map field-name="shopId"/>

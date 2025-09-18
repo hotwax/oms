@@ -139,6 +139,7 @@ under the License.
                 try(InputStream inputStream = ec.resource.getLocationStream(inputPath);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                     String line
+                    int sequenceIndex = 1
                     while ((line = reader.readLine()) != null) {
                         Map jsonLine = ContextJavaUtil.jacksonMapper.readValue(line, Map.class)
                         String id = jsonLine.get("id") as String
@@ -165,7 +166,8 @@ under the License.
                                         .call()
 
                                     if (variant?.id) {
-                                        variantIds.add(variant.id)
+                                        variantIds.add([variant.id, sequenceIndex])
+                                        sequenceIndex++
                                     }
                                 }
 
@@ -179,7 +181,7 @@ under the License.
 
                                 // Assocs handling
                                 if (variantIds) {
-                                    sortedAssocs = variantIds.sort()
+                                    sortedAssocs = variantIds.sort { a, b -> a[1] <=> b[1] }.collect { it[0] }  // Collect only the variant ID
                                     assocsHash = hash(sortedAssocs)
 
                                     productUpdateHistory = ec.entity.find("co.hotwax.product.ProductUpdateHistory")
@@ -203,20 +205,20 @@ under the License.
                                         differenceMap: existingDiffMap
                                     ]
                                     if (forCreate) {
-                                        existingDiffMap.assocs = [added: sortedAssocs, removed: []]
-                                        updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
+                                        existingDiffMap.assocs = [added: variantIds.collect { [id: it[0], sequenceNumber: it[1]] }, removed: []]
+                                        updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
                                         updateParams.assocsHash = assocsHash
                                     } else {
                                         existingAssocs = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.assocs ?: "[]", List.class)
-                                        existingAssocsSorted = existingAssocs.collect { it.toString() }.sort()
+                                        existingAssocsSorted = existingAssocs.sort { a, b -> a[1] <=> b[1] }.collect { it[0] }
                                         existingAssocsHash = productUpdateHistory?.assocsHash
 
 
                                         if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                            added = (sortedAssocs - existingAssocsSorted).collect { it.toString() }
-                                            removed = (existingAssocsSorted - sortedAssocs).collect { it.toString() }
+                                            added = (variantIds - existingAssocsSorted).collect { [id: it[0], sequenceNumber: it[1]] }
+                                            removed = (existingAssocsSorted - variantIds).collect { [id: it[0], sequenceNumber: it[1]] }
                                             existingDiffMap.assocs = [added: added, removed: removed]
-                                            updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
+                                            updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
                                             updateParams.assocsHash = assocsHash
                                         } else {
                                             existingDiffMap.assocs = [added: [], removed: []]
@@ -234,6 +236,7 @@ under the License.
                                 variants.clear()
                                 metafields.clear()
                             }
+                            sequenceIndex = 1
                             virtualProduct = jsonLine
 
                         } else if (isVariant) {
@@ -258,7 +261,8 @@ under the License.
                                 .parameters([variantJson: variant, systemMessageId: systemMessageId, shopId: shopId])
                                 .call()
                             if (variant?.id) {
-                                variantIds.add(variant.id)
+                                variantIds.add([variant.id, sequenceIndex])  // Add variant with sequence index
+                                sequenceIndex++
                             }
                         }
 
@@ -270,7 +274,7 @@ under the License.
                         }
 
                         if (variantIds) {
-                            sortedAssocs = variantIds.sort()
+                            sortedAssocs = variantIds.sort { a, b -> a[1] <=> b[1] }.collect { it[0] }  // Collect only the variant ID
                             assocsHash = hash(sortedAssocs)
 
                             productUpdateHistory = ec.entity.find("co.hotwax.product.ProductUpdateHistory")
@@ -295,19 +299,19 @@ under the License.
                             ]
 
                             if (forCreate) {
-                                existingDiffMap.assocs = [added: sortedAssocs, removed: []]
-                                updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
+                                existingDiffMap.assocs = [added: variantIds.collect { [id: it[0], sequenceNumber: it[1]] }, removed: []]
+                                updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
                                 updateParams.assocsHash = assocsHash
                             } else {
                                 existingAssocs = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.assocs ?: "[]", List.class)
-                                existingAssocsSorted = existingAssocs.collect { it.toString() }.sort()
+                                existingAssocsSorted = existingAssocs.sort { a, b -> a[1] <=> b[1] }.collect { it[0] }
                                 existingAssocsHash = productUpdateHistory?.assocsHash
 
                                 if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                    added = sortedAssocs - existingAssocsSorted
-                                    removed = existingAssocsSorted - sortedAssocs
+                                    added = (variantIds - existingAssocsSorted).collect { [id: it[0], sequenceNumber: it[1]] }
+                                    removed = (existingAssocsSorted - variantIds).collect { [id: it[0], sequenceNumber: it[1]] }
                                     existingDiffMap.assocs = [added: added, removed: removed]
-                                    updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(sortedAssocs)
+                                    updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
                                     updateParams.assocsHash = assocsHash
                                 } else {
                                     existingDiffMap.assocs = [added: [], removed: []]
@@ -544,25 +548,31 @@ under the License.
                             <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
                             <date-filter/>
                         </entity-find>
-                        <iterate list="diff.assocs?.added" entry="vid">
+                        <iterate list="diff.assocs?.added" entry="variantProduct">
                             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
                                 <field-map field-name="shopId" from="shopId"/>
-                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
+                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantProduct.id)"/>
                             </entity-find-one>
                             <if condition="shopifyShopProduct">
-                                <if condition="productAssocs?.find{ it.productIdTo == shopifyShopProduct.productId }">
+                                <if condition="productAssocs?.find{ it.productIdTo == shopifyShopProduct.productId &amp;&amp; it.sequenceNum == variantProduct.sequenceNumber }">
                                     <continue/>
                                 </if>
-                                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
-                                                  in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp]"/>
+                                <if condition="productAssocs?.find{ it.productIdTo == shopifyShopProduct.productId &amp;&amp; it.sequenceNum != variantProduct.sequenceNumber }">
+                                    <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc"
+                                                  in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:variantProduct.sequenceNumber]"/>
+                                    <else>
+                                        <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc"
+                                                      in-map="[productIdTo:shopifyShopProduct.productId, productId:productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:ec.user.nowTimestamp, sequenceNum:variantProduct.sequenceNumber]"/>
+                                    </else>
                                 </if>
+                            </if>
                         </iterate>
                     </if>
                     <if condition="diff.assocs?.removed">
-                        <iterate list="diff.assocs?.removed" entry="vid">
+                        <iterate list="diff.assocs?.removed" entry="variantProduct">
                             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
                                 <field-map field-name="shopId" from="shopId"/>
-                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(vid)"/>
+                                <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantProduct.id)"/>
                             </entity-find-one>
                             <if condition="shopifyShopProduct">
                                 <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
