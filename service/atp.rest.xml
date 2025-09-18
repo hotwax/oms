@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/rest-api-3.xsd"
+          name="available-to-promise" displayName="Commerce Available to Promise REST API" version="${moqui_version}"
+          description="">
+
+    <resource name="login" require-authentication="anonymous-all" description="Deprecated (since maarg 4.4.0): Use admin/login">
+        <method type="post"><service name="co.hotwax.auth.AuthServices.login#User"/></method>
+    </resource>
+    <resource name="user" description="Deprecated (since maarg 4.4.0): Use admin/user">
+        <resource name="profile" description="Deprecated (since maarg 4.4.0): Use admin/user/profile">
+            <method type="get"><service name="co.hotwax.util.UserServices.getUserProfile"/></method>
+        </resource>
+        <resource name="getAvailableTimeZones" description="Deprecated (since maarg 4.4.0): Use admin/user/getAvailableTimeZones">
+            <method type="get"><service name="co.hotwax.common.CommonServices.getAvailableTimeZones"/></method>
+        </resource>
+        <resource name="productStore" description="Deprecated (since maarg 4.4.0): Use admin/user/productStore">
+            <!--
+                TODO: Need to get the User's ProductStore, as of now returing all the productStore
+                As UserAccount and ProductStore are part of two different datasource
+             -->
+            <method type="get"><entity name="org.apache.ofbiz.product.store.ProductStore" operation="list"/></method>
+        </resource>
+    </resource>
+    <resource name="productStores" description="Deprecated (since maarg 4.4.0): Use admin/productStores">
+        <id name="productStoreId">
+            <resource name="facilityGroups" description="Deprecated (since maarg 4.4.0): Use admin/productStores/${productStoreId}/facilityGroups">
+                <method type="get"><entity name="co.hotwax.facility.ProductStoreAndFacilityGroup" operation="list"/></method>
+                <id name="facilityGroupId">
+                    <resource name="association">
+                        <method type="post"><entity name="co.hotwax.facility.ProductStoreFacilityGroup" operation="store"/></method>
+                    </resource>
+                </id>
+            </resource>
+            <resource name="facilities" description="Deprecated (since maarg 4.4.0): Use admin/productStores/${productStoreId}/facilities">
+                <method type="get"><entity name="co.hotwax.product.store.ProductStoreFacilityDetail" operation="list"/></method>
+                <id name="facilityId">
+                    <resource name="association">
+                        <method type="post"><entity name="org.apache.ofbiz.product.store.ProductStoreFacility" operation="store"/></method>
+                    </resource>
+                </id>
+            </resource>
+        </id>
+    </resource>
+    <resource name="shopifyShops" description="Deprecated (since maarg 4.4.0): Use admin/shopifyShops">
+        <method type="get"><entity name="co.hotwax.shopify.ShopifyShopAndConfig" operation="list"/></method>
+    </resource>
+    <resource name="status" description="Deprecated (since maarg 4.4.0): Use admin/status">
+        <method type="get"><entity name="co.hotwax.common.status.StatusItemAndType" operation="list"/></method>
+    </resource>
+    <resource name="enums" description="Deprecated (since maarg 4.4.0): Use admin/enums">
+        <method type="get"><entity name="moqui.basic.EnumerationAndType" operation="list"/></method>
+        <id name="enumId">
+            <method type="get"><entity name="moqui.basic.EnumerationAndType" operation="one"/></method>
+        </id>
+    </resource>
+    <resource name="facilities" description="Deprecated (since maarg 4.4.0): Use admin/facilities">
+        <method type="post"><entity name="org.apache.ofbiz.product.facility.Facility" operation="create"/></method>
+        <method type="get"><entity name="co.hotwax.facility.FacilityAndType" operation="list"/></method>
+        <id name="facilityId">
+            <method type="put"><entity name="org.apache.ofbiz.product.facility.Facility" operation="update"/></method>
+            <method type="get"><entity name="co.hotwax.facility.FacilityAndType" operation="one"/></method>
+        </id>
+        <resource name="orderCount" description="Deprecated (since maarg 4.4.0): Use admin/facilities/orderCount">
+            <method type="get"><entity name="co.hotwax.facility.FacilityOrderCount" operation="list"/></method>
+        </resource>
+    </resource>
+    <resource name="facilityGroups" description="Deprecated (since maarg 4.4.0): Use admin/facilityGroups">
+        <method type="post"><entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="create"/></method>
+        <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="list"/></method>
+        <id name="facilityGroupId">
+            <method type="get"><entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="one"/></method>
+            <method type="put"><entity name="org.apache.ofbiz.product.facility.FacilityGroup" operation="update"/></method>
+            <resource name="facilities">
+                <method type="get"><entity name="co.hotwax.facility.FacilityGroupAndMember" operation="list"/></method>
+                <id name="facilityId">
+                    <resource name="association">
+                        <method type="post"><entity name="org.apache.ofbiz.product.facility.FacilityGroupMember" operation="store"/></method>
+                    </resource>
+                </id>
+            </resource>
+        </id>
+    </resource>
+    <resource name="solrFacets">
+        <method type="get"><service name="co.hotwax.search.SearchServices.autoComplete#SolrFacet"/></method>
+    </resource>
+    <resource name="checkOmsConnection" description="Deprecated (since maarg 4.4.0): Use admin/oms/healthCheck">
+        <method type="get"><service name="co.hotwax.util.UtilityServices.check#OmsConnection"/></method>
+    </resource>
+    <resource name="serviceJobRuns" description="Deprecated (since maarg 4.4.0): Use admin/serviceJobs">
+        <id name="jobName"><!--admin/serviceJobs/${jobName}/runs -->
+            <method type="get"><entity name="moqui.service.job.ServiceJobRun" operation="list"/></method>
+            <id name="jobRunId"><!--admin/serviceJobs/${jobName}/runs/jobRunId -->
+                <method type="get"><entity name="moqui.service.job.ServiceJobRun" operation="one"/></method>
+            </id>
+            <resource name="activeJobRun" description="Deprecated (since maarg 4.4.0): Use admin/serviceJobRuns/${jobName}/runs/activeJobRun">
+                <method type="get">
+                    <entity name="moqui.service.job.ServiceJobRunLock" operation="one"/>
+                </method>
+            </resource>
+        </id>
+    </resource>
+    <resource name="ruleGroups">
+        <method type="post"><entity name="co.hotwax.rule.RuleGroup" operation="store"/></method>
+        <method type="get"><entity name="co.hotwax.rule.RuleGroup" operation="list" masterName="default"/></method>
+        <id name="ruleGroupId">
+            <method type="get"><entity name="co.hotwax.rule.RuleGroup" operation="one" masterName="default"/></method>
+            <method type="post"><entity name="co.hotwax.rule.RuleGroup" operation="store" masterName="default"/></method>
+            <resource name="rules">
+                <method type="get"><entity name="co.hotwax.rule.DecisionRule" operation="list"/></method>
+            </resource>
+            <resource name="runNow">
+                <method type="post"><service name="co.hotwax.rule.DecisionRuleServices.scheduleNow#RuleGroup"/></method>
+            </resource>
+            <resource name="schedule">
+                <method type="get"><service name="co.hotwax.rule.DecisionRuleServices.get#RuleGroupSchedule"/></method>
+                <method type="post"><service name="co.hotwax.rule.DecisionRuleServices.store#RuleGroupSchedule"/></method>
+            </resource>
+            <resource name="ruleGroupRuns">
+                <method type="get"><entity name="co.hotwax.rule.RuleGroupRun" operation="list"/></method>
+            </resource>
+        </id>
+    </resource>
+    <resource name="decisionRules">
+        <method type="post"><entity name="co.hotwax.rule.DecisionRule" operation="store"/></method>
+        <method type="get"><entity name="co.hotwax.rule.DecisionRule" operation="list" masterName="default"/></method>
+        <id name="ruleId">
+            <method type="get"><entity name="co.hotwax.rule.DecisionRule" operation="one" masterName="default"/></method>
+            <method type="post"><entity name="co.hotwax.rule.DecisionRule" operation="store" masterName="default"/></method>
+            <resource name="conditions">
+                <method type="delete"><entity name="co.hotwax.rule.RuleCondition" operation="delete"/></method>
+            </resource>
+            <resource name="actions">
+                <method type="delete"><entity name="co.hotwax.rule.RuleAction" operation="delete"/></method>
+            </resource>
+        </id>
+    </resource>
+</resource>

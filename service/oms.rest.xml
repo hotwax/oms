@@ -29,7 +29,7 @@ under the License.
         </method>
         <id name="orderId">
             <method type="get">
-                <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="one" masterName="default"/>
+                <service name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"/>
             </method>
             <method type="put">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="update"/>
@@ -54,6 +54,11 @@ under the License.
                     <method type="put">
                         <entity name="org.apache.ofbiz.order.order.OrderItem" operation="update"/>
                     </method>
+                    <resource name="cancel">
+                        <method type="post">
+                            <service name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItem"/>
+                        </method>
+                    </resource>
                     <resource name="reservation">
                         <method type="delete">
                             <service name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"/>
@@ -73,6 +78,11 @@ under the License.
                         </method>
                     </resource>
                 </id>
+                <resource name="cancel">
+                    <method type="post">
+                        <service name="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItems"/>
+                    </method>
+                </resource>
             </resource>
             <resource name="shipGroups">
                 <method type="get">
@@ -107,6 +117,21 @@ under the License.
                 </method>
             </resource>
         </id>
+        <resource name="pickupScheduledNotification">
+            <method type="post">
+                <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
+            </method>
+        </resource>
+        <resource name="pickup">
+            <method type="get"><service name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders"/></method>
+            <id name="orderId">
+                <resource name="notification">
+                    <method type="post">
+                        <service name="co.hotwax.oms.order.OrderNotificationServices.send#BopisOrderReceivedNotification"/>
+                    </method>
+                </resource>
+            </id>
+        </resource>
     </resource>
     <resource name="returns">
         <method type="get">
@@ -117,7 +142,7 @@ under the License.
         </method>
     </resource>
 
-    <resource name="productStores">
+    <resource name="productStores" description="Deprecated (since maarg 4.4.0): Use admin/productStores">
         <method type="get">
             <entity name="org.apache.ofbiz.product.store.ProductStore" operation="list"/>
         </method>
@@ -131,7 +156,7 @@ under the License.
             <method type="put">
                 <entity name="org.apache.ofbiz.product.store.ProductStore" operation="update"/>
             </method>
-            <resource name="settings">
+            <resource name="settings" description="Deprecated (since maarg 4.4.0): Use admin/productStores/${productStoreId}/settings">
                 <method type="get">
                     <entity name="org.apache.ofbiz.product.store.ProductStoreSetting" operation="list"/>
                 </method>

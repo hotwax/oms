@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<entity-facade-xml type="ext-seed">
+    <moqui.basic.EnumerationType enumTypeId="AVAILABLE_TO_PROMISE" description="Available to promise"/>
+
+    <moqui.basic.EnumerationType enumTypeId="ATP_RULE_GROUP_TYPE" description="Rule group type" parentTypeId="AVAILABLE_TO_PROMISE"/>
+    <moqui.basic.Enumeration enumId="RG_THRESHOLD" description="Threshold rule group" sequenceNum="5" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_THRESHOLD"/>
+    <moqui.basic.Enumeration enumId="RG_SAFETY_STOCK" description="Safety stock rule group" sequenceNum="10" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_SAFETY_STOCK"/>
+    <moqui.basic.Enumeration enumId="RG_SHIPPING_CHANNEL" description="Allow brokering on channel rule group" sequenceNum="15" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_SHIPPING_CHANNEL"/>
+    <moqui.basic.Enumeration enumId="RG_SHIPPING_FACILITY" description="Allow brokering on facility rule group" sequenceNum="20" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_SHIPPING_FACILITY"/>
+    <moqui.basic.Enumeration enumId="RG_PICKUP_CHANNEL" description="Allow pickup on channel rule group" sequenceNum="25" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_PICKUP_CHANNEL"/>
+    <moqui.basic.Enumeration enumId="RG_PICKUP_FACILITY" description="Allow pickup on facility rule group" sequenceNum="30" enumTypeId="ATP_RULE_GROUP_TYPE" enumCode="RG_PICKUP_FACILITY"/>
+
+    <moqui.basic.EnumerationType enumTypeId="CONDITION_TYPE" description="Filter Condition type" parentTypeId="AVAILABLE_TO_PROMISE"/>
+    <moqui.basic.Enumeration enumId="ENTCT_ATP_SORT_BY" description="Order by" sequenceNum="5" enumTypeId="CONDITION_TYPE" enumCode="orderBy"/>
+    <moqui.basic.Enumeration enumId="ENTCT_ATP_FILTER" description="Filter Condition" sequenceNum="10" enumTypeId="CONDITION_TYPE" enumCode="condition"/>
+    <moqui.basic.Enumeration enumId="ENTCT_ATP_FACILITIES" description="Facilities on which action to be performed" sequenceNum="15" enumTypeId="CONDITION_TYPE" enumCode="facilities"/>
+    <moqui.basic.Enumeration enumId="ENTCT_ATP_FAC_GROUPS" description="Facility groups on which action to be performed" sequenceNum="20" enumTypeId="CONDITION_TYPE" enumCode="facilityGroups"/>
+
+    <moqui.basic.EnumerationType enumTypeId="ATP_RULE_ACT_TYPE" description="Determine the type of action to be performed in the context of rules" parentTypeId="AVAILABLE_TO_PROMISE"/>
+    <moqui.basic.Enumeration enumId="ATP_THRESHOLD" description="Set threshold" sequenceNum="10" enumTypeId="ATP_RULE_ACT_TYPE" enumCode="SET_THRESHOLD"/>
+    <moqui.basic.Enumeration enumId="ATP_SAFETY_STOCK" description="Set safety stock" sequenceNum="15" enumTypeId="ATP_RULE_ACT_TYPE" enumCode="SET_SAFETY_STOCK"/>
+    <moqui.basic.Enumeration enumId="ATP_ALLOW_BROKERING" description="Enable brokering" sequenceNum="20" enumTypeId="ATP_RULE_ACT_TYPE" enumCode="SET_ALLOW_BROKERING"/>
+    <moqui.basic.Enumeration enumId="ATP_ALLOW_PICKUP" description="Enable pickup" sequenceNum="25" enumTypeId="ATP_RULE_ACT_TYPE" enumCode="SET_ALLOW_PICKUP"/>
+    
+    <moqui.basic.StatusType statusTypeId="RG_STATUS" description="Rule Group Status"/>
+    <moqui.basic.StatusType statusTypeId="ATP_RG_STATUS" parentTypeId="RG_STATUS" description="ATP Rule Group Status"/>
+    <moqui.basic.StatusItem statusId="ATP_RG_DRAFT" description="Draft" sequenceNum="1" statusCode="DRAFT" statusTypeId="ATP_RG_STATUS"/>
+    <moqui.basic.StatusItem statusId="ATP_RG_ACTIVE" description="Active" sequenceNum="2" statusCode="ACTIVE" statusTypeId="ATP_RG_STATUS"/>
+    <moqui.basic.StatusItem statusId="ATP_RG_ARCHIVED" description="Archived" sequenceNum="3" statusCode="ARCHIVED" statusTypeId="ATP_RG_STATUS"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RG_DRAFT" toStatusId="ATP_RG_ACTIVE" transitionName="Active"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RG_ACTIVE" toStatusId="ATP_RG_ARCHIVED" transitionName="Active to Archived"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RG_DRAFT" toStatusId="ATP_RG_ARCHIVED" transitionName="Draft to Archived"/>
+
+    <moqui.basic.StatusType statusTypeId="ATP_RULE_STATUS" parentTypeId="RG_STATUS" description="ATP Rule Status"/>
+    <moqui.basic.StatusItem statusId="ATP_RULE_DRAFT" description="Draft" sequenceNum="1" statusCode="DRAFT" statusTypeId="ATP_RULE_STATUS"/>
+    <moqui.basic.StatusItem statusId="ATP_RULE_ACTIVE" description="Active" sequenceNum="2" statusCode="ACTIVE" statusTypeId="ATP_RULE_STATUS"/>
+    <moqui.basic.StatusItem statusId="ATP_RULE_ARCHIVED" description="Archived" sequenceNum="3" statusCode="ARCHIVED" statusTypeId="ATP_RULE_STATUS"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RULE_DRAFT" toStatusId="ATP_RULE_ACTIVE" transitionName="Active"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RULE_DRAFT" toStatusId="ATP_RULE_ARCHIVED" transitionName="Draft to Archived"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RULE_ACTIVE" toStatusId="ATP_RULE_ARCHIVED" transitionName="Active to Archived"/>
+    <moqui.basic.StatusFlowTransition statusFlowId="Default" statusId="ATP_RULE_ARCHIVED" toStatusId="ATP_RULE_ACTIVE" transitionName="Archived to Active"/>
+
+
+    <artifactGroups artifactGroupId="ATP_API" description="Commerce ATP API (via root resource)">
+        <artifacts artifactTypeEnumId="AT_REST_PATH" inheritAuthz="Y" artifactName="/available-to-promise"/>
+        <!-- Full permissions for the ADMIN user group -->
+        <authz artifactAuthzId="ATP_API_ADMIN" userGroupId="ADMIN" authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>
+    </artifactGroups>
+
+    <!-- Using below config for preparing file path
+    <moqui.basic.Enumeration enumId="mantle.content.root" description="Mantle Content Root Loc" enumTypeId="UserPreferenceKey"/>
+    <moqui.security.UserGroupPreference userGroupId="ALL_USERS" preferenceKey="mantle.content.root"
+                                        preferenceValue="runtime://datamanager"/>-->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ExportProductFacilityDetail"
+            description="Export product facility detail"
+            sendPath="/home/${sftpUsername}/hotwax/available-to-promise/PRODUCT_FACILITY_${dateTime}.csv"
+            sendServiceName="co.hotwax.ofbiz.SystemMessageServices.send#SystemMessageFileSftp"
+            receivePath="${contentRoot}/hotwax/available-to-promise/PRODUCT_FACILITY_${dateTime}.csv"/>
+
+    <!-- Service job data to purge rule group runs data older than 30 days -->
+    <moqui.service.job.ServiceJob jobName="clean_Rule_Group_Runs" description="Clean Rule Group runs"
+                                  serviceName="co.hotwax.rule.DecisionRuleServices.clean#RuleGroupRun" cronExpression="0 0 2 * * ?" paused="N">
+        <parameters parameterName="daysToKeep" parameterValue="30"/>
+    </moqui.service.job.ServiceJob>
+</entity-facade-xml>
