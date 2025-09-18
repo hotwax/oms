@@ -733,8 +733,14 @@ under the License.
                         </entity-find>
                         <!-- If not then create a new ProductAssoc record -->
                         <if condition="!productAssocs">
+                            <then>
                             <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                             <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                            </then>
+                            <else>
+                                <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:productAssocs.first?.fromDate,sequenceNum:productVariantJson.sequenceNum]"/>
+                                <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                            </else>
                         </if>
                     </then><else>
                         <log level="warn" message="Not creating ProductAssoc record as the parentProductId is missing for [${productVariantJson.productId}]"/>
@@ -786,31 +792,45 @@ under the License.
             </if>
 
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop"/>
-            <!-- Update product fields -->
-            <set field="updateProductMap" from="[:]"/>
-            <set field="updateProductMap.productId" from="existingProduct.productId"/>
-            <set field="updateProductMap.productName" from="productVariantJson.title"/>
-            <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
-            <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
-            <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
-            <set field="updateProductMap.isVariant" value="Y"/>
-            <set field="updateProductMap.isVirtual" value="N"/>
-            <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap" transaction="force-new"/>
-
             <set field="productId" from="existingProduct.productId"/>
 
+            <!-- Fetch GoodIdentification records for the product to check if already exists -->
+            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdentifications">
+                <econdition field-name="productId"/>
+                <date-filter/>
+            </entity-find>
             <!-- Insert GoodIdentification for Barcode -->
             <if condition="productVariantJson.barcode">
-                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                              in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode]"
-                              transaction="force-new"/>
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'UPCA' }"/>
+                <if condition="goodIdentification">
+                    <if condition="goodIdentification.idValue &amp;&amp; !goodIdentification.idValue.equals(productVariantJson.barcode)">
+                        <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: goodIdentification.idValue, fromDate: goodIdentification.fromDate, thruDate: ec.user.nowTimestamp]"/>
+                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode, fromDate: ec.user.nowTimestamp]"/>
+                    </if>
+                    <else>
+                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'UPCA', idValue: productVariantJson.barcode, fromDate: ec.user.nowTimestamp]"/>
+                    </else>
+                </if>
             </if>
 
             <!-- Insert GoodIdentification for SKU -->
             <if condition="productVariantJson.sku">
-                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                              in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku]"
-                              transaction="force-new"/>
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'SKU' }"/>
+                <if condition="goodIdentification">
+                    <if condition="goodIdentification.idValue &amp;&amp; !goodIdentification.idValue.equals(productVariantJson.sku)">
+                        <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: goodIdentification.idValue, fromDate: goodIdentification.fromDate, thruDate: ec.user.nowTimestamp]"/>
+                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku, fromDate: ec.user.nowTimestamp]"/>
+                    </if>
+                    <else>
+                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'SKU', idValue: productVariantJson.sku, fromDate: ec.user.nowTimestamp]"/>
+                    </else>
+                </if>
                 <else>
                     <return error="true" message="Primary Identifier UPCA is missing."/>
                 </else>
@@ -818,10 +838,22 @@ under the License.
 
             <!-- Insert GoodIdentification for ERP_ID -->
             <if condition="productVariantJson.ERP_ID">
-                <service-call name="store#org.apache.ofbiz.product.product.GoodIdentification"
-                              in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID]"
-                              transaction="force-new"/>
+                <set field="goodIdentification" from="goodIdentifications.find { it.goodIdentificationTypeId == 'ERP_ID' }"/>
+                <if condition="goodIdentification">
+                    <if condition="goodIdentification.idValue &amp;&amp; !goodIdentification.idValue.equals(productVariantJson.ERP_ID)">
+                        <service-call name="update#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: goodIdentification.idValue, fromDate: goodIdentification.fromDate, thruDate: ec.user.nowTimestamp]"/>
+                        <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                      in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID, fromDate: ec.user.nowTimestamp]"/>
+                    </if>
+                </if>
+                <else>
+                    <service-call name="create#org.apache.ofbiz.product.product.GoodIdentification"
+                                  in-map="[productId: productId, goodIdentificationTypeId: 'ERP_ID', idValue: productVariantJson.ERP_ID, fromDate: ec.user.nowTimestamp]"/>
+                </else>
             </if>
+            <set field="productName" value=""/>
+            <set field="featureMap" from="[:]"/>
 
             <!-- Insert variant options as ProductFeature if provided -->
             <if condition="productVariantJson.selectedOptions">
@@ -829,6 +861,8 @@ under the License.
                     <set field="productFeatureTypeDesc" from="selectedOption.name"/>
                     <set field="featureDesc" from="selectedOption.value"/>
 
+                    <!-- Store feature in featureMap for later ordered processing -->
+                    <set field="featureMap[productFeatureTypeDesc]" from="featureDesc"/>
                     <!-- Fetch or create ProductFeatureType -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
                         <econdition field-name="description" from="productFeatureTypeDesc"/>
@@ -838,8 +872,7 @@ under the License.
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType"
                                           out-map="createdFeatureType"
-                                          in-map="[description: productFeatureTypeDesc]"
-                                          transaction="force-new"/>
+                                          in-map="[description: productFeatureTypeDesc]"/>
                             <set field="productFeatureTypeId" from="createdFeatureType.productFeatureTypeId"/>
                         </else>
                     </if>
@@ -854,18 +887,46 @@ under the License.
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature"
                                           out-map="createdFeature"
-                                          in-map="[productFeatureTypeId: productFeatureTypeId, description: featureDesc]"
-                                          transaction="force-new"/>
+                                          in-map="[productFeatureTypeId: productFeatureTypeId, description: featureDesc]"/>
                             <set field="productFeatureId" from="createdFeature.productFeatureId"/>
                         </else>
                     </if>
 
-                    <!-- Create ProductFeatureAppl -->
-                    <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
-                                  in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'SELECTABLE_FEATURE']"
-                                  transaction="force-new"/>
+                    <!-- Create ProductFeatureAppl, if doesn't exist already -->
+                    <entity-find-count entity-name="org.apache.ofbiz.product.feature.ProductFeatureAppl" count-field="productFeatureApplCount">
+                        <econdition field-name="productId" from="productId"/>
+                        <econdition field-name="productFeatureId" from="productFeatureId"/>
+                        <econdition field-name="productFeatureApplTypeId" value="STANDARD_FEATURE"/>
+                        <date-filter/>
+                    </entity-find-count>
+                    <if condition="productFeatureApplCount == 0">
+                        <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureAppl"
+                                      in-map="[productId: productId, productFeatureId: productFeatureId, productFeatureApplTypeId: 'STANDARD_FEATURE']"/>
+                    </if>
+                </iterate>
+
+                <!-- Build productName in order: Color / Size / Color Code -->
+                <set field="orderedFeatures" from="['Color', 'Size', 'Color Code']"/>
+                <iterate list="orderedFeatures" entry="featureType">
+                    <if condition="featureMap[featureType]">
+                        <if condition="productName">
+                            <set field="productName" value="${productName} / ${featureMap[featureType]}"/>
+                            <else>
+                                <set field="productName" from="featureMap[featureType]"/>
+                            </else>
+                        </if>
+                    </if>
                 </iterate>
             </if>
+
+            <!-- Update product fields -->
+            <set field="updateProductMap" from="[:]"/>
+            <set field="updateProductMap.productId" from="existingProduct.productId"/>
+            <set field="updateProductMap.productName" from="productName"/>
+            <set field="updateProductMap.productWeight" from="productVariantJson.weight ?: 1"/>
+            <set field="updateProductMap.shippingWeight" from="productVariantJson.weight ?: 1"/>
+            <set field="updateProductMap.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+            <service-call name="update#org.apache.ofbiz.product.product.Product" in-map="updateProductMap"/>
 
             <!-- Insert product price -->
             <if condition="productVariantJson.price">
@@ -876,8 +937,7 @@ under the License.
                               in-map="[productId: productId, productPriceTypeId: 'LIST_PRICE', productPricePurposeId: 'PURCHASE',
                         currencyUomId: productStores[0].defaultCurrencyUomId,
                         productStoreGroupId: productStores[0].primaryStoreGroupId,
-                        price: productVariantJson.price, fromDate: ec.user.nowTimestamp]"
-                              transaction="force-new"/>
+                        price: productVariantJson.price, fromDate: ec.user.nowTimestamp]"/>
             </if>
 
             <!-- Index product -->
