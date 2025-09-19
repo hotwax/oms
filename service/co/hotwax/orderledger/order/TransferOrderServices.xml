@@ -512,6 +512,10 @@
             <parameter name="shipGroupSeqId" required="true"/>
             <parameter name="unitPrice" required="true" type="Integer"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="orderId"/>
+            <parameter name="orderItemSeqId"/>
+        </out-parameters>
         <actions>
 
             <!-- Check if the order is in Created status. -->
@@ -530,7 +534,7 @@
                  statuses:[orderId:orderId,statusId:'ITEM_CREATED']]"/>
 
             <!-- Create the OrderItem with the incoming product. -->
-            <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem" out-map="context"/>
 
             <!-- Set the grandTotal field from the unitPrice and quantity -->
             <set field="grandTotal" from="orderHeader.first.grandTotal + (unitPrice * quantity)"/>
