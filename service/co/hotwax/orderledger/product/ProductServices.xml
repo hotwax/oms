@@ -994,7 +994,7 @@ under the License.
                 </entity-find-one>
 
                 <script>
-                    def oldSet = new HashSet((history?.metafields ?: []) as List)
+                    def oldSet = ContextJavaUtil.jacksonMapper.readValue(history?.metafields ?: "[]", List.class) as Set
                     def newVal = "${productJson.key}/${productJson.namespace}/${productJson.value}"
                     if (!oldSet.contains(newVal)) {
                     diffMap.metafields = [added: [newVal], removed: []]
@@ -1129,7 +1129,6 @@ under the License.
                 productJson.title ?: '',
                 (productJson.featuredMedia?.preview?.image?.url ?: '')
             ]
-            ec.logger.info("\n\n --${productId} --${productJson}+++\n\n-- ${productJson.featuredMedia?.preview?.image?.url}----------------------- \n\n");
             def newCoreHash = hash(parts.join('||'))
             if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
                 differenceMap.productCoreDetailsHash = newCoreHash
@@ -1310,10 +1309,8 @@ under the License.
             </if>
 
             <!-- Update flow -->
-            <set field="diffMap" from="[:]" type="NewMap"/>
+            <set field="diffMap" from="[:]"/>
             <script><![CDATA[
-                diffMap.inventoryItemId = (variantJson.inventoryItem?.id ?: '').toString()
-
                 // --- Identifications ---
                 def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantJson.id ?: '']
                 def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
@@ -1377,6 +1374,7 @@ under the License.
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
                     diffMap.featureImageUrl = (variantJson.image?.url ?: '')
+                    diffMap.inventoryItemId = (variantJson.inventoryItem?.id ?: '').toString()
                     diffMap.weightUnit = (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString()
                     diffMap.weightValue = (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
                 }

@@ -648,7 +648,6 @@ under the License.
                                 <econdition field-name="productStoreGroupId" from="productStore.primaryStoreGroupId"/>
                                 <date-filter/>
                             </entity-find>
-                            <log message="\n\n -+_+_+_ ${productPriceList} +_+_ ${diff.price} +_+_+_+_+ \n\n"/>
 
                             <!-- If productPriceList and price is updated then set the values from the list if not then set the values from the incoming productPrices -->
                             <if condition="productPriceList"><then>
@@ -662,7 +661,6 @@ under the License.
                             </else>
                             </if>
                         </if>
-                        <log message="\n\n- = = == -${product.prices} -= -= -  \n \n\n"/>
                         <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
                             <set field="productIdentifier" from="diff.identifications?.sku"/>
                             <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
