@@ -1,3 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
+    <moqui.service.job.ServiceJob jobName="queue_BulkQuerySystemMessage_BulkProductAndVariantsByIdQuery" description="Queue bulk products query"
+                                  serviceName="co.hotwax.shopify.system.ShopifySystemMessageServices.queue#BulkQuerySystemMessage" cronExpression="0 0 * * * ?" paused="Y">
+        <parameters parameterName="systemMessageTypeId" parameterValue="BulkProductAndVariantsByIdQuery"/>
+        <parameters parameterName="systemMessageRemoteId" parameterValue=""/>
+        <parameters parameterName="filterQuery" parameterValue=""/>
+        <parameters parameterName="fromDate" parameterValue=""/>
+        <parameters parameterName="thruDate" parameterValue=""/>
+        <parameters parameterName="fromDateLabel" parameterValue=""/>
+        <parameters parameterName="thruDateLabel" parameterValue=""/>
+    </moqui.service.job.ServiceJob>
+
+    <!-- SystemMessageType record for bulk product metafield by tags query to Shopify -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="BulkProductAndVariantsByIdQuery"
+                                             description="Bulk Product and Variants By Id Query System Message"
+                                             parentTypeId="ShopifyBulkQuery"
+                                             sendServiceName="co.hotwax.shopify.system.ShopifySystemMessageServices.send#BulkQuerySystemMessage"
+                                             sendPath="dbresource://shopify/template/graphQL/BulkProductAndVariantsByIdQuery.ftl"
+                                             consumeServiceName="co.hotwax.shopify.system.ShopifySystemMessageServices.consume#BulkOperationResult"
+                                             receivePath="${contentRoot}/shopify/BulkProductAndVariantsByIdQuery/BulkOperationResult-${systemMessageId}-${remoteMessageId}-${nowDate}.jsonl">
+        <parameters parameterName="consumeSmrId" parameterValue="" systemMessageRemoteId=""/>
+    </moqui.service.message.SystemMessageType>
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeedNew"
+                                             description="Product Updates Feed New"
+                                             consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#OMSFeedNew"/>
+    <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeedNew" enumTypeId="OMSMessageTypeEnum"/>
+
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="GenerateOMSUpdateProductsFeedNew"
+                                             description="Generate OMS New Products Feed"
+                                             sendServiceName="co.hotwax.sob.system.FeedServices.generate#OMSFeedNew">
+        <parameters parameterName="forCreate" parameterValue="true"/>
+    </moqui.service.message.SystemMessageType>
+    <moqui.basic.Enumeration description="Generate OMS Update Products Feed" enumId="GenerateOMSUpdateProductsFeedNew" enumTypeId="SOBMessageTypeEnum" relatedEnumId="ProductUpdatesFeedNew" relatedEnumTypeId="OMSMessageTypeEnum"/>
+
+    <moqui.basic.Enumeration description="Bulk Product Metafields Query" enumId="BulkProductAndVariantsByIdQuery" enumTypeId="ShopifyMessageTypeEnum" relatedEnumId="GenerateOMSUpdateProductsFeedNew" relatedEnumTypeId="ShopifyMessageTypeEnum"/>
+
+    <moqui.service.job.ServiceJob jobName="send_BulkProductAndVariantsByIdQueryProducedSystemMessages" description="Send All Bulk Product Variants By Id Query Produced SystemMessages"
+                                  serviceName="org.moqui.impl.SystemMessageServices.send#AllProducedSystemMessages" cronExpression="0 0/15 * * * ?" paused="Y">
+        <parameters parameterName="systemMessageTypeIds" parameterValue="BulkProductAndVariantsByIdQuery"/>
+    </moqui.service.job.ServiceJob>
+    <!-- NOTE: The poll_BulkOperationResult_ShopifyBulkQuery job will be used to get bulk operation result followed by product updates -->
 </entity-facade-xml>
