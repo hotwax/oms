@@ -1428,6 +1428,7 @@ under the License.
                         productId: variantProductId,
                         shopId: shopId,
                         systemMessageId: systemMessageId,
+                        price: variantJson.price,
                         productCoreDetailsHash: newCoreHash,
                         features: ContextJavaUtil.jacksonMapper.writeValueAsString(newFeatures),
                         featuresHash: featuresHash,
