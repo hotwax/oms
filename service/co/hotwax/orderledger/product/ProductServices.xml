@@ -1235,6 +1235,7 @@ under the License.
             </script>
 
             <set field="variantProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.id)"/>
+            <set field="currentVariantProductId" from="variantProductId"/>
 
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop">
                 <field-map field-name="shopId" from="shopId"/>
@@ -1261,7 +1262,7 @@ under the License.
                     <set field="productIdentifier" from="variantJson.barcode"/>
                 </else-if>
                 <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
-                    <set field="productIdentifier" from="variantJson.id"/>
+                    <set field="productIdentifier" from="currentVariantProductId"/>
                 </else-if>
             </if>
 
@@ -1269,12 +1270,12 @@ under the License.
                 <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="products">
                     <econdition field-name="internalName" from="productIdentifier"/>
                 </entity-find>
-                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
-                    <field-map field-name="productId" from="products?.first?.productId"/>
-                    <field-map field-name="shopId" from="shopId"/>
-                </entity-find-one>
-                <if condition="shopifyShopProduct">
-                    <set field="variantProductId" from="shopifyShopProduct.shopifyProductId"/>
+                <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="shopifyShopProducts">
+                    <econdition field-name="productId" from="products?.first?.productId"/>
+                    <order-by field-name="lastUpdatedStamp"/>
+                </entity-find>
+                <if condition="shopifyShopProducts">
+                    <set field="variantProductId" from="shopifyShopProducts[0].shopifyProductId"/>
                 </if>
             </if>
 
@@ -1316,17 +1317,18 @@ under the License.
                 ]]></script>
 
                 <script><![CDATA[
-                    def identifications = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantJson.id ?: '']
+                    def identifications = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: currentVariantProductId]
                     createProductUpdateHistoryMap.identifications = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
                     createProductUpdateHistoryMap.identificationsHash = hash(identifications)
                 ]]></script>
 
-                <set field="createProductUpdateHistoryMap.price" from="variantJson.price"/>
+                <set field="
+                .price" from="variantJson.price"/>
                 <set field="createProductUpdateHistoryMap.parentProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id)"/>
 
                 <script><![CDATA[
                     def diffMap = [
-                        id             : variantJson.id,
+                        id             : currentVariantProductId,
                         parentProductId : co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id),
                         sku            : variantJson.sku,
                         title          : variantJson.title,
@@ -1354,7 +1356,7 @@ under the License.
             <set field="diffMap" from="[:]"/>
             <script><![CDATA[
                 // --- Identifications ---
-                def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantJson.id ?: '']
+                def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantProductId ?: '']
                 def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
                 if (!oldIdent.equals(newIdent)) {
                     diffMap.identifications = newIdent
@@ -1410,6 +1412,7 @@ under the License.
                 def newCoreHash = hash(parts.join('||'))
                 if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
                     diffMap.productCoreDetailsHash = newCoreHash
+                    diffMap.id = currentVariantProductId
                     diffMap.position = variantJson.position
                     diffMap.title = variantJson.title
                     diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
