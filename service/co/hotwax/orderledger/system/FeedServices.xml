@@ -114,6 +114,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="inputPath" required="true"/>
+            <parameter name="additionalParameters" type="Map"/>
             <parameter name="systemMessageId" required="true"/>
             <parameter name="shopId" required="true"/>
         </in-parameters>
@@ -136,6 +137,18 @@ under the License.
                         return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
                     }
                 }
+                def compareValues = { incomingParamValue, paramValue ->
+                    if (incomingParamValue == paramValue) {
+                        return true
+                    } else if (incomingParamValue instanceof String && paramValue instanceof String) {
+                        return incomingParamValue == paramValue
+                    } else if (incomingParamValue instanceof List && paramValue instanceof List) {
+                        return incomingParamValue.sort() == paramValue.sort()
+                    } else if (incoingParamValue instanceof Map && paramValue instanceof Map) {
+                        return hash(incomingParamValue) == hash(paramValue)
+                    }
+                    return false
+                }
                 try(InputStream inputStream = ec.resource.getLocationStream(inputPath);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
                     String line
@@ -149,6 +162,16 @@ under the License.
                         boolean isMetafield = id.contains("/Metafield/")
 
                         if (isVirtual) {
+                            boolean skipProductImport = false
+                            additionalParameters.each { paramName, paramValue ->
+                                if (jsonLine.containsKey(paramName) && compareValues(jsonLine[paramName], paramValue)) {
+                                    skipProductImport = true
+                                    return
+                                }
+                            }
+                            if (skipProductImport) {
+                                continue
+                            }
                             // Process previous virtual group
                             if (virtualProduct) {
                                 variantIds = []
@@ -248,6 +271,14 @@ under the License.
 
                     // Final group
                     if (virtualProduct) {
+                        boolean skipProductImport = false
+                        additionalParameters.each { paramName, paramValue ->
+                            if (virtualProduct.containsKey(paramName) && compareValues(virtualProduct[paramName], paramValue)) {
+                               skipProductImport = true
+                               return
+                            }
+                        }
+                        if (!skipProductImport) {
                         def variantIds = []
                         virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                             .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
@@ -324,6 +355,7 @@ under the License.
                                 .requireNewTransaction(true)
                                 .parameters(updateParams)
                                 .call()
+                        }
                         }
                     }
                 } catch (Exception e) {

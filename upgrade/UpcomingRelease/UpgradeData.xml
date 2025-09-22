@@ -31,7 +31,9 @@
     <moqui.service.message.SystemMessageType systemMessageTypeId="GenerateOMSUpdateProductsFeedNew"
                                              description="Generate OMS New Products Feed"
                                              sendServiceName="co.hotwax.sob.system.FeedServices.generate#OMSFeedNew">
-        <parameters parameterName="forCreate" parameterValue="true"/>
+        <!-- Add the SystemMessageTypeParameters to skip product import, applicable on the virtual product fields
+        <parameters parameterName="vendor" parameterValue="recurate"/>
+        -->
     </moqui.service.message.SystemMessageType>
     <moqui.basic.Enumeration description="Generate OMS Update Products Feed" enumId="GenerateOMSUpdateProductsFeedNew" enumTypeId="SOBMessageTypeEnum" relatedEnumId="ProductUpdatesFeedNew" relatedEnumTypeId="OMSMessageTypeEnum"/>
 
