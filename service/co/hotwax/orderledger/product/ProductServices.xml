@@ -1207,13 +1207,15 @@ under the License.
                 newTags = newTagsRaw.collect { it.toString().trim() }.findAll { it }
             }
             newTags = newTags.sort()
-            def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
-            def addedTags = (newTags - oldTags).collect { it.toString() }
-            def removedTags = (oldTags - newTags).collect { it.toString() }
-            if (addedTags || removedTags) {
-                differenceMap.tags = [added: addedTags, removed: removedTags]
-            }
             def newTagsHash = hash(newTags)
+            if (newTagsHash != productUpdateHistory.tagsHash) {
+                def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
+                def addedTags = (newTags - oldTags).collect { it.toString() }
+                def removedTags = (oldTags - newTags).collect { it.toString() }
+                if (addedTags || removedTags) {
+                    differenceMap.tags = [added: addedTags, removed: removedTags]
+                }
+            }
 
             // --- Features ---
             def newFeatures = []
@@ -1230,23 +1232,28 @@ under the License.
                 def sequenceNumberB = b.split('/')[0].toInteger()
                 return sequenceNumberA <=> sequenceNumberB
             }
-            def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
-            def addedFeatures = (newFeatures - oldFeatures).collect { it.toString() }
-            def removedFeatures = (oldFeatures - newFeatures).collect { it.toString() }
-            if (addedFeatures || removedFeatures) {
-                differenceMap.features = [added: addedFeatures, removed: removedFeatures]
-            }
             def newFeaturesHash = hash(newFeatures)
+            if (newFeaturesHash != productUpdateHistory.featuresHash) {
+                def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+                def addedFeatures = (newFeatures - oldFeatures).collect { it.toString() }
+                def removedFeatures = (oldFeatures - newFeatures).collect { it.toString() }
+                if (addedFeatures || removedFeatures) {
+                    differenceMap.features = [added: addedFeatures, removed: removedFeatures]
+                }
+            }
 
             // --- Identifications ---
             def newIdent = [id: productJson.id]
-            def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
-            if (!oldIdent.equals(newIdent)) {
-                differenceMap.identifications = newIdent
-            }
             def identificationsHash = hash(newIdent)
+            if (identificationsHash != productUpdateHistory.identificationsHash) {
+                def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
+                if (!oldIdent.equals(newIdent)) {
+                    differenceMap.identifications = newIdent
+                }
+            }
 
             // --- Persist if changed ---
+            updateMap = [:]
             if (!differenceMap.isEmpty()) {
                 // prepare JSON serialized fields for storage
                 updateMap = [
@@ -1264,7 +1271,9 @@ under the License.
                 ]
             }
             ]]></script>
-            <service-call name="update#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
+            <if condition="updateMap">
+                <service-call name="update#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
+            </if>
         </actions>
     </service>
     <service verb="compare" noun="VariantProduct">
@@ -1414,11 +1423,13 @@ under the License.
             <script><![CDATA[
                 // --- Identifications ---
                 def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantProductId ?: '']
-                def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
-                if (!oldIdent.equals(newIdent)) {
-                    diffMap.identifications = newIdent
-                }
                 def identHash = hash(newIdent)
+                if (identHash != productUpdateHistory.identificationsHash) {
+                    def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
+                    if (!oldIdent.equals(newIdent)) {
+                        diffMap.identifications = newIdent
+                    }
+                }
 
                 // --- Price ---
                 def newPrice = variantJson?.price
@@ -1434,25 +1445,29 @@ under the License.
 
                 // --- Features ---
                 def newFeatures = (variantJson.selectedOptions ?: []).collect { "${it.name}/${it.value}" }.sort()
-                def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
-                def addedFeatures = (newFeatures - oldFeatures)
-                def removedFeatures = (oldFeatures - newFeatures)
-                if (addedFeatures || removedFeatures) {
-                    diffMap.features = [:]
-                    if (addedFeatures) diffMap.features.added = addedFeatures
-                    if (removedFeatures) diffMap.features.removed = removedFeatures
-                }
                 def featuresHash = hash(newFeatures)
+                if (featuresHash != productUpdateHistory.featuresHash) {
+                    def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+                    def addedFeatures = (newFeatures - oldFeatures)
+                    def removedFeatures = (oldFeatures - newFeatures)
+                    if (addedFeatures || removedFeatures) {
+                        diffMap.features = [:]
+                        if (addedFeatures) diffMap.features.added = addedFeatures
+                        if (removedFeatures) diffMap.features.removed = removedFeatures
+                    }
+                }
 
                 // --- Tags ---
                 def newTags = (variantJson.product?.productType ? [variantJson.product.productType.toString()] : []).sort()
-                def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
-                def addedTags = (newTags - oldTags)
-                def removedTags = (oldTags - newTags)
-                if (addedTags || removedTags) {
-                    diffMap.tags = [added: addedTags, removed: removedTags]
-                }
                 def tagsHash = hash(newTags)
+                if (tagsHash != productUpdateHistory.tagsHash) {
+                    def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
+                    def addedTags = (newTags - oldTags)
+                    def removedTags = (oldTags - newTags)
+                    if (addedTags || removedTags) {
+                        diffMap.tags = [added: addedTags, removed: removedTags]
+                    }
+                }
 
                 // --- Core details hash ---
                 def parts = [
