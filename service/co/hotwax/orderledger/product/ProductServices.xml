@@ -973,8 +973,8 @@ under the License.
             </script>
 
             <!-- Metafield handling (metafield entries have key/namespace/value and __parentId) -->
-            <if condition="productJson.key != null &amp;&amp; productJson.namespace != null &amp;&amp; productJson.value != null &amp;&amp; productJson.__parentId != null">
-                <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.__parentId)"/>
+            <if condition="productJson.metafields">
+                <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.id)"/>
                 <set field="diffMap" from="[:]"/>
                 <!-- If same handle is used for another virtual product then update the existing product -->
                 <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
@@ -993,19 +993,69 @@ under the License.
                     <field-map field-name="shopId"/>
                 </entity-find-one>
 
-                <script>
-                    def oldSet = ContextJavaUtil.jacksonMapper.readValue(history?.metafields ?: "[]", List.class) as Set
-                    def newVal = "${productJson.key}/${productJson.namespace}/${productJson.value}"
-                    if (!oldSet.contains(newVal)) {
-                    diffMap.metafields = [added: [newVal], removed: []]
-                    def newMetafields = (oldSet + newVal) as List
-                    newMetafields = newMetafields.collect { it.toString() }.sort()
-                    }
-                </script>
+                <script><![CDATA[
+                    def newMetafields = (productJson.metafields ?: []).collect { mf ->
+                        [
+                            key: mf.key?.toString(),
+                            namespace: mf.namespace?.toString(),
+                            value: mf.value?.toString()
+                        ]
+                    }.findAll { it.key && it.namespace }
 
-                <service-call name="store#co.hotwax.product.ProductUpdateHistory"
-                              in-map="[productId: virtualProductId, shopId: shopId, systemMessageId: systemMessageId, metafields: ContextJavaUtil.jacksonMapper.writeValueAsString(newMetafields)]"
-                              transaction="force-new"/>
+                    // Load old metafields from history
+                    def oldMetafields = ContextJavaUtil.jacksonMapper.readValue(history?.metafields ?: "[]", List.class)
+                    oldMetafields = oldMetafields.collect { [
+                        key: it.key?.toString(),
+                        namespace: it.namespace?.toString(),
+                        value: it.value?.toString()
+                    ] }.findAll { it.key && it.namespace }
+
+                    // Compute hashes
+                    def newHash = hash(newMetafields)
+                    def oldHash = history?.metafieldsHash
+
+                    if (newHash != oldHash) {
+                        // Indexes for comparison
+                        def oldIndex = oldMetafields.collectEntries { [("${it.key}|${it.namespace}") : it.value] }
+                        def newIndex = newMetafields.collectEntries { [("${it.key}|${it.namespace}") : it.value] }
+
+                        def added = []
+                        def removed = []
+
+                        newIndex.each { kn, newVal ->
+                            if (!oldIndex.containsKey(kn)) {
+                                def parts = kn.split("\\|", 2)
+                                added << [key: parts[0], namespace: parts[1], value: newVal]
+                            } else if (oldIndex[kn] != newVal) {
+                                def parts = kn.split("\\|", 2)
+                                removed << [key: parts[0], namespace: parts[1], value: oldIndex[kn]]
+                                added   << [key: parts[0], namespace: parts[1], value: newVal]
+                            }
+                        }
+
+                        // Merge into diffMap.metafields
+                        diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
+                        def diffMetafields = diffMap.metafields ?: [added: [], removed: []]
+                        diffMetafields.added   = (diffMetafields.added + added).unique()
+                        diffMetafields.removed = (diffMetafields.removed + removed).unique()
+                        diffMap.metafields = diffMetafields
+                    } else {
+                        diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
+                        diffMap.metafields = []
+                    }
+                    // Prepare update
+                        updateMap = [
+                            productId      : virtualProductId,
+                            shopId         : shopId,
+                            systemMessageId: systemMessageId,
+                            metafields     : ContextJavaUtil.jacksonMapper.writeValueAsString(newMetafields),
+                            metafieldsHash : newHash,
+                            differenceMap  : ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                        ]
+                ]]></script>
+                <if condition="updateMap">
+                    <service-call name="store#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
+                </if>
                 <return/>
             </if>
 
@@ -1119,6 +1169,14 @@ under the License.
 
             <!-- Update case -->
             <set field="differenceMap" from="[:]"/>
+            <if condition="productUpdateHistory.differenceMap">
+                <script>
+                    def existingDifferenceMap = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.differenceMap, Map.class)
+                </script>
+                <if condition="existingDifferenceMap.metafields">
+                    <set field="differenceMap.metafields" from="existingDifferenceMap.metafields"/>
+                </if>
+            </if>
             <script><![CDATA[
             // --- Core Product Hash ---
             def parts = [
@@ -1322,8 +1380,7 @@ under the License.
                     createProductUpdateHistoryMap.identificationsHash = hash(identifications)
                 ]]></script>
 
-                <set field="
-                .price" from="variantJson.price"/>
+                <set field="price" from="variantJson.price"/>
                 <set field="createProductUpdateHistoryMap.parentProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id)"/>
 
                 <script><![CDATA[

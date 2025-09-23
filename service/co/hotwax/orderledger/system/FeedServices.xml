@@ -195,11 +195,11 @@ under the License.
                                 }
 
                                 // Compare metafields
-                                for (Map metafield : metafields) {
-                                    metafield.put("productId", virtualProduct.id)
+                                if (metafields) {
+                                    virtualProduct.put("metafields", metafields)
                                     ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
-                                        .parameters([productJson: metafield, systemMessageId: systemMessageId, shopId: shopId])
-                                        .call()
+                                        .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
+                                        .requireNewTransaction(true).call()
                                 }
 
                                 // Assocs handling
@@ -297,11 +297,11 @@ under the License.
                             }
                         }
 
-                        for (Map metafield: metafields) {
-                            metafield.put("productId", virtualProduct.id)
+                        if (metafields) {
+                            virtualProduct.put("metafields", metafields)
                             ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
-                                .parameters([productJson: metafield, systemMessageId: systemMessageId, shopId: shopId])
-                                .call()
+                                .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
+                                .requireNewTransaction(true).call()
                         }
 
                         if (variantIds) {
@@ -616,6 +616,43 @@ under the License.
                             </entity-find>
                             <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
                         </if>
+                    </iterate>
+                </if>
+                <if condition="diff.metafields?.added">
+                    <iterate list="diff.metafields.added" entry="metafield">
+                        <!-- metafield is a map: [key, namespace, value] -->
+                        <set field="attrName" from="metafield.key"/>
+                        <set field="attrType" from="metafield.namespace"/>
+                        <set field="attrValue" from="metafield.value"/>
+                        <set field="attrDescription" from="'Shopify Metafield'"/>
+
+                        <!-- Upsert logic: check if already exists -->
+                        <entity-find-one entity-name="org.apache.ofbiz.product.product.ProductAttribute" value-field="existingAttr">
+                            <field-map field-name="productId" from="productId"/>
+                            <field-map field-name="attrName" from="attrName"/>
+                        </entity-find-one>
+
+                        <if condition="existingAttr">
+                            <!-- Update value if different -->
+                            <if condition="existingAttr.attrValue != attrValue || existingAttr.attrType != attrType">
+                                <service-call name="update#org.apache.ofbiz.product.product.ProductAttribute"
+                                              in-map="[productId:productId, attrName:attrName, attrValue:attrValue,
+                                              attrType:attrType, attrDescription:attrDescription]"/>
+                            </if>
+                            <else>
+                                <!-- Create new metafield -->
+                                <service-call name="create#org.apache.ofbiz.product.product.ProductAttribute"
+                                              in-map="[productId:productId, attrName:attrName, attrValue:attrValue,
+                                              attrType:attrType, attrDescription:attrDescription]"/>
+                            </else>
+                        </if>
+                    </iterate>
+                </if>
+
+                <!-- Handle removed metafields -->
+                <if condition="diff.metafields?.removed">
+                    <iterate list="diff.metafields.removed" entry="metafield">
+                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAttribute" in-map="[productId:productId, attrName:metafield.key]"/>
                     </iterate>
                 </if>
                 <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
