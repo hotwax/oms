@@ -988,7 +988,7 @@ under the License.
                     <set field="virtualProductId" from="shopifyShopProduct?.shopifyProductId ?: virtualProductId"/>
                 </if>
 
-                <entity-find-one entity-name="ProductUpdateHistory" value-field="history">
+                <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="history">
                     <field-map field-name="productId" from="virtualProductId"/>
                     <field-map field-name="shopId"/>
                 </entity-find-one>
@@ -1074,7 +1074,7 @@ under the License.
                 <set field="virtualProductId" from="shopifyShopProduct?.shopifyProductId ?: virtualProductId"/>
             </if>
 
-            <entity-find-one entity-name="ProductUpdateHistory" value-field="productUpdateHistory">
+            <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="productUpdateHistory">
                 <field-map field-name="productId" from="virtualProductId"/>
                 <field-map field-name="shopId"/>
             </entity-find-one>
@@ -1346,7 +1346,7 @@ under the License.
                 </if>
             </if>
 
-            <entity-find-one entity-name="ProductUpdateHistory" value-field="productUpdateHistory">
+            <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="productUpdateHistory">
                 <field-map field-name="productId" from="variantProductId"/>
                 <field-map field-name="shopId"/>
             </entity-find-one>
@@ -1414,7 +1414,6 @@ under the License.
                 ]]></script>
 
                 <service-call name="create#co.hotwax.product.ProductUpdateHistory" in-map="createProductUpdateHistoryMap" transaction="force-new"/>
-                <set field="diffMap" from="variantJson"/>
                 <return/>
             </if>
 
