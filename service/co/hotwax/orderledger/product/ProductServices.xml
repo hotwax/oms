@@ -1355,6 +1355,21 @@ under the License.
                             </entity-find-one>
                             <if condition="product.internalName != productIdentifier">
                                 <service-call name="delete#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopId, shopifyProductId:currentVariantProductId]" transaction="force-new"/>
+                                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="parentShopifyShopProduct">
+                                    <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.__parentId)"/>
+                                    <field-map field-name="shopId" from="shopId"/>
+                                </entity-find-one>
+                                <if condition="parentShopifyShopProduct">
+                                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                                        <econdition field-name="productIdTo" from="product.productId"/>
+                                        <econdition field-name="productId" from="parentShopifyShopProduct.productId"/>
+                                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                                        <date-filter/>
+                                    </entity-find>
+                                    <iterate list="productAssocs" entry="productAssoc">
+                                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new"/>
+                                    </iterate>
+                                </if>
                                 <service-call name="delete#co.hotwax.product.ProductUpdateHistory" in-map="[productId:currentVariantProductId, shopId:shopId]" transaction="force-new"/>
                             </if>
                         </if>

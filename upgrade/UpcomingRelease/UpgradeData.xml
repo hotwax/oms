@@ -30,8 +30,9 @@
 
 
     <moqui.service.message.SystemMessageType systemMessageTypeId="GenerateOMSUpdateProductsFeedNew"
-                                             description="Generate OMS New Products Feed"
-                                             sendServiceName="co.hotwax.sob.system.FeedServices.generate#OMSFeedNew">
+                                             description="Generate OMS Products Feed"
+                                             sendServiceName="co.hotwax.sob.system.FeedServices.generate#OMSFeedNew"
+                                             consumeServiceName="co.hotwax.orderledger.system.FeedServices.transform#JsonLToJsonForUpdatedProducts">
         <!-- Add the SystemMessageTypeParameters to skip product import, applicable on the virtual product fields
         <parameters parameterName="vendor" parameterValue="recurate"/>
         -->
