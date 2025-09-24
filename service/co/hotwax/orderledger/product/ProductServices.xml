@@ -1343,6 +1343,22 @@ under the License.
                 </entity-find>
                 <if condition="shopifyShopProducts">
                     <set field="variantProductId" from="shopifyShopProducts[0].shopifyProductId"/>
+                    <else>
+                        <!-- To handle products with same primary identifier, if the primary identifier is modified on Shopify side then delete the old mapping -->
+                        <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                            <field-map field-name="shopId"/>
+                            <field-map field-name="shopifyProductId" from="currentVariantProductId"/>
+                        </entity-find-one>
+                        <if condition="shopifyShopProduct">
+                            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                                <field-map field-name="productId" from="shopifyShopProduct.productId"/>
+                            </entity-find-one>
+                            <if condition="product.internalName != productIdentifier">
+                                <service-call name="delete#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopId, shopifyProductId:currentVariantProductId]" transaction="force-new"/>
+                                <service-call name="delete#co.hotwax.product.ProductUpdateHistory" in-map="[productId:currentVariantProductId, shopId:shopId]" transaction="force-new"/>
+                            </if>
+                        </if>
+                    </else>
                 </if>
             </if>
 

@@ -144,7 +144,7 @@ under the License.
                         return incomingParamValue == paramValue
                     } else if (incomingParamValue instanceof List && paramValue instanceof List) {
                         return incomingParamValue.sort() == paramValue.sort()
-                    } else if (incoingParamValue instanceof Map && paramValue instanceof Map) {
+                    } else if (incomingParamValue instanceof Map && paramValue instanceof Map) {
                         return hash(incomingParamValue) == hash(paramValue)
                     }
                     return false
@@ -388,8 +388,11 @@ under the License.
 
             <iterate list="productUpdateHistories" entry="productUpdateHistory">
                 <service-call name="co.hotwax.orderledger.system.FeedServices.consume#ProductUpdateWorker"
-                              in-map="[productUpdateHistory:productUpdateHistory, shopId:shopId]"
+                              in-map="[productUpdateHistory:productUpdateHistory, shopId:shopId]" out-map="context"
                               transaction="force-new"/>
+                <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
+                              in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
+                <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
             </iterate>
         </actions>
     </service>
@@ -402,6 +405,9 @@ under the License.
             <parameter name="productUpdateHistory" type="Map" required="true"/>
             <parameter name="shopId" required="true"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="productId"/>
+        </out-parameters>
         <actions>
             <script>
                 diff = productUpdateHistory.differenceMap ? org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.differenceMap, Map.class) : null
@@ -419,6 +425,28 @@ under the License.
                 <order-by field-name="lastUpdatedStamp"/>
             </entity-find>
             <set field="productId" from="shopifyShopProducts ? shopifyShopProducts[0].productId : null"/>
+            <if condition="diff.identifications">
+                <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
+                    <set field="productIdentifier" from="diff.identifications.sku"/>
+                    <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
+                        <set field="productIdentifier" from="diff.identifications.barcode"/>
+                    </else-if>
+                    <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
+                        <set field="productIdentifier" from="productUpdateHistory.productId"/>
+                    </else-if>
+                </if>
+                <if condition="productIdentifier">
+                    <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="existingProduct">
+                        <econdition field-name="internalName" from="productIdentifier"/>
+                    </entity-find>
+                    <if condition="existingProduct">
+                        <set field="productId" from="existingProduct[0].productId"/>
+                        <else>
+                            <set field="productId" from="null"/>
+                        </else>
+                    </if>
+                </if>
+            </if>
 
             <if condition="!productUpdateHistory.parentProductId">
                 <set field="product" from="[:]"/>
@@ -942,9 +970,6 @@ under the License.
                     </if>
                 </else>
             </if>
-            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                          in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
-            <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
         </actions>
     </service>
 </services>
