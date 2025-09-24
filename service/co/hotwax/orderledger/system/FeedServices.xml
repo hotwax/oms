@@ -365,7 +365,7 @@ under the License.
             ]]></script>
         </actions>
     </service>
-    <service verb="consume" noun="OMSFeedNew" transaction-timeout="1800">
+    <service verb="consume" noun="UpdatedProductHistories" transaction-timeout="1800">
         <description>
             Orchestrates processing of product updates by iterating over ProductUpdateHistory entries
             and delegating each to the worker service in a new transaction.
