@@ -472,4 +472,65 @@ under the License.
             <return message="New BOPIS Order Notification Service Ran Successfully At ${nowDate}."/>
         </actions>
     </service>
+    <service verb="send" noun="PickupReminderAtRegularInterval" authenticate="anonymous-all">
+        <description>
+            Service to send reminder emails for packed shipments with STOREPICKUP method at regular intervals. This service should be scheduled to run once in a day.
+        </description>
+        <in-parameters>
+            <parameter name="emailType" default-value="REM_READY_FOR_PICKUP"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="intervalDays" type="Integer" default-value="7">
+                <description>Specifies the number of days between each reminder email; the service will repeat the action every nth day as defined by this value.</description>
+            </parameter>
+            <parameter name="maxOccurrences" type="Integer" default-value="3">
+                <description>Specifies the maximum number of times the reminder email should be sent for each shipment.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <set field="nowTimestamp" from="ec.user.nowTimestamp"/>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return error="true" message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
+            <script>
+                import java.time.LocalDateTime
+                import java.time.temporal.ChronoUnit
+                import java.time.ZoneId
+                import java.sql.Timestamp
+
+                def intervalList = (1..maxOccurrences).collect { it }
+            </script>
+
+            <iterate list="intervalList" entry="interval">
+                <script>
+                    def targetDate = nowTimestamp.toLocalDateTime().minusDays(interval * intervalDays)
+                    def packedDateStart = Timestamp.valueOf(targetDate.truncatedTo(ChronoUnit.DAYS))
+                    def packedDateEnd = Timestamp.valueOf(targetDate.truncatedTo(ChronoUnit.DAYS).plusDays(1).minus(1, ChronoUnit.MILLIS))
+                </script>
+
+                <!-- Fetch packed shipments with STOREPICKUP method -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentAndShipmentStatus" list="shipments" distinct="true">
+                    <econdition field-name="statusId" value="SHIPMENT_PACKED"/>
+                    <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                    <econdition field-name="shipmentTypeId" value="SALES_SHIPMENT"/>
+                    <econdition field-name="statusDate" operator="greater-equals" from="packedDateStart"/>
+                    <econdition field-name="statusDate" operator="less-equals" from="packedDateEnd"/>
+                    <use-iterator/>
+                </entity-find>
+
+                <!-- Iterate over shipments -->
+                <iterate list="shipments" entry="shipment">
+                    <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
+                                  in-map="[shipmentId: shipment.shipmentId, emailType: emailType]" transaction="force-new" />
+                </iterate>
+            </iterate>
+            <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
+        </actions>
+    </service>
 </services>
