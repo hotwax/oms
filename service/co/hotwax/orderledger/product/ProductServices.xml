@@ -1223,14 +1223,11 @@ under the License.
                         def position = opt.position
                         def name = opt.name
                         (opt.optionValues ?: []).each { val ->
-                            features << "${sequence++}/${position}/${name}/${val.name}"
+                            features << [sequenceNumber: sequence++, position: position, name: name, value: val.name]
                         }
                     }
-                    features = features.collect { it.toString() }.sort { a, b ->
-                        def sequenceNumberA = a.split('/')[0].toInteger()
-                        def sequenceNumberB = b.split('/')[0].toInteger()
-                        return sequenceNumberA <=> sequenceNumberB
-                    }
+                    // Sort by sequenceNumber
+                    features = features.sort { it.sequenceNumber }
                     def featuresHash = hash(features)
 
                     // identifications map
@@ -1331,17 +1328,13 @@ under the License.
             def newFeatures = []
             def sequence = 1
             (productJson.options ?: []).each { opt ->
-                def pos = opt.position
+                def position = opt.position
                 def name = opt.name
                 (opt.optionValues ?: []).each { val ->
-                    newFeatures << "${sequence++}/${pos}/${name}/${val.name}"
+                    newFeatures << [sequenceNumber: sequence++, position: position, name: name, value: val.name]
                 }
             }
-            newFeatures = newFeatures.collect { it.toString() }.sort { a, b ->
-                def sequenceNumberA = a.split('/')[0].toInteger()
-                def sequenceNumberB = b.split('/')[0].toInteger()
-                return sequenceNumberA <=> sequenceNumberB
-            }
+            newFeatures = newFeatures.sort { it.sequenceNumber }
             def newFeaturesHash = hash(newFeatures)
             if (newFeaturesHash != productUpdateHistory.featuresHash) {
                 def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
@@ -1399,6 +1392,8 @@ under the License.
             <script>
                 import org.apache.commons.codec.digest.DigestUtils
                 import org.moqui.impl.context.ContextJavaUtil
+                import java.math.BigDecimal
+                import java.math.RoundingMode
 
                 def hash = { listOrMap ->
                     if (listOrMap instanceof Map) {
@@ -1517,11 +1512,15 @@ under the License.
                 <set field="tags" from="(variantJson.product?.productType ? [variantJson.product.productType.toString()] : [])"/>
                 <script>
                     createProductUpdateHistoryMap.tags = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
+                    createProductUpdateHistoryMap.tagsHash = hash(tags)
                 </script>
 
                 <script><![CDATA[
-                    def features = (variantJson.selectedOptions ?: []).collect { "${it.name}/${it.value}" }.sort()
+                    def features = (variantJson.selectedOptions ?: []).collect { opt ->
+                        [name: opt.name, value: opt.value] }.sort { a, b -> a.name <=> b.name }
+                    def featuresHash = hash(features)
                     createProductUpdateHistoryMap.features = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
+                    createProductUpdateHistoryMap.featuresHash = featuresHash
                 ]]></script>
 
                 <script><![CDATA[
@@ -1530,7 +1529,7 @@ under the License.
                     createProductUpdateHistoryMap.identificationsHash = hash(identifications)
                 ]]></script>
 
-                <set field="price" from="variantJson.price"/>
+                <set field="createProductUpdateHistoryMap.price" from="variantJson.price"/>
                 <set field="createProductUpdateHistoryMap.parentProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id)"/>
 
                 <script><![CDATA[
@@ -1572,9 +1571,14 @@ under the License.
                 }
 
                 // --- Price ---
-                def newPrice = variantJson?.price
-                if (newPrice != productUpdateHistory.price) {
-                    diffMap.price = newPrice
+                def newPriceString = variantJson?.price
+                if (newPriceString) {
+                    def newPrice = new BigDecimal(newPriceString).setScale(2, RoundingMode.HALF_UP)
+                    def oldPrice = productUpdateHistory.price ? new BigDecimal(productUpdateHistory.price).setScale(2, RoundingMode.HALF_UP) : null
+
+                    if (!oldPrice || newPrice.compareTo(oldPrice) != 0) {
+                        diffMap.price = newPrice.toPlainString()
+                    }
                 }
 
                 // --- Assocs ---
@@ -1584,7 +1588,8 @@ under the License.
                 }
 
                 // --- Features ---
-                def newFeatures = (variantJson.selectedOptions ?: []).collect { "${it.name}/${it.value}" }.sort()
+                def newFeatures = (variantJson.selectedOptions ?: []).collect { opt ->
+                    [name: opt.name, value: opt.value] }.sort { a, b -> a.name <=> b.name }
                 def featuresHash = hash(newFeatures)
                 if (featuresHash != productUpdateHistory.featuresHash) {
                     def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
-    <moqui.service.job.ServiceJob jobName="queue_BulkQuerySystemMessage_BulkProductAndVariantsByIdQuery" description="Queue bulk products query"
+    <moqui.service.job.ServiceJob jobName="queue_BulkQuerySystemMessage_BulkProductAndVariantsById" description="Queue bulk products query"
                                   serviceName="co.hotwax.shopify.system.ShopifySystemMessageServices.queue#BulkQuerySystemMessage" cronExpression="0 0 * * * ?" paused="Y" instanceOfProductId="QUEUE_UPD_PRD_FEED">
         <parameters parameterName="systemMessageTypeId" parameterValue="BulkProductAndVariantsByIdQuery"/>
         <parameters parameterName="systemMessageRemoteId" parameterValue=""/>
@@ -16,7 +16,7 @@
                                              description="Bulk Product and Variants By Id Query System Message"
                                              parentTypeId="ShopifyBulkQuery"
                                              sendServiceName="co.hotwax.shopify.system.ShopifySystemMessageServices.send#BulkQuerySystemMessage"
-                                             sendPath="component://mantle-shopify-connector/template/graphQL/BulkProductAndVariantsByIdQuery.ftl"
+                                             sendPath="component://shopify-connector/template/graphQL/BulkProductAndVariantsByIdQuery.ftl"
                                              consumeServiceName="co.hotwax.shopify.system.ShopifySystemMessageServices.consume#BulkOperationResult"
                                              receivePath="${contentRoot}/shopify/BulkProductAndVariantsByIdQuery/BulkOperationResult-${systemMessageId}-${remoteMessageId}-${nowDate}.jsonl">
         <parameters parameterName="consumeSmrId" parameterValue="" systemMessageRemoteId=""/>
