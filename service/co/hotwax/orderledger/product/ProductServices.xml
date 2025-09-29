@@ -1338,8 +1338,8 @@ under the License.
             def newFeaturesHash = hash(newFeatures)
             if (newFeaturesHash != productUpdateHistory.featuresHash) {
                 def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
-                def addedFeatures = (newFeatures - oldFeatures).collect { it.toString() }
-                def removedFeatures = (oldFeatures - newFeatures).collect { it.toString() }
+                def addedFeatures = (newFeatures - oldFeatures)
+                def removedFeatures = (oldFeatures - newFeatures)
                 if (addedFeatures || removedFeatures) {
                     differenceMap.features = [added: addedFeatures, removed: removedFeatures]
                 }
@@ -1582,7 +1582,7 @@ under the License.
                 }
 
                 // --- Assocs ---
-                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id?.toString())
+                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id?)
                 if (newAssoc != productUpdateHistory.parentProductId) {
                     diffMap.parentProductId = newAssoc
                 }

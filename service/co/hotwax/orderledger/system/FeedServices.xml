@@ -461,18 +461,18 @@ under the License.
                     <set field="product.detailImageUrl" from="diff.featureImageUrl"/>
                 </if>
                 <if condition="diff.isGiftCard">
-                    <set field="product.isGiftCard" from="diff.isGiftCard"/>
+                    <set field="isGiftCard" from="diff.isGiftCard" type="Boolean"/>
                 </if>
                 <if condition="diff.hasVariantsThatRequireComponents">
-                    <set field="product.requiresComponents" from="diff.hasVariantsThatRequireComponents"/>
+                    <set field="requireComponents" from="diff.hasVariantsThatRequireComponents" type="Boolean"/>
                 </if>
 
                 <set field="product.productTypeId" value="FINISHED_GOOD"/>
                 <!-- Read from first variant for requireShipping if false then set to DIGITAL_GOOD -->
-                <if condition="diff.hasVariantsThatRequiresComponents">
+                <if condition="requireComponents">
                     <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
                 </if>
-                <if condition="diff.isGiftCard">
+                <if condition="isGiftCard">
                     <set field="product.productTypeId" value="FINISHED_GOOD"/>
                 </if>
                 <set field="product.isVirtual" value="Y"/>
@@ -649,7 +649,9 @@ under the License.
                                 <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
                                 <date-filter/>
                             </entity-find>
-                            <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                            <if condition="productAssocs">
+                                <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                            </if>
                         </if>
                     </iterate>
                 </if>
@@ -712,14 +714,20 @@ under the License.
                     </if>
 
                     <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                    <if condition="diff.requiresShipping == false">
-                        <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                    <if condition="diff.requiresShipping">
+                        <if condition="!diff.requiresShipping.toBoolean()">
+                            <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                        </if>
                     </if>
-                    <if condition="diff.requiresComponents == true">
-                        <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                    <if condition="diff.requiresComponents">
+                        <if condition="diff.requiresComponents.toBoolean()">
+                            <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                        </if>
                     </if>
-                    <if condition="diff.isGiftCard == true">
-                        <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                    <if condition="diff.isGiftCard">
+                        <if condition="diff.isGiftCard.toBoolean()">
+                            <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                        </if>
                     </if>
                     <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
                     <set field="product.isVariant" value="Y"/>
