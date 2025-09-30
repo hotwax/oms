@@ -1105,12 +1105,27 @@ under the License.
 
                 <script><![CDATA[
                     def newMetafields = (productJson.metafields ?: []).collect { mf ->
-                        [
-                            key: mf.key?.toString(),
-                            namespace: mf.namespace?.toString(),
-                            value: mf.value?.toString()
+                        def key = mf.key
+                        def namespace = mf.namespace
+                        def finalValue = null
+
+                        // Case 1: Direct value (not a reference)
+                        if (mf.value && (!mf.reference || !mf.reference.fields)) {
+                            finalValue = mf.value
+                        } else if (mf.reference?.fields) {
+                            // Case 2: Shopify object reference with fields
+                            def refFieldValue = mf.reference.fields.findResult { field ->
+                                field?.value
+                            }
+                            finalValue = refFieldValue
+                        }
+                        if (finalValue == null) return null
+                        return [
+                            key      : key,
+                            namespace: namespace,
+                            value    : finalValue
                         ]
-                    }.findAll { it.key && it.namespace }
+                    }.findAll { it } // Remove nulls
 
                     // Load old metafields from history
                     def oldMetafields = ContextJavaUtil.jacksonMapper.readValue(history?.metafields ?: "[]", List.class)
@@ -1123,7 +1138,6 @@ under the License.
                     // Compute hashes
                     def newHash = hash(newMetafields)
                     def oldHash = history?.metafieldsHash
-
                     if (newHash != oldHash) {
                         // Indexes for comparison
                         def oldIndex = oldMetafields.collectEntries { [("${it.key}|${it.namespace}") : it.value] }
@@ -1582,7 +1596,7 @@ under the License.
                 }
 
                 // --- Assocs ---
-                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id?)
+                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id)
                 if (newAssoc != productUpdateHistory.parentProductId) {
                     diffMap.parentProductId = newAssoc
                 }
