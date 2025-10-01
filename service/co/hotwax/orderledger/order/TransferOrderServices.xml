@@ -680,7 +680,7 @@
             </entity-find>
 
             <if condition="shipments">
-                <return type="warning" message="Fulfillment process already started for the order [${orderId}]. Cannot cancel the Order."/>
+                <return error="true" message="Fulfillment process already started for the order [${orderId}]. Cannot cancel the Order."/>
             </if>
 
             <!-- Check if any Shipment Receipt record exists for the order then return a warning. -->
@@ -689,7 +689,7 @@
             </entity-find>
 
             <if condition="shipmentReceipts">
-                <return type="warning" message="Receiving process already started for the order [${orderId}]. Cannot cancel the Order."/>
+                <return error="true" message="Receiving process already started for the order [${orderId}]. Cannot cancel the Order."/>
             </if>
 
             <!-- Get all the items for the given transfer order id. -->
