@@ -588,6 +588,13 @@ under the License.
                     <entity name="co.hotwax.order.OrderHeaderAndShipGroup" operation="list"/>
                 </method>
             </resource>
+            <resource name="whFulfillment">
+                <resource name="approve" description="Approve WH Fulfill Transfer Order">
+                    <method type="post">
+                        <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#WhFulfillTransferOrder"/>
+                    </method>
+                </resource>
+            </resource>
         </id>
         <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
             <method type="get">
