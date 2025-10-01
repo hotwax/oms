@@ -65,4 +65,9 @@
          sendServiceName="co.hotwax.orderledger.order.TransferOrderServices.create#TransferOrder"
          sendPath="${contentRoot}/oms/TransferOrderFeed">
     </moqui.service.message.SystemMessageType>
+
+    <moqui.service.message.SystemMessageType systemMessageTypeId="ProductUpdatesFeedNew"
+                                             description="Product Updates Feed New"
+                                             consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#UpdatedProductHistories"/>
+    <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeedNew" enumTypeId="OMSMessageTypeEnum"/>
 </entity-facade-xml>
