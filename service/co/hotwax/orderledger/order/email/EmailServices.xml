@@ -359,22 +359,23 @@ under the License.
             </entity-find-one>
 
             <if condition="!productStoreEmail">
-                <return error="true" message="No product store email setting found for email type ${emailType}"/>
+                <return message="No product store email setting found for email type ${emailType}"/>
             </if>
 
             <!-- Find eligible BOPIS orders -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersIterator" distinct="true">
-                <econdition field-name="orderStatusId" operator="in" value="ORDER_APPROVED,ORDER_CREATED"/>
+                <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderDate,facilityId"/>
+                <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator">
-                <return error="true" message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
+            <if condition="!ordersIterator.hasNext()">
+                <return message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
             </if>
             <script>
                 import java.time.LocalDateTime
@@ -462,7 +463,7 @@ under the License.
             </entity-find-one>
 
             <if condition="!productStoreEmail">
-                <return error="true" message="No product store email setting found for email type ${emailType}"/>
+                <return message="No product store email setting found for email type ${emailType}"/>
             </if>
 
             <!-- Find eligible BOPIS orders -->
@@ -516,7 +517,7 @@ under the License.
             </entity-find-one>
 
             <if condition="!productStoreEmail">
-                <return error="true" message="No product store email setting found for email type ${emailType}"/>
+                <return message="No product store email setting found for email type ${emailType}"/>
             </if>
 
             <script>
