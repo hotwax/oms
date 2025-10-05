@@ -978,7 +978,7 @@ under the License.
                             <field-map field-name="shopifyProductId" from="diff.id"/>
                             <field-map field-name="shopId" from="shopId"/>
                         </entity-find-one>
-                        <if condition="!shopifyShopProduct">
+                        <if condition="!shopifyShopProduct &amp;&amp; diff.inventoryItemId">
                             <service-call name="create#co.hotwax.shopify.ShopifyShopProduct"
                                           in-map="[productId:productId, shopId:shopId, shopifyProductId:diff.id, shopifyInventoryItemId:co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(diff.inventoryItemId)]"/>
                         </if>
@@ -987,7 +987,7 @@ under the License.
                         <econdition field-name="shopifyProductId" from="productUpdateHistory.productId"/>
 <!--                        <field-map field-name="shopId" from="shopId"/>-->
                     </entity-find>
-                    <if condition="!shopifyShopProducts">
+                    <if condition="!shopifyShopProducts &amp;&amp; diff.inventoryItemId">
                         <service-call name="create#co.hotwax.shopify.ShopifyShopProduct"
                                       in-map="[productId:productId, shopId:shopId, shopifyProductId:productUpdateHistory.productId, shopifyInventoryItemId:co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(diff.inventoryItemId)]"/>
                     </if>
