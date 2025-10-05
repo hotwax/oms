@@ -333,7 +333,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
-            <parameter name="productStoreId"/>
+            <parameter name="productStoreId" required="true"/>
             <parameter name="emailType" default-value="BOPIS_STR_CLS_NOTIF"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
@@ -437,7 +437,7 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
-            <parameter name="productStoreId"/>
+            <parameter name="productStoreId" required="true"/>
             <parameter name="emailType" default-value="OPEN_BOPIS_ORD_NOTIF"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
