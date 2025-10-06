@@ -197,12 +197,11 @@ under the License.
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
                 <search-form-inputs default-order-by="-orderDate"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
-                <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
-                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keywrod == ''"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                     <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                 </econditions>
                 <econdition field-name="orderId" ignore-if-empty="true"/>
@@ -216,11 +215,21 @@ under the License.
                 <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
                 <!-- Fetch items for this order -->
+                <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" list="eligibleShipGroups">
+                    <search-form-inputs/>
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="facilityId" ignore-if-empty="true"/>
+                    <select-field field-name="shipGroupSeqId"/>
+                </entity-find>
+
+                <!-- Extract eligible shipGroupSeqIds -->
+                <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
+
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
                     <search-form-inputs input-fields-map="[statusId: statusId]" />
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" ignore-if-empty="true"/>
-                    <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                    <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
                     <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
                         statusId,shippingInstructions,facilityId"/>
                 </entity-find>
