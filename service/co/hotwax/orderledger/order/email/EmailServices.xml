@@ -126,7 +126,7 @@ under the License.
 
             <set field="order.orderUpdateUrl" from="orderUpdateUrl"/>
 
-            <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: orderItems]" out-map="itemsList" ignore-error="true"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.get#ProductDetails" in-map="[orderItems: order.shipGroups[0]?.items]" out-map="itemsList" ignore-error="true"/>
             <set field="order.items" from="itemsList.orderItemsList"/>
 
             <entity-find entity-name="co.hotwax.shopify.ShopifyShop" list="shopifyShop" limit="1" cache="true">
