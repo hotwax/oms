@@ -43,6 +43,17 @@ under the License.
             <if condition="!orderId">
                 <return error="true" message="Order ID is required to send email with type: ${emailType}."/>
             </if>
+            <if condition="orderItems">
+                <set field="orderItemList" from="[]"/>
+                <iterate list="orderItems" entry="item">
+                    <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
+                        <field-map field-name="orderId" from="item?.orderId"/>
+                        <field-map field-name="orderItemSeqId" from="item?.orderItemSeqId"/>
+                    </entity-find-one>
+                    <set field="orderItemList" from="orderItemList + [orderItem]"/>
+                </iterate>
+                <set field="orderItems" from="orderItemList"/>
+            </if>
             <if condition="orderItemSeqId">
                 <entity-find-one entity-name="co.hotwax.order.OrderItemAndShipGroup" value-field="orderItem">
                     <field-map field-name="orderId"/>
@@ -88,7 +99,7 @@ under the License.
             </script>
             <set field="order.orderDate" from="order.orderDate.toString()"/>
             <iterate list="order.shipGroups" entry="shipGroup">
-                <if condition="orderItems?.first.shipGroupSeqId == shipGroup.shipGroupSeqId">
+                <if condition="orderItems[0]?.shipGroupSeqId == shipGroup.shipGroupSeqId">
                     <set field="facilityId" from="shipGroup.facilityId"/>
                 </if>
                 <iterate list="shipGroup.items" entry="item">
@@ -333,7 +344,8 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
-            <parameter name="productStoreId"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="emailType" default-value="BOPIS_STR_CLS_NOTIF"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
             </parameter>
@@ -352,26 +364,36 @@ under the License.
                 <set field="sinceDate" from="lastRunParam?.parameterValue"/>
             </if>
 
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
             <!-- Find eligible BOPIS orders -->
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersList" distinct="true">
-                <econdition field-name="orderStatusId" operator="in" value="ORDER_APPROVED,ORDER_CREATED"/>
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersIterator" distinct="true">
+                <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderDate,facilityId"/>
+                <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersList">
-                <return error="true" message="No valid BOPIS orders found, not sending store close notification email."/>
+            <if condition="!ordersIterator.hasNext()">
+                <return message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
             </if>
             <script>
                 import java.time.LocalDateTime
                 import java.time.LocalTime
                 import java.sql.Time
             </script>
-            <iterate list="ordersList" entry="order">
+            <iterate list="ordersIterator" entry="order">
                 <script>
                     LocalDateTime orderDateTime = order.orderDate.toLocalDateTime()
                     String dayOfWeek = orderDateTime.getDayOfWeek().toString().toLowerCase()
@@ -407,7 +429,7 @@ under the License.
                     <if condition="isValidOrder">
                         <set field="storeHour" from="[openingHoursMtoS:storeOpenTime,colsingHoursMtoS:storeCloseTime,openingHoursSunday:sundayOpenTime,colsingHoursSunday:sundayCloseTime]"/>
                         <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                                      in-map="[orderId: order.orderId, emailType: 'BopisSCloseNotification', additionalFields:storeHour]"/>
+                                      in-map="[orderId: order.orderId, emailType: emailType, additionalFields:storeHour]" async="true"/>
                     </if>
                 </if>
             </iterate>
@@ -426,7 +448,8 @@ under the License.
         </description>
         <in-parameters>
             <parameter name="orderIds"/>
-            <parameter name="productStoreId"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="emailType" default-value="OPEN_BOPIS_ORD_NOTIF"/>
             <parameter name="jobName">
                 <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
             </parameter>
@@ -445,8 +468,17 @@ under the License.
                 <set field="sinceDate" from="lastRunParam?.parameterValue"/>
             </if>
 
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
             <!-- Find eligible BOPIS orders -->
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersList" distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersIterator" distinct="true">
                 <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
@@ -454,14 +486,15 @@ under the License.
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
                 <select-field field-name="orderId"/>
+                <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersList">
-                <return error="true" message="No valid BOPIS orders found, not sending notification email."/>
+            <if condition="!ordersIterator.hasNext()">
+                <return message="No valid BOPIS orders found at ${nowDate}, not sending notification email."/>
             </if>
-            <iterate list="ordersList" entry="order">
+            <iterate list="ordersIterator" entry="order">
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                              in-map="[orderId: order.orderId, emailType: 'BopisPickUpNotification']"/>
+                              in-map="[orderId: order.orderId, emailType: emailType]" async="true"/>
             </iterate>
 
             <!-- Update job parameter if jobName is provided -->
@@ -470,6 +503,71 @@ under the License.
                               in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
             </if>
             <return message="New BOPIS Order Notification Service Ran Successfully At ${nowDate}."/>
+        </actions>
+    </service>
+    <service verb="send" noun="PickupReminderAtRegularInterval" authenticate="anonymous-all">
+        <description>
+            Service to send reminder emails for packed shipments with STOREPICKUP method at regular intervals. This service should be scheduled to run once in a day.
+        </description>
+        <in-parameters>
+            <parameter name="emailType" default-value="REM_READY_FOR_PICKUP"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="intervalDays" type="Integer" default-value="7">
+                <description>Specifies the number of days between each reminder email; the service will repeat the action every nth day as defined by this value.</description>
+            </parameter>
+            <parameter name="maxOccurrences" type="Integer" default-value="3">
+                <description>Specifies the maximum number of times the reminder email should be sent for each shipment.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <set field="nowTimestamp" from="ec.user.nowTimestamp"/>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
+            <script>
+                import java.time.LocalDateTime
+                import java.time.temporal.ChronoUnit
+                import java.time.ZoneId
+                import java.sql.Timestamp
+
+                def intervalList = (1..maxOccurrences).collect { it }
+            </script>
+
+            <iterate list="intervalList" entry="interval">
+                <script>
+                    def targetDate = nowTimestamp.toLocalDateTime().minusDays(interval * intervalDays)
+                    def packedDateStart = Timestamp.valueOf(targetDate.truncatedTo(ChronoUnit.DAYS))
+                    def packedDateEnd = Timestamp.valueOf(targetDate.truncatedTo(ChronoUnit.DAYS).plusDays(1).minus(1, ChronoUnit.MILLIS))
+                </script>
+
+                <!-- Fetch packed shipments with STOREPICKUP method -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentAndShipmentStatus" list="shipments" distinct="true">
+                    <econdition field-name="statusId" value="SHIPMENT_PACKED"/>
+                    <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                    <econdition field-name="shipmentTypeId" value="SALES_SHIPMENT"/>
+                    <econdition field-name="statusDate" operator="greater-equals" from="packedDateStart"/>
+                    <econdition field-name="statusDate" operator="less-equals" from="packedDateEnd"/>
+                    <use-iterator/>
+                </entity-find>
+
+                <if condition="!shipments.hasNext()">
+                    <return message="No valid BOPIS orders found at ${nowDate}, not sending reminder email."/>
+                </if>
+
+                <!-- Iterate over shipments -->
+                <iterate list="shipments" entry="shipment">
+                    <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
+                                  in-map="[shipmentId: shipment.shipmentId, emailType: emailType]" async="true" />
+                </iterate>
+            </iterate>
+            <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
         </actions>
     </service>
 </services>
