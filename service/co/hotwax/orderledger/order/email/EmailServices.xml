@@ -506,7 +506,7 @@ under the License.
                 </entity-find>
 
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                              in-map="[orderId: order.orderId, emailType: emailType, emailAddress: facilityContactDetail?.infoString]" async="true"/>
+                              in-map="[orderId: order.orderId, emailType: emailType, emailAddress: facilityContactDetail?.infoString[0].toString()]" async="true"/>
             </iterate>
 
             <!-- Update job parameter if jobName is provided -->
