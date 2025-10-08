@@ -63,7 +63,7 @@
         </condition>
         <actions>
             <script>
-                orderItemShipGroup = ec.entity.find("org.apache.ofbiz.order.order.OrderItemShipGroup").condition("orderId", orderId, "shipGroupSeqId", cancelledItems[0].shipGroupSeqId).one()
+                orderItemShipGroup = ec.entity.find("org.apache.ofbiz.order.order.OrderItemShipGroup").condition("orderId", orderId).condition("shipGroupSeqId", cancelledItems[0].shipGroupSeqId).one()
             </script>
             <set field="hasParentType" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', orderItemShipGroup.shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
             <if condition="!hasParentType">
