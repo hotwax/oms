@@ -35,7 +35,8 @@
                 def getQohTotal(inventoryItemId, qohTotalMap) {
                     def qohTotal = qohTotalMap.get(inventoryItemId)
                     if (!qohTotal) {
-                        qohTotalMap.put(inventoryItemId, 0.0)
+                        qohTotal = 0.0
+                        qohTotalMap.put(inventoryItemId, qohTotal)
                     }
                     return qohTotal
                 }
