@@ -464,7 +464,7 @@
             </entity-find>
 
             <if condition="!orderHeader">
-                <return type="warning" message="Order [${orderId}] not in CREATED status. Cannot edit ordered quantity"/>
+                <return error="true" message="Order [${orderId}] not in CREATED status. Cannot edit ordered quantity"/>
             </if>
 
             <!-- Fetch the orderItem detail for the incoming orderItemSeqId -->
@@ -526,7 +526,7 @@
             </entity-find>
 
             <if condition="!orderHeader">
-                <return type="warning" message="Order [${orderId}] not in CREATED status. Cannot add new order items."/>
+                <return error="true" message="Order [${orderId}] not in CREATED status. Cannot add new order items."/>
             </if>
 
             <!-- Set the OrderItem map to create OrderItem record -->
