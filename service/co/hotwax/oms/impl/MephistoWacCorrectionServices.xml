@@ -11,6 +11,7 @@
             <set field="filePath" from="systemMessage.messageText"/>
 
             <set field="qohTotal" from="0.0"/>
+            <set field="qohTotalMap" from="[:]"/>
             <set field="averageCostMap" from="[:]"/>
 
             <script><![CDATA[
@@ -29,6 +30,18 @@
                     }
                     ec.logger.info("========= Resolved PAC for ${inventoryItemId}: ${validPac}")
                     return validPac
+                }
+
+                def getQohTotal(inventoryItemId, qohTotalMap) {
+                    def qohTotal = qohTotalMap.get(inventoryItemId)
+                    if (!qohTotal) {
+                        qohTotalMap.put(inventoryItemId, 0.0)
+                    }
+                    return qohTotal
+                }
+
+                def setQohTotal(inventoryItemId, qohTotal, qohTotalMap) {
+                    qohTotalMap.put(inventoryItemId, qohTotal)
                 }
 
                 ec.logger.info("======= SystemMessageId: ${systemMessageId}, filePath: ${filePath}")
@@ -56,9 +69,13 @@
             <set field="orderId" from="event.orderId"/>
             <set field="orderItemSeqId" from="event.orderItemSeqId"/>
             <set field="returnId" from="event.returnId"/>
+            <set field="inventoryItemId" from="event.inventoryItemId"/>
 
             <set field="qohDiff" from="event.quantityOnHandDiff" type="BigDecimal"/>
-            <set field="qohTotal" from="qohTotal + (qohDiff ?: 0.0)"/>
+            <set field="prevQohTotal" from="getQohTotal(inventoryItemId, qohTotalMap)" type="BigDecimal"/>
+
+            <set field="qohTotal" from="prevQohTotal + (qohDiff ?: 0.0)"/>
+            <script>setQohTotal(inventoryItemId, qohTotal, qohTotalMap)</script>
 
             <if condition="!orderId || returnId">
                 <continue/>
@@ -87,7 +104,6 @@
                             <continue/>
                         </if>
 
-                        <set field="inventoryItemId" from="event.inventoryItemId"/>
                         <set field="validPac" from="getValidProductAverageCost(inventoryItemId, averageCostMap)"/>
 
                         <set field="effectiveDate" from="event.effectiveDate"/>
