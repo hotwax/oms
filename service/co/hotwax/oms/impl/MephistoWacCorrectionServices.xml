@@ -19,15 +19,19 @@
                 def getValidProductAverageCost(inventoryItemId, averageCostMap) {
                     def validPac = averageCostMap.get(inventoryItemId)
                     if (!validPac) {
+                        ec.logger.info("========== PAC CACHE MISS for inventoryItemId=${inventoryItemId}, calling valid#ProductAverageCost")
                         def validPacResult = ec.service.sync()
                                 .name("co.hotwax.oms.impl.MephistoWacCorrectionServices.valid#ProductAverageCost")
                                 .parameters([inventoryItemId: inventoryItemId]).call()
                         if (ec.message.hasError()) return null
-                        validPac = validPacResult?.averageCost
+                        validPac = (BigDecimal) validPacResult?.averageCost
                         averageCostMap.put(inventoryItemId, validPac)
                     }
+                    ec.logger.info("========= Resolved PAC for ${inventoryItemId}: ${validPac}")
                     return validPac
                 }
+
+                ec.logger.info("======= SystemMessageId: ${systemMessageId}, filePath: ${filePath}")
 
                 try (fileStream = ec.resource.getLocationReference(filePath).openStream()) {
                     CSVParser csvParser = CSVFormat.DEFAULT.builder().setEscape((char)'\\').build().parse(new InputStreamReader(fileStream))
@@ -53,7 +57,7 @@
             <set field="orderItemSeqId" from="event.orderItemSeqId"/>
             <set field="returnId" from="event.returnId"/>
 
-            <set field="qohDiff" from="event.quantityOnHandDiff"/>
+            <set field="qohDiff" from="event.quantityOnHandDiff" type="BigDecimal"/>
             <set field="qohTotal" from="qohTotal + (qohDiff ?: 0.0)"/>
 
             <if condition="!orderId || returnId">
@@ -62,11 +66,12 @@
 
             <if condition="orderTypeId == 'TRANSFER_ORDER'">
                 <then>
-                    <set field="validPac" from="getValidProductAverageCost(event.originInventoryItemId, averageCostMap)"/>
+                    <set field="validPac" from="getValidProductAverageCost(event.originInventoryItemId, averageCostMap)" type="BigDecimal"/>
+                    <log message="========== TRANSFER_ORDER: updating OrderItem ${orderId}-${orderItemSeqId} with PAC=${validPac}"/>
                     <!-- Update Transfer Order Item's Unit Cost, if validPac is null then set to 0 -->
                     <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId: orderId, orderItemSeqId: orderItemSeqId, unitPrice: validPac]"/>
                 </then>
-                <else-if condition="qohDiff > 0">
+                <else-if condition="qohDiff > 0.0">
                     <then>
                         <!-- It is TO/PO row -->
                         <!-- Query for Linked OrderItem -->
@@ -75,9 +80,10 @@
                             <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
                             <select-field field-name="unitPrice"/>
                         </entity-find-one>
-                        <set field="receivedUnitCost" from="linkedOrderItem.unitPrice"/>
+                        <set field="receivedUnitCost" from="linkedOrderItem?.unitPrice ?: 0.0"/>
 
-                        <if condition="receivedUnitCost &lt;= 0">
+                        <if condition="receivedUnitCost &lt;= 0.0">
+                            <log message="========== Skipping row with invalid receivedUnitCost=${receivedUnitCost} for orderId=${orderId}"/>
                             <continue/>
                         </if>
 
@@ -91,9 +97,11 @@
                         <if condition="validPac">
                             <then>
                                 <script>weightedAvgCost = (affectedQuantity * receivedUnitCost + quantityOnHand * validPac) / qohTotal</script>
+                                <log message="========== WeightedAvgCost computed=${weightedAvgCost} for inventoryItemId=${inventoryItemId}"/>
                             </then>
                             <else>
                                 <set field="weightedAvgCost" from="receivedUnitCost"/>
+                                <log message="========== No valid PAC found, using receivedUnitCost=${receivedUnitCost}"/>
                             </else>
                         </if>
 
@@ -129,6 +137,7 @@
                                 orderId: orderId,
                                 orderItemSeqId: orderItemSeqId
                             ]"/>
+                        <log message="=========== Creating new PAC record for productId=${inventoryItem.productId}, avgCost=${weightedAvgCost}"/>
                         <service-call name="create#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCostMap"/>
 
                         <script>validPacResultForToPo?.clear()</script>
