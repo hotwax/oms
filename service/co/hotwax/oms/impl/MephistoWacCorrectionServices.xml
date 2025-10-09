@@ -53,7 +53,7 @@
                     <!-- Update Transfer Order Item's Unit Cost, if validPac is null then set to 0 -->
                     <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId: orderId, orderItemSeqId: orderItemSeqId, unitPrice: validPac]"/>
                 </then>
-                <else-if condition="qohDiff > 0 &amp;&amp; ">
+                <else-if condition="qohDiff > 0">
                     <then>
                         <!-- It is TO/PO row -->
                         <!-- Query for Linked OrderItem -->
