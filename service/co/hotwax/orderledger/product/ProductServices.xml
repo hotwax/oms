@@ -946,4 +946,748 @@ under the License.
             <log level="info" message="Updated and indexed product: ${productId}"/>
         </actions>
     </service>
+
+    <service verb="store" noun="ProductAverageCost">
+        <description>Creates ProductAverageCost record by calculating the Weighted Average Cost of a product, expires old ProductAverageCost records, and updates InventoryItem.unitCost.
+        </description>
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost"/>
+        </in-parameters>
+        <actions>
+            <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem" in-map="[productId:productId,
+                facilityId:facilityId]" out-map="findOrCreateResult"/>
+            <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem"/>
+
+            <!-- Set ownerPartyId -->
+            <set field="ownerPartyId" from="inventoryItem.ownerPartyId"/>
+            <if condition="!ownerPartyId">
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
+                    <field-map field-name="facilityId" from="inventoryItem.facilityId"/>
+                </entity-find-one>
+                <set field="ownerPartyId" from="facility?.ownerPartyId"/>
+            </if>
+
+            <!-- Set totalQuantity -->
+            <set field="totalQuantity" from="inventoryItem.quantityOnHandTotal ?: 0.0"/>
+
+            <!-- Find active ProductAverageCost records -->
+            <entity-find entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" list="productAverageCosts">
+                <econdition field-name="productId" from="inventoryItem.productId"/>
+                <econdition field-name="facilityId" from="inventoryItem.facilityId"/>
+                <econdition field-name="productAverageCostTypeId" value="WEIGHTED_AVG_COST"/>
+                <econdition field-name="organizationPartyId" from="ownerPartyId"/>
+                <date-filter/>
+                <order-by field-name="-fromDate"/>
+            </entity-find>
+
+            <!-- Expire old ProductAverageCosts -->
+            <iterate list="productAverageCosts" entry="productAverageCost">
+                <set field="productAverageCost.thruDate" from="ec.user.nowTimestamp"/>
+                <service-call name="update#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCost"/>
+            </iterate>
+
+            <!-- Get latest ProductAverageCost -->
+            <set field="latestCostRecord" from="productAverageCosts?.first" />
+            <set field="oldWeightedAvgCost" from="latestCostRecord?.averageCost ?: 0.0"/>
+            <!-- NOTE affectedQuantity is incoming in the request, it is a field on ProductAverageCost entity -->
+            <set field="oldQoh" from="totalQuantity - affectedQuantity"/>
+
+            <!-- Calculate oldTotalCost -->
+            <set field="oldTotalCost" from="oldWeightedAvgCost * oldQoh"/>
+
+            <!-- Resolve new unit Cost (priority: orderItem.unitPrice from orderId, orderItemSeqId → orderItem.unitPrice from shipmentId, shipmentItemSeqId → lastReceivedUnitCost) -->
+            <!-- NOTE For the adhoc receipts i.e. the receipt of new product as part of TO/PO, the orderItem will not exist, so will
+                    use the unitCost from InventoryItem.lastReceivedUnitCost in this scenario -->
+            <set field="unitCost" from="0.0"/>
+            <if condition="orderId &amp;&amp; orderItemSeqId">
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                    <field-map field-name="orderId"/>
+                    <field-map field-name="orderItemSeqId"/>
+                </entity-find-one>
+                <set field="unitCost" from="orderItem?.unitPrice ?: 0.0"/>
+            </if>
+            <if condition="unitCost == 0.0 &amp;&amp; shipmentId &amp;&amp; shipmentItemSeqId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
+                    <econdition field-name="shipmentId"/>
+                    <econdition field-name="shipmentItemSeqId"/>
+                </entity-find>
+                <set field="orderShipment" from="orderShipments?.first"/>
+                <if condition="orderShipment">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                        <field-map field-name="orderId" from="orderShipment.orderId"/>
+                        <field-map field-name="orderItemSeqId" from="orderShipment.orderItemSeqId"/>
+                    </entity-find-one>
+                    <set field="unitCost" from="orderItem?.unitPrice ?: 0.0"/>
+                </if>
+            </if>
+            <if condition="unitCost == 0.0 &amp;&amp; inventoryItem.lastReceivedUnitCost">
+                <set field="unitCost" from="inventoryItem.lastReceivedUnitCost"/>
+            </if>
+
+            <!-- Weighted Average Cost calculation -->
+            <set field="newTotalCost" from="unitCost * affectedQuantity"/>
+            <set field="totalNewQuantity" from="oldQoh + affectedQuantity"/>
+            <set field="totalCost" from="oldTotalCost + newTotalCost"/>
+            <set field="weightedAvgCost" from="(totalNewQuantity &gt; 0) ? (totalCost.divide(totalNewQuantity as BigDecimal, 2, java.math.RoundingMode.HALF_UP)) : 0.0"/>
+
+            <!-- Create new ProductAverageCost record -->
+            <set field="productAverageCostMap" from="[
+                productAverageCostTypeId: 'WEIGHTED_AVG_COST',
+                organizationPartyId: ownerPartyId,
+                productId: inventoryItem.productId,
+                facilityId: inventoryItem.facilityId,
+                fromDate: ec.user.nowTimestamp,
+                averageCost: weightedAvgCost,
+                affectedQuantity: affectedQuantity,
+                quantityOnHand: totalQuantity,
+                orderId: orderId,
+                orderItemSeqId: orderItemSeqId,
+                shipmentId: shipmentId,
+                shipmentItemSeqId: shipmentItemSeqId,
+                receiptId: receiptId
+            ]"/>
+            <service-call name="create#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCostMap"/>
+
+            <!-- Update InventoryItem with new unitCost -->
+            <set field="inventoryItem.unitCost" from="weightedAvgCost"/>
+            <set field="inventoryItem.lastReceivedUnitCost" from="unitCost"/>
+            <service-call name="update#org.apache.ofbiz.product.inventory.InventoryItem" in-map="inventoryItem"/>
+        </actions>
+    </service>
+    <service verb="compare" noun="VirtualProduct">
+        <in-parameters>
+            <parameter name="productJson" type="Map" required="true"/>
+            <parameter name="systemMessageId"/>
+            <parameter name="shopId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="forCreate" type="Boolean"/>
+            <parameter name="virtualProductId"/>
+        </out-parameters>
+        <actions>
+            <script>
+                import org.apache.commons.codec.digest.DigestUtils
+                import org.moqui.impl.context.ContextJavaUtil
+
+                def hash = { listOrMap ->
+                    if (listOrMap instanceof Map) {
+                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                    } else if (listOrMap instanceof List) {
+                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                    } else {
+                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                    }
+                }
+            </script>
+
+            <!-- Metafield handling (metafield entries have key/namespace/value and __parentId) -->
+            <if condition="productJson.metafields">
+                <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.id)"/>
+
+                <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                    <field-map field-name="internalName" value="V_${productJson.handle}"/>
+                </entity-find-one>
+                <if condition="product">
+                    <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                        <field-map field-name="productId" from="product.productId"/>
+                        <field-map field-name="shopId"/>
+                    </entity-find-one>
+                    <set field="virtualProductId" from="shopifyShopProduct?.shopifyProductId ?: virtualProductId"/>
+                </if>
+
+                <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="history">
+                    <field-map field-name="productId" from="virtualProductId"/>
+                    <field-map field-name="shopId"/>
+                </entity-find-one>
+
+                <script><![CDATA[
+                    def normalizeValue = { val ->
+                        if (val == null) return ""
+                        if (val instanceof Map || val instanceof List)
+                            return ContextJavaUtil.jacksonMapper.writeValueAsString(val)
+                        return val.toString().trim()
+                    }
+
+                    // --- Extract metafields with (namespace, key, value)
+                    def extractMetafields = { list ->
+                        (list ?: []).collect { mf ->
+                            def key = mf?.key?.toString()?.trim()
+                            def ns  = mf?.namespace?.toString()?.trim()
+                            def val = null
+
+                            // determine value (direct or reference)
+                            if (mf?.value && (!mf?.reference || !mf?.reference?.fields)) {
+                                val = mf.value
+                            } else if (mf?.reference?.fields instanceof List) {
+                                val = mf.reference.fields.find { it?.key == "title" }.value
+                            }
+
+                            [namespace: ns, key: key, value: normalizeValue(val)]
+                        }
+                        .findAll { it.namespace && it.key } // must have both namespace and key
+                    }
+
+                    def newMetafields = extractMetafields(productJson.metafields)
+                    // Sort by namespace and key
+                    newMetafields = newMetafields.sort { a, b -> (a.namespace <=> b.namespace) ?: (a.key <=> b.key) }
+
+                    // --- Load old metafields
+                    def oldMetafields = []
+                    if (history?.metafields) {
+                        try {
+                            oldMetafields = ContextJavaUtil.jacksonMapper.readValue(history.metafields, List.class)
+                        } catch (Throwable ignore) { oldMetafields = [] }
+                    }
+                    oldMetafields = (oldMetafields ?: []).collect {
+                        [namespace: it.namespace?.toString(), key: it.key?.toString(), value: normalizeValue(it.value)]
+                    }.findAll { it.namespace && it.key }
+
+                    // --- Identify added and removed metafields
+                    def added = []
+                    def removed = []
+
+                    // Prepare lookup maps by namespace+key
+                    def oldMap = oldMetafields.collectEntries { [(it.namespace + "|" + it.key): it] }
+                    def newMap = newMetafields.collectEntries { [(it.namespace + "|" + it.key): it] }
+
+                    // Detect added and removed
+                    newMap.each { k, v ->
+                        if (v.value && v.value.trim()) { // has valid value
+                            def oldVal = oldMap[k]?.value
+                            if (oldVal == null || oldVal != v.value) {
+                                added << [namespace: v.namespace, key: v.key, value: v.value]
+                            }
+                        }
+                    }
+
+                    oldMap.each { k, v ->
+                        def newVal = newMap[k]?.value
+                        if (!newVal || newVal.trim() == "") {
+                            removed << [namespace: v.namespace, key: v.key, value: v.value]
+                        }
+                    }
+
+                    def newHash = hash(newMetafields)
+                    def oldHash = history?.metafieldsHash
+
+                    def diffMap = [:]
+                    diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
+                    diffMap.remove("metafields")
+
+                    if (newHash != oldHash && (added || removed)) {
+                        diffMap.metafields = [added: added, removed: removed]
+                    }
+
+                    def updateMap = [
+                        productId      : virtualProductId,
+                        shopId         : shopId,
+                        systemMessageId: systemMessageId,
+                        metafields     : ContextJavaUtil.jacksonMapper.writeValueAsString(newMetafields),
+                        metafieldsHash : newHash,
+                        differenceMap  : ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                    ]
+                ]]></script>
+
+                <if condition="updateMap">
+                    <service-call name="store#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
+                </if>
+                <return/>
+            </if>
+            <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.id)"/>
+            <set field="forCreate" from="false"/>
+
+            <!-- Check if handle already exists and pick existing shopify id if present -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                <field-map field-name="internalName" value="V_${productJson.handle}"/>
+            </entity-find-one>
+            <if condition="product">
+                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                    <field-map field-name="productId" from="product.productId"/>
+                    <field-map field-name="shopId"/>
+                </entity-find-one>
+                <set field="virtualProductId" from="shopifyShopProduct?.shopifyProductId ?: virtualProductId"/>
+            </if>
+
+            <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="productUpdateHistory">
+                <field-map field-name="productId" from="virtualProductId"/>
+                <field-map field-name="shopId"/>
+            </entity-find-one>
+
+            <!-- First insert case -->
+            <if condition="!productUpdateHistory">
+                <set field="forCreate" from="true"/>
+                <script><![CDATA[
+                    // core product hash
+                    def parts = [
+                        productJson.handle ?: '',
+                        productJson.vendor ?: '',
+                        (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
+                        (productJson.isGiftCard ?: '').toString(),
+                        productJson.title ?: '',
+                        (productJson.featuredMedia?.preview?.image?.url ?: '')
+                    ]
+                    def productCoreDetailsHash = hash(parts.join('||'))
+
+                    // tags as List
+                    def tagsRaw = productJson.tags
+                    def tags = []
+
+                    if (tagsRaw instanceof String) {
+                        tags = tagsRaw.split(',')*.trim().findAll { it }
+                    } else if (tagsRaw instanceof List) {
+                        tags = tagsRaw.collect { it.toString().trim() }.findAll { it }
+                    }
+                    tags = tags.sort()
+                    def tagsHash = hash(tags)
+
+                    // features as List of position/name/value
+                    def features = []
+                    def sequence = 1
+                    (productJson.options ?: []).each { opt ->
+                        def position = opt.position
+                        def name = opt.name
+                        (opt.optionValues ?: []).each { val ->
+                            features << [sequenceNumber: sequence++, position: position, name: name, value: val.name]
+                        }
+                    }
+                    // Sort by sequenceNumber
+                    features = features.sort { it.sequenceNumber }
+                    def featuresHash = hash(features)
+
+                    // identifications map
+                    def identifications = [id: productJson.id]
+                    def identificationsHash = hash(identifications)
+
+                    // Build initial diffMap with added lists (so consumer sees same schema)
+                    def diffMap = [
+                        id: productJson.id,
+                        handle: productJson.handle,
+                        vendor: productJson.vendor,
+                        title: productJson.title,
+                        featureImageUrl: productJson.featuredMedia?.preview?.image?.url,
+                        isGiftCard: productJson.isGiftCard,
+                        hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
+                        tags: [added: tags, removed: []],
+                        features: [added: features, removed: []],
+                        identifications: identifications
+                    ]
+
+                    // prepare JSON-serialized fields for storage (so DB has JSON text)
+                    tagsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
+                    featuresJson = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
+                    identificationsJson = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
+                    diffMapJson = ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                    featuresHash = featuresHash
+                    identificationsHash = identificationsHash
+                ]]></script>
+
+                <set field="createProductUpdateHistoryMap" from="[:]"/>
+                <set field="createProductUpdateHistoryMap.productId" from="virtualProductId"/>
+                <set field="createProductUpdateHistoryMap.shopId" from="shopId"/>
+                <set field="createProductUpdateHistoryMap.systemMessageId" from="systemMessageId"/>
+                <set field="createProductUpdateHistoryMap.productCoreDetailsHash" from="productCoreDetailsHash"/>
+                <set field="createProductUpdateHistoryMap.features" from="featuresJson"/>
+                <set field="createProductUpdateHistoryMap.featuresHash" from="featuresHash"/>
+                <set field="createProductUpdateHistoryMap.tags" from="tagsJson"/>
+                <set field="createProductUpdateHistoryMap.tagsHash" from="tagsHash"/>
+                <set field="createProductUpdateHistoryMap.identifications" from="identificationsJson"/>
+                <set field="createProductUpdateHistoryMap.identificationsHash" from="identificationsHash"/>
+                <set field="createProductUpdateHistoryMap.differenceMap" from="diffMapJson"/>
+
+                <service-call name="create#co.hotwax.product.ProductUpdateHistory" in-map="createProductUpdateHistoryMap" transaction="force-new"/>
+                <return/>
+            </if>
+
+            <!-- Update case -->
+            <set field="differenceMap" from="[:]"/>
+            <if condition="productUpdateHistory.differenceMap">
+                <script>
+                    def existingDifferenceMap = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.differenceMap, Map.class)
+                </script>
+                <if condition="existingDifferenceMap.metafields">
+                    <set field="differenceMap.metafields" from="existingDifferenceMap.metafields"/>
+                </if>
+            </if>
+            <script><![CDATA[
+            // --- Core Product Hash ---
+            def parts = [
+                productJson.handle ?: '',
+                productJson.vendor ?: '',
+                (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
+                (productJson.isGiftCard ?: '').toString(),
+                productJson.title ?: '',
+                (productJson.featuredMedia?.preview?.image?.url ?: '')
+            ]
+            def newCoreHash = hash(parts.join('||'))
+            if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
+                differenceMap.productCoreDetailsHash = newCoreHash
+                differenceMap.title = productJson.title
+                differenceMap.vendor = productJson.vendor
+                differenceMap.handle = productJson.handle
+                differenceMap.isGiftCard = productJson.isGiftCard
+                differenceMap.hasVariantsThatRequireComponents = productJson.hasVariantsThatRequiresComponents
+                differenceMap.featureImageUrl = productJson.featuredMedia?.preview?.image?.url
+            }
+
+            // --- Tags ---
+            def newTagsRaw = productJson.tags
+            def newTags = []
+            if (newTagsRaw instanceof String) {
+                newTags = newTagsRaw.split(',')*.trim().findAll { it }
+            } else if (newTagsRaw instanceof List) {
+                newTags = newTagsRaw.collect { it.toString().trim() }.findAll { it }
+            }
+            newTags = newTags.sort()
+            def newTagsHash = hash(newTags)
+            if (newTagsHash != productUpdateHistory.tagsHash) {
+                def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
+                def addedTags = (newTags - oldTags).collect { it.toString() }
+                def removedTags = (oldTags - newTags).collect { it.toString() }
+                if (addedTags || removedTags) {
+                    differenceMap.tags = [added: addedTags, removed: removedTags]
+                }
+            }
+
+            // --- Features ---
+            def newFeatures = []
+            def sequence = 1
+            (productJson.options ?: []).each { opt ->
+                def position = opt.position
+                def name = opt.name
+                (opt.optionValues ?: []).each { val ->
+                    newFeatures << [sequenceNumber: sequence++, position: position, name: name, value: val.name]
+                }
+            }
+            newFeatures = newFeatures.sort { it.sequenceNumber }
+            def newFeaturesHash = hash(newFeatures)
+            if (newFeaturesHash != productUpdateHistory.featuresHash) {
+                def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+                def addedFeatures = (newFeatures - oldFeatures)
+                def removedFeatures = (oldFeatures - newFeatures)
+                if (addedFeatures || removedFeatures) {
+                    differenceMap.features = [added: addedFeatures, removed: removedFeatures]
+                }
+            }
+
+            // --- Identifications ---
+            def newIdent = [id: productJson.id]
+            def identificationsHash = hash(newIdent)
+            if (identificationsHash != productUpdateHistory.identificationsHash) {
+                def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
+                if (!oldIdent.equals(newIdent)) {
+                    differenceMap.identifications = newIdent
+                }
+            }
+
+            // --- Persist if changed ---
+            updateMap = [:]
+            if (!differenceMap.isEmpty()) {
+                // prepare JSON serialized fields for storage
+                updateMap = [
+                    productId: virtualProductId,
+                    shopId: shopId,
+                    systemMessageId: systemMessageId,
+                    productCoreDetailsHash: newCoreHash,
+                    features: ContextJavaUtil.jacksonMapper.writeValueAsString(newFeatures),
+                    featuresHash: newFeaturesHash,
+                    tags: ContextJavaUtil.jacksonMapper.writeValueAsString(newTags),
+                    tagsHash: newTagsHash,
+                    identifications: ContextJavaUtil.jacksonMapper.writeValueAsString(newIdent),
+                    identificationsHash: identificationsHash,
+                    differenceMap: ContextJavaUtil.jacksonMapper.writeValueAsString(differenceMap)
+                ]
+            }
+            ]]></script>
+            <if condition="updateMap">
+                <service-call name="update#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
+            </if>
+        </actions>
+    </service>
+    <service verb="compare" noun="VariantProduct">
+        <in-parameters>
+            <parameter name="variantJson" type="Map" required="true"/>
+            <parameter name="systemMessageId"/>
+            <parameter name="shopId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="variantProductId"/>
+        </out-parameters>
+        <actions>
+            <script>
+                import org.apache.commons.codec.digest.DigestUtils
+                import org.moqui.impl.context.ContextJavaUtil
+                import java.math.BigDecimal
+                import java.math.RoundingMode
+
+                def hash = { listOrMap ->
+                    if (listOrMap instanceof Map) {
+                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                    } else if (listOrMap instanceof List) {
+                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                    } else {
+                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                    }
+                }
+            </script>
+
+            <set field="variantProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.id)"/>
+            <set field="currentVariantProductId" from="variantProductId"/>
+
+            <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop">
+                <field-map field-name="shopId" from="shopId"/>
+            </entity-find-one>
+            <if condition="!shopifyShop">
+                <return error="true" type="warning" message="No shopify shop found for the shopId: ${shopId}."/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore">
+                <field-map field-name="productStoreId" from="shopifyShop.productStoreId"/>
+                <select-field field-name="productStoreId"/>
+                <select-field field-name="productIdentifierEnumId,defaultCurrencyUomId,primaryStoreGroupId"/>
+            </entity-find-one>
+            <if condition="!productStore">
+                <return error="true" type="warning" message="No ProductStore found for the productStoreId: ${shopifyShop.productStoreId}."/>
+            </if>
+            <if condition="!productStore.productIdentifierEnumId">
+                <return error="true" message="No productIdentifierEnumId found for the productStoreId: ${shopifyShop.productStoreId}"/>
+            </if>
+
+            <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
+                <set field="productIdentifier" from="variantJson.sku"/>
+                <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_BARCODE'">
+                    <set field="productIdentifier" from="variantJson.barcode"/>
+                </else-if>
+                <else-if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_ID'">
+                    <set field="productIdentifier" from="currentVariantProductId"/>
+                </else-if>
+            </if>
+
+            <if condition="productIdentifier">
+                <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="products">
+                    <econdition field-name="internalName" from="productIdentifier"/>
+                </entity-find>
+                <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="shopifyShopProducts">
+                    <econdition field-name="productId" from="products?.first?.productId"/>
+                    <order-by field-name="lastUpdatedStamp"/>
+                </entity-find>
+                <if condition="shopifyShopProducts">
+                    <set field="variantProductId" from="shopifyShopProducts[0].shopifyProductId"/>
+                    <else>
+                        <!-- To handle products with same primary identifier, if the primary identifier is modified on Shopify side then delete the old mapping -->
+                        <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="shopifyShopProduct">
+                            <field-map field-name="shopId"/>
+                            <field-map field-name="shopifyProductId" from="currentVariantProductId"/>
+                        </entity-find-one>
+                        <if condition="shopifyShopProduct">
+                            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
+                                <field-map field-name="productId" from="shopifyShopProduct.productId"/>
+                            </entity-find-one>
+                            <if condition="product.internalName != productIdentifier">
+                                <service-call name="delete#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopId, shopifyProductId:currentVariantProductId]" transaction="force-new"/>
+                                <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="parentShopifyShopProduct">
+                                    <field-map field-name="shopifyProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.__parentId)"/>
+                                    <field-map field-name="shopId" from="shopId"/>
+                                </entity-find-one>
+                                <if condition="parentShopifyShopProduct">
+                                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                                        <econdition field-name="productIdTo" from="product.productId"/>
+                                        <econdition field-name="productId" from="parentShopifyShopProduct.productId"/>
+                                        <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                                        <date-filter/>
+                                    </entity-find>
+                                    <iterate list="productAssocs" entry="productAssoc">
+                                        <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssoc" transaction="force-new"/>
+                                    </iterate>
+                                </if>
+                                <service-call name="delete#co.hotwax.product.ProductUpdateHistory" in-map="[productId:currentVariantProductId, shopId:shopId]" transaction="force-new"/>
+                            </if>
+                        </if>
+                    </else>
+                </if>
+            </if>
+
+            <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="productUpdateHistory">
+                <field-map field-name="productId" from="variantProductId"/>
+                <field-map field-name="shopId"/>
+            </entity-find-one>
+
+            <!-- Insert flow -->
+            <if condition="!productUpdateHistory">
+                <set field="createProductUpdateHistoryMap" from="[:]"/>
+                <set field="createProductUpdateHistoryMap.productId" from="variantProductId"/>
+                <set field="createProductUpdateHistoryMap.shopId" from="shopId"/>
+                <set field="createProductUpdateHistoryMap.systemMessageId" from="systemMessageId"/>
+
+                <script><![CDATA[
+                    def parts = [
+                        (variantJson.position ?: '').toString(),
+                        variantJson.title ?: '',
+                        (variantJson?.image?.url ?: ''),
+                        (variantJson.requiresComponents ?: '').toString(),
+                        (variantJson.product?.isGiftCard ?: '').toString(),
+                        (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        (variantJson.inventoryItem?.id ?: '').toString(),
+                        (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
+                        (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
+                    ]
+                    createProductUpdateHistoryMap.productCoreDetailsHash = hash(parts.join('||'))
+                ]]></script>
+
+                <set field="tags" from="(variantJson.product?.productType ? [variantJson.product.productType.toString()] : [])"/>
+                <script>
+                    createProductUpdateHistoryMap.tags = ContextJavaUtil.jacksonMapper.writeValueAsString(tags)
+                    createProductUpdateHistoryMap.tagsHash = hash(tags)
+                </script>
+
+                <script><![CDATA[
+                    def features = (variantJson.selectedOptions ?: []).collect { opt ->
+                        [name: opt.name, value: opt.value] }.sort { a, b -> a.name <=> b.name }
+                    def featuresHash = hash(features)
+                    createProductUpdateHistoryMap.features = ContextJavaUtil.jacksonMapper.writeValueAsString(features)
+                    createProductUpdateHistoryMap.featuresHash = featuresHash
+                ]]></script>
+
+                <script><![CDATA[
+                    def identifications = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: currentVariantProductId]
+                    createProductUpdateHistoryMap.identifications = ContextJavaUtil.jacksonMapper.writeValueAsString(identifications)
+                    createProductUpdateHistoryMap.identificationsHash = hash(identifications)
+                ]]></script>
+
+                <set field="createProductUpdateHistoryMap.price" from="variantJson.price"/>
+                <set field="createProductUpdateHistoryMap.parentProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id)"/>
+
+                <script><![CDATA[
+                    def diffMap = [
+                        id             : currentVariantProductId,
+                        parentProductId : co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson.product?.id),
+                        sku            : variantJson.sku,
+                        title          : variantJson.title,
+                        price          : variantJson.price,
+                        requiresShipping  :  (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        requiresComponents: (variantJson.requiresComponents ?: '').toString(),
+                        isGiftCard        : (variantJson.product?.isGiftCard ?: '').toString(),
+                        featureImageUrl   : (variantJson.image?.url ?: ''),
+                        weightUnit        : (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
+                        weightValue       : (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString(),
+                        inventoryItemId   : (variantJson.inventoryItem?.id ?: '').toString(),
+                        identifications: identifications,
+                        features       : [added: features, removed: []],
+                        tags           : [added: tags, removed: []]
+                    ]
+                    createProductUpdateHistoryMap.differenceMap = ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                ]]></script>
+
+                <service-call name="create#co.hotwax.product.ProductUpdateHistory" in-map="createProductUpdateHistoryMap" transaction="force-new"/>
+                <return/>
+            </if>
+
+            <!-- Update flow -->
+            <set field="diffMap" from="[:]"/>
+            <script><![CDATA[
+                // --- Identifications ---
+                def newIdent = [sku: variantJson.sku ?: '', barcode: variantJson.barcode ?: '', id: variantProductId ?: '']
+                def identHash = hash(newIdent)
+                if (identHash != productUpdateHistory.identificationsHash) {
+                    def oldIdent = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.identifications ?: "{}", Map.class)
+                    if (!oldIdent.equals(newIdent)) {
+                        diffMap.identifications = newIdent
+                    }
+                }
+
+                // --- Price ---
+                def newPriceString = variantJson?.price
+                if (newPriceString) {
+                    def newPrice = new BigDecimal(newPriceString).setScale(2, RoundingMode.HALF_UP)
+                    def oldPrice = productUpdateHistory.price ? new BigDecimal(productUpdateHistory.price).setScale(2, RoundingMode.HALF_UP) : null
+
+                    if (!oldPrice || newPrice.compareTo(oldPrice) != 0) {
+                        diffMap.price = newPrice.toPlainString()
+                    }
+                }
+
+                // --- Assocs ---
+                def newAssoc = co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(variantJson?.product?.id)
+                if (newAssoc != productUpdateHistory.parentProductId) {
+                    diffMap.parentProductId = newAssoc
+                }
+
+                // --- Features ---
+                def newFeatures = (variantJson.selectedOptions ?: []).collect { opt ->
+                    [name: opt.name, value: opt.value] }.sort { a, b -> a.name <=> b.name }
+                def featuresHash = hash(newFeatures)
+                if (featuresHash != productUpdateHistory.featuresHash) {
+                    def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+                    def addedFeatures = (newFeatures - oldFeatures)
+                    def removedFeatures = (oldFeatures - newFeatures)
+                    if (addedFeatures || removedFeatures) {
+                        diffMap.features = [:]
+                        if (addedFeatures) diffMap.features.added = addedFeatures
+                        if (removedFeatures) diffMap.features.removed = removedFeatures
+                    }
+                }
+
+                // --- Tags ---
+                def newTags = (variantJson.product?.productType ? [variantJson.product.productType.toString()] : []).sort()
+                def tagsHash = hash(newTags)
+                if (tagsHash != productUpdateHistory.tagsHash) {
+                    def oldTags = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.tags ?: "[]", List.class)
+                    def addedTags = (newTags - oldTags)
+                    def removedTags = (oldTags - newTags)
+                    if (addedTags || removedTags) {
+                        diffMap.tags = [added: addedTags, removed: removedTags]
+                    }
+                }
+
+                // --- Core details hash ---
+                def parts = [
+                    (variantJson.position ?: '').toString(),
+                    variantJson.title ?: '',
+                    (variantJson.image?.url ?: ''),
+                    (variantJson.requiresComponents ?: '').toString(),
+                    (variantJson.product?.isGiftCard ?: '').toString(),
+                    (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                    (variantJson.inventoryItem?.id ?: '').toString(),
+                    (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
+                    (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
+                ]
+                def newCoreHash = hash(parts.join('||'))
+                if (newCoreHash != productUpdateHistory.productCoreDetailsHash) {
+                    diffMap.productCoreDetailsHash = newCoreHash
+                    diffMap.id = currentVariantProductId
+                    diffMap.position = variantJson.position
+                    diffMap.title = variantJson.title
+                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
+                    diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
+                    diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
+                    diffMap.featureImageUrl = (variantJson.image?.url ?: '')
+                    diffMap.inventoryItemId = (variantJson.inventoryItem?.id ?: '').toString()
+                    diffMap.weightUnit = (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString()
+                    diffMap.weightValue = (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
+                }
+
+                // --- Persist updates ---
+                if (!diffMap.isEmpty()) {
+                    ec.service.sync().name("update#co.hotwax.product.ProductUpdateHistory")
+                      .parameters([
+                        productId: variantProductId,
+                        shopId: shopId,
+                        systemMessageId: systemMessageId,
+                        price: variantJson.price,
+                        productCoreDetailsHash: newCoreHash,
+                        features: ContextJavaUtil.jacksonMapper.writeValueAsString(newFeatures),
+                        featuresHash: featuresHash,
+                        tags: ContextJavaUtil.jacksonMapper.writeValueAsString(newTags),
+                        tagsHash: tagsHash,
+                        identifications: ContextJavaUtil.jacksonMapper.writeValueAsString(newIdent),
+                        identificationsHash: identHash,
+                        differenceMap: ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                      ])
+                      .requireNewTransaction(true)
+                      .call()
+                }
+            ]]></script>
+        </actions>
+    </service>
 </services>

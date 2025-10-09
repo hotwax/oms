@@ -28,15 +28,15 @@ under the License.
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <select-field field-name="facilityId"/>
             </entity-find>
-            <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
-                <field-map field-name="facilityId" from="shipGroups?.first?.facilityId"/>
-            </entity-find-one>
             <if condition="shipGroups">
                 <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumeration" cache="true">
                     <field-map field-name="enumId" from="topicEnumId"/>
                 </entity-find-one>
                 <if condition="enumeration">
                     <iterate list="shipGroups" entry="shipGroup">
+                        <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true">
+                            <field-map field-name="facilityId" from="shipGroup.facilityId"/>
+                        </entity-find-one>
                         <service-call name="co.hotwax.oms.order.OrderNotificationServices.build#TopicName" in-map="[facilityId: shipGroup.facilityId, topicEnumId: topicEnumId]" out-map="context"/>
                         <script>
                             ec.makeNotificationMessage().topic(topicName).type("info").title(enumeration.enumName)
