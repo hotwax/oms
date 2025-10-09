@@ -106,10 +106,11 @@
                         </if>
 
                         <set field="validPac" from="getValidProductAverageCost(inventoryItemId, averageCostMap)"/>
+                        <log message="========== Processing inventoryItemId=${inventoryItemId}, qohDiff=${qohDiff}, prevQohTotal=${prevQohTotal}, qohTotal=${qohTotal}, receivedUnitCost=${receivedUnitCost}, validPac=${validPac}"/>
 
                         <set field="effectiveDate" from="event.effectiveDate"/>
                         <set field="affectedQuantity" from="qohDiff"/>
-                        <set field="quantityOnHand" from="qohTotal + qohDiff"/>
+                        <set field="quantityOnHand" from="qohTotal - qohDiff"/>
 
                         <if condition="validPac">
                             <then>
