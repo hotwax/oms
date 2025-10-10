@@ -156,6 +156,7 @@
                                 orderItemSeqId: orderItemSeqId
                             ]"/>
                         <log message="=========== Creating new PAC record for productId=${inventoryItem.productId}, avgCost=${weightedAvgCost}"/>
+                        <script>averageCostMap.put(inventoryItemId, weightedAvgCost)</script>
                         <service-call name="create#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCostMap"/>
 
                         <script>validPacResultForToPo?.clear()</script>
