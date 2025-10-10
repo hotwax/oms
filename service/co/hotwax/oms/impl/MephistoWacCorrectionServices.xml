@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+    <!-- co.hotwax.oms.impl.MephistoWacCorrectionServices.consume#PacSystemMessage -->
+    <service verb="consume" noun="PacSystemMessage">
+        <implements service="org.moqui.impl.SystemMessageServices.consume#SystemMessage"/>
+        <actions>
+            <entity-find-one entity-name="moqui.service.message.SystemMessage" value-field="systemMessage"/>
+            <if condition="!systemMessage">
+                <return error="true" message="System message not found for id ${systemMessageId}."/>
+            </if>
+            <set field="filePath" from="systemMessage.messageText"/>
+
+            <set field="qohTotal" from="0.0"/>
+            <set field="qohTotalMap" from="[:]"/>
+            <set field="averageCostMap" from="[:]"/>
+
+            <script><![CDATA[
+                import org.apache.commons.csv.*
+
+                def getValidProductAverageCost(inventoryItemId, averageCostMap) {
+                    def validPac = averageCostMap.get(inventoryItemId)
+                    if (!validPac) {
+                        ec.logger.info("========== PAC CACHE MISS for inventoryItemId=${inventoryItemId}, calling valid#ProductAverageCost")
+                        def validPacResult = ec.service.sync()
+                                .name("co.hotwax.oms.impl.MephistoWacCorrectionServices.valid#ProductAverageCost")
+                                .parameters([inventoryItemId: inventoryItemId]).call()
+                        if (ec.message.hasError()) return null
+                        validPac = (BigDecimal) validPacResult?.averageCost
+                        averageCostMap.put(inventoryItemId, validPac)
+                    }
+                    ec.logger.info("========= Resolved PAC for ${inventoryItemId}: ${validPac}")
+                    return validPac
+                }
+
+                def getQohTotal(inventoryItemId, qohTotalMap) {
+                    def qohTotal = qohTotalMap.get(inventoryItemId)
+                    if (!qohTotal) {
+                        qohTotal = 0.0
+                        qohTotalMap.put(inventoryItemId, qohTotal)
+                    }
+                    return qohTotal
+                }
+
+                def setQohTotal(inventoryItemId, qohTotal, qohTotalMap) {
+                    qohTotalMap.put(inventoryItemId, qohTotal)
+                }
+
+                ec.logger.info("======= SystemMessageId: ${systemMessageId}, filePath: ${filePath}")
+
+                try (fileStream = ec.resource.getLocationReference(filePath).openStream()) {
+                    CSVParser csvParser = CSVFormat.DEFAULT.builder().setEscape((char)'\\').build().parse(new InputStreamReader(fileStream))
+                    Map<String, Integer> headerMap = [:]
+
+                    Iterator<CSVRecord> iterator = csvParser.iterator()
+                    CSVRecord headerRecord = iterator.next()
+                    for (int i = 0; i < headerRecord.size(); i++) headerMap.put(headerRecord.get(i), i)
+
+                    while (iterator.hasNext()) {
+                        CSVRecord record = iterator.next()
+                        event = [:]
+
+                        for (Map.Entry<String, Integer> field in headerMap) {
+                            fieldValue = record.get(field.value)
+                            if (fieldValue == null) continue
+                            event.put(field.key, fieldValue.isEmpty() ? null : fieldValue)
+                        }
+                ]]></script>
+
+            <set field="orderTypeId" from="event.orderTypeId"/>
+            <set field="orderId" from="event.orderId"/>
+            <set field="orderItemSeqId" from="event.orderItemSeqId"/>
+            <set field="returnId" from="event.returnId"/>
+            <set field="inventoryItemId" from="event.inventoryItemId"/>
+
+            <set field="qohDiff" from="event.quantityOnHandDiff" type="BigDecimal"/>
+            <set field="prevQohTotal" from="getQohTotal(inventoryItemId, qohTotalMap)" type="BigDecimal"/>
+
+            <set field="qohTotal" from="prevQohTotal + (qohDiff ?: 0.0)"/>
+            <script>setQohTotal(inventoryItemId, qohTotal, qohTotalMap)</script>
+
+            <if condition="!orderId || returnId">
+                <continue/>
+            </if>
+
+            <if condition="orderTypeId == 'TRANSFER_ORDER'">
+                <then>
+                    <set field="validPac" from="getValidProductAverageCost(event.originInventoryItemId, averageCostMap)" type="BigDecimal"/>
+                    <log message="========== TRANSFER_ORDER: updating OrderItem ${orderId}-${orderItemSeqId} with PAC=${validPac}"/>
+                    <!-- Update Transfer Order Item's Unit Cost, if validPac is null then set to 0 -->
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId: orderId, orderItemSeqId: orderItemSeqId, unitPrice: validPac]"/>
+                </then>
+                <else-if condition="qohDiff > 0.0">
+                    <then>
+                        <!-- It is TO/PO row -->
+                        <!-- Query for Linked OrderItem -->
+                        <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="linkedOrderItem">
+                            <field-map field-name="orderId" from="orderId"/>
+                            <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                            <select-field field-name="unitPrice"/>
+                        </entity-find-one>
+                        <set field="receivedUnitCost" from="linkedOrderItem?.unitPrice ?: 0.0"/>
+
+                        <if condition="receivedUnitCost &lt;= 0.0">
+                            <log message="========== Skipping row with invalid receivedUnitCost=${receivedUnitCost} for orderId=${orderId}"/>
+                            <continue/>
+                        </if>
+
+                        <set field="validPac" from="getValidProductAverageCost(inventoryItemId, averageCostMap)"/>
+                        <log message="========== Processing inventoryItemId=${inventoryItemId}, qohDiff=${qohDiff}, prevQohTotal=${prevQohTotal}, qohTotal=${qohTotal}, receivedUnitCost=${receivedUnitCost}, validPac=${validPac}"/>
+
+                        <set field="effectiveDate" from="event.effectiveDate"/>
+                        <set field="affectedQuantity" from="qohDiff"/>
+                        <set field="quantityOnHand" from="qohTotal - qohDiff"/>
+
+                        <if condition="validPac">
+                            <then>
+                                <script>weightedAvgCost = (affectedQuantity * receivedUnitCost + quantityOnHand * validPac) / qohTotal</script>
+                                <log message="========== WeightedAvgCost computed=${weightedAvgCost} for inventoryItemId=${inventoryItemId}"/>
+                            </then>
+                            <else>
+                                <set field="weightedAvgCost" from="receivedUnitCost"/>
+                                <log message="========== No valid PAC found, using receivedUnitCost=${receivedUnitCost}"/>
+                            </else>
+                        </if>
+
+                        <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem">
+                            <field-map field-name="inventoryItemId" from="inventoryItemId"/>
+                            <select-field field-name="productId,facilityId,ownerPartyId"/>
+                        </entity-find-one>
+
+                        <entity-find entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" list="productAverageCosts">
+                            <econdition field-name="productId" from="inventoryItem.productId"/>
+                            <econdition field-name="facilityId" from="inventoryItem.facilityId"/>
+                            <econdition field-name="productAverageCostTypeId" value="WEIGHTED_AVG_COST"/>
+                            <date-filter/>
+                            <order-by field-name="-fromDate"/>
+                        </entity-find>
+
+                        <!-- Expire old ProductAverageCosts -->
+                        <iterate list="productAverageCosts" entry="productAverageCost">
+                            <set field="productAverageCost.thruDate" from="ec.user.nowTimestamp"/>
+                            <service-call name="update#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCost"/>
+                        </iterate>
+
+                        <!-- Create Product Average Cost, Required: productAverageCostTypeId,organizationPartyId,productId,facilityId,fromDate,averageCost,affectedQuantity,quantityOnHand,orderId,orderItemSeqId,shipmentId,shipmentItemSeqId,receiptId -->
+                        <set field="productAverageCostMap" from="[
+                                productAverageCostTypeId: 'WEIGHTED_AVG_COST',
+                                organizationPartyId: inventoryItem.ownerPartyId,
+                                productId: inventoryItem.productId,
+                                facilityId: inventoryItem.facilityId,
+                                fromDate: effectiveDate,
+                                averageCost: weightedAvgCost,
+                                affectedQuantity: affectedQuantity,
+                                quantityOnHand: qohTotal,
+                                orderId: orderId,
+                                orderItemSeqId: orderItemSeqId
+                            ]"/>
+                        <log message="=========== Creating new PAC record for productId=${inventoryItem.productId}, avgCost=${weightedAvgCost}"/>
+                        <script>averageCostMap.put(inventoryItemId, weightedAvgCost)</script>
+                        <service-call name="create#org.apache.ofbiz.accounting.ledger.ProductAverageCost" in-map="productAverageCostMap"/>
+
+                        <script>validPacResultForToPo?.clear()</script>
+                    </then>
+                </else-if>
+            </if>
+            <script><![CDATA[
+                }
+                }
+                ]]></script>
+        </actions>
+    </service>
+
+    <!-- co.hotwax.oms.impl.MephistoWacCorrectionServices.valid#ProductAverageCost -->
+    <service verb="valid" noun="ProductAverageCost">
+        <in-parameters>
+            <parameter name="productId"/>
+            <parameter name="facilityId"/>
+            <parameter name="inventoryItemId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="averageCost"/>
+        </out-parameters>
+        <actions>
+            <!-- Check if pair of productId, facilityId or the inventoryItemId is must have -->
+            <if condition="!((productId &amp;&amp; facilityId) || inventoryItemId)">
+                <return error="true" message="Either (productId and facilityId) or inventoryItemId is required"/>
+            </if>
+
+            <!-- If only inventoryItemId then get the productId, facilityId -->
+            <if condition="!productId || !facilityId">
+                <entity-find-one entity-name="org.apache.ofbiz.product.inventory.InventoryItem" value-field="inventoryItem">
+                    <field-map field-name="inventoryItemId" from="inventoryItemId"/>
+                </entity-find-one>
+                <if condition="!inventoryItem">
+                    <return/>
+                </if>
+                <set field="productId" from="inventoryItem.productId"/>
+                <set field="facilityId" from="inventoryItem.facilityId"/>
+            </if>
+
+            <!-- Get the latest ProductAverageCost -->
+            <entity-find entity-name="org.apache.ofbiz.accounting.ledger.ProductAverageCost" list="productAverageCostList" limit="1">
+                <econdition field-name="productId" from="productId"/>
+                <econdition field-name="facilityId" from="facilityId"/>
+                <date-filter/>
+                <order-by field-name="-fromDate"/>
+            </entity-find>
+            <set field="productAverageCost" from="productAverageCostList ? productAverageCostList.get(0) : null"/>
+
+            <set field="averageCost" from="productAverageCost?.averageCost"/>
+        </actions>
+    </service>
+</services>
