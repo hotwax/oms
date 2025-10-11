@@ -114,6 +114,11 @@
 
                         <if condition="validPac">
                             <then>
+                                <if condition="qohTotal == 0.0">
+                                    <then>
+                                        <continue/>
+                                    </then>
+                                </if>
                                 <script>weightedAvgCost = (affectedQuantity * receivedUnitCost + quantityOnHand * validPac) / qohTotal</script>
                                 <log message="========== WeightedAvgCost computed=${weightedAvgCost} for inventoryItemId=${inventoryItemId}"/>
                             </then>
