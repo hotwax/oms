@@ -153,7 +153,7 @@ under the License.
             </entity-find-one>
             <set field="order.brandName" from="shopifyShopTypeMapping?.mappedValue"/>
 
-            <entity-find entity-name="co.hotwax.integration.IntegrationTypeMapping" list="sandboxValue" limit="1">
+            <entity-find entity-name="co.hotwax.integration.IntegrationTypeMapping" list="sandboxValue" limit="1" cache="true">
                 <econdition field-name="integrationTypeId" value="SHOPIFY_EMAIL"/>
                 <econdition field-name="mappingKey" value="shopifyemail.sandbox"/>
             </entity-find>
