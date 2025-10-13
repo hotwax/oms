@@ -123,7 +123,7 @@
                 <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId,orderFacilityId,carrierPartyId,shipmentMethodTypeId,unitPrice"/>
             </entity-find>
 
-            <!-- NOTE: Added the orderFacilityId, facilityId, shipmentMethodTypeId and carrierPartyId of the first order item of the order.-->
+            <!-- NOTE: Added the maySplit, orderFacilityId, facilityId, shipmentMethodTypeId and carrierPartyId of the first order item of the order.-->
             <set field="orderItemFirst" from="orderItemList?.first"/>
 
             <set field="order" from="order + [maySplit:orderItemFirst?.maySplit,facilityId:orderItemFirst?.facilityId,
