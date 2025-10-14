@@ -123,12 +123,17 @@
                 <select-field field-name="orderItemSeqId,shipGroupSeqId,productId,quantity,statusId,itemDescription,cancelQuantity,maySplit,facilityId,orderFacilityId,carrierPartyId,shipmentMethodTypeId,unitPrice"/>
             </entity-find>
 
-            <!-- NOTE: Added the maySplit, orderFacilityId, facilityId, shipmentMethodTypeId and carrierPartyId of the first order item of the order.-->
-            <set field="orderItemFirst" from="orderItemList?.first"/>
+            <!-- Get Order Item Ship Group details -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroups">
+                <econdition field-name="orderId"/>
+            </entity-find>
 
-            <set field="order" from="order + [maySplit:orderItemFirst?.maySplit,facilityId:orderItemFirst?.facilityId,
-                    orderFacilityId:orderItemFirst?.orderFacilityId, carrierPartyId:orderItemFirst?.carrierPartyId,
-                    shipmentMethodTypeId:orderItemFirst?.shipmentMethodTypeId]"/>
+            <!-- Get the details from the first ship group -->
+            <set field="shipGroupFirst" from="shipGroups?.first"/>
+
+            <set field="order" from="order + [maySplit:shipGroupFirst?.maySplit,facilityId:shipGroupFirst?.facilityId,
+                    orderFacilityId:shipGroupFirst?.orderFacilityId, carrierPartyId:shipGroupFirst?.carrierPartyId,
+                    shipmentMethodTypeId:shipGroupFirst?.shipmentMethodTypeId]"/>
 
             <set field="order.items" from="[]"/>
             <iterate list="orderItemList" entry="orderItem">
