@@ -464,8 +464,8 @@
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="quantity" required="true" type="Integer"/>
-            <parameter name="unitPrice" required="true" type="Integer"/>
+            <parameter name="quantity" type="Integer"/>
+            <parameter name="unitPrice" type="BigDecimal"/>
         </in-parameters>
         <actions>
 
@@ -523,7 +523,7 @@
             <parameter name="productId" required="true"/>
             <parameter name="quantity" default-value="1" type="Integer"/>
             <parameter name="shipGroupSeqId" required="true"/>
-            <parameter name="unitPrice" required="true" type="Integer"/>
+            <parameter name="unitPrice" type="BigDecimal"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId"/>
