@@ -422,8 +422,23 @@
         <alias entity-alias="TDCW" name="sundayCapacity"/>
     </view-entity>
 
+    <view-entity entity-name="ShipmentAndShipmentStatus" package="co.hotwax.shipment">
+        <description>View for Shipment and ShipmentStatus.</description>
+        <member-entity entity-alias="SH" entity-name="org.apache.ofbiz.shipment.shipment.Shipment"/>
+        <member-entity entity-alias="SS" entity-name="org.apache.ofbiz.shipment.shipment.ShipmentStatus" join-from-alias="SH">
+            <key-map field-name="shipmentId"/>
+            <key-map field-name="statusId"/>
+        </member-entity>
+        <alias entity-alias="SH" name="shipmentId"/>
+        <alias entity-alias="SH" name="primaryOrderId"/>
+        <alias entity-alias="SH" name="shipmentTypeId"/>
+        <alias entity-alias="SH" name="shipmentMethodTypeId"/>
+        <alias entity-alias="SS" name="statusId"/>
+        <alias entity-alias="SS" name="statusDate"/>
+    </view-entity>
+
     <!-- TODO: Check using the OrderHeaderItemShipGroup that has all the fields similar to this view.
-           This view has an extra check of orderTypeId = 'TRANSFER_ORDER' -->
+       This view has an extra check of orderTypeId = 'TRANSFER_ORDER' -->
     <view-entity entity-name="TransferOrderAndItem" package="co.hotwax.oms.order">
     <description>View to get Transfer Order details.</description>
     <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
