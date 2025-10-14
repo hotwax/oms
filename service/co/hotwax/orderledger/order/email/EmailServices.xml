@@ -27,6 +27,7 @@ under the License.
             <parameter name="additionalFields" type="Map">
                 <description>Used to send additional data for the master payload</description>
             </parameter>
+            <parameter name="emailAddress"/>
         </in-parameters>
         <actions>
             <if condition="!orderId &amp;&amp; !shipmentId">
@@ -152,6 +153,12 @@ under the License.
             </entity-find-one>
             <set field="order.brandName" from="shopifyShopTypeMapping?.mappedValue"/>
 
+            <entity-find entity-name="co.hotwax.integration.IntegrationTypeMapping" list="sandboxValue" limit="1" cache="true">
+                <econdition field-name="integrationTypeId" value="SHOPIFY_EMAIL"/>
+                <econdition field-name="mappingKey" value="shopifyemail.sandbox"/>
+            </entity-find>
+            <set field="order.sandbox" from="sandboxValue?.mappedValue"/>
+
             <set field="partyIdTo" from="order.roles?.find { it.roleTypeId == 'BILL_TO_CUSTOMER' }?.partyId "/>
             <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
                 <field-map field-name="partyId" from="partyIdTo"/>
@@ -159,9 +166,12 @@ under the License.
             </entity-find-one>
             <set field="order.firstName" from="person.firstName"/>
             <set field="order.lastName" from="person.lastName"/>
-            <set field="emailAddress" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+
             <if condition="!emailAddress">
-                <return error="true" message="Could not send ${emailType} email, No email address found for the order with ID ${orderId}."/>
+                <set field="emailAddress" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+                <if condition="!emailAddress">
+                    <return error="true" message="Could not send ${emailType} email, No email address found for the order with ID ${orderId}."/>
+                </if>
             </if>
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmailSetting">
                 <field-map field-name="productStoreId" from="order.productStoreId"/>
@@ -378,6 +388,7 @@ under the License.
                 <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                <econdition field-name="facilityId" operator="not-in" value="PICKUP_REJECTED"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
@@ -482,10 +493,11 @@ under the License.
                 <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
+                <econdition field-name="facilityId" operator="not-in" value="PICKUP_REJECTED"/>
                 <econdition field-name="orderDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
-                <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
-                <select-field field-name="orderId"/>
+                <econdition field-name="productStoreId" from="productStoreId"/>
+                <select-field field-name="orderId,facilityId"/>
                 <use-iterator/>
             </entity-find>
 
@@ -493,8 +505,14 @@ under the License.
                 <return message="No valid BOPIS orders found at ${nowDate}, not sending notification email."/>
             </if>
             <iterate list="ordersIterator" entry="order">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
+                    <econdition field-name="facilityId" from="order?.facilityId"/>
+                    <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
+                    <date-filter/>
+                </entity-find>
+
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                              in-map="[orderId: order.orderId, emailType: emailType]" async="true"/>
+                              in-map="[orderId: order.orderId, emailType: emailType, emailAddress: facilityContactDetail?.infoString[0].toString()]" async="true"/>
             </iterate>
 
             <!-- Update job parameter if jobName is provided -->
