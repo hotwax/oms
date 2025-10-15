@@ -103,6 +103,11 @@
                         <parameter name="unitPrice"/>
                     </parameter>
                 </parameter>
+                <parameter name="shipGroups" type="List">
+                    <parameter name="shipGroup" type="Map">
+                        <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"/>
+                    </parameter>
+                </parameter>
             </parameter>
         </out-parameters>
         <actions>
