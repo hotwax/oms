@@ -459,4 +459,101 @@
             </iterate>
         </actions>
     </service>
+
+    <service verb="update" noun="TransferOrderItem">
+        <description>Service to update the Transfer Order Item Quantity.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="orderItemSeqId" required="true"/>
+            <parameter name="quantity" type="Integer" required="true"/>
+        </in-parameters>
+        <actions>
+
+            <!-- Check if the order is in Created status. -->
+            <!-- If the Order is not in Created status then return a warning. -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" value="ORDER_CREATED"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+            </entity-find>
+
+            <if condition="!orderHeader">
+                <return error="true" message="Order [${orderId}] not in CREATED status. Cannot edit ordered quantity"/>
+            </if>
+
+            <!-- Fetch the orderItem detail for the incoming orderItemSeqId -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId"/>
+                <field-map field-name="orderItemSeqId"/>
+            </entity-find-one>
+
+            <!-- If no orderItem for the incoming orderItemSeqId then return error -->
+            <if condition="!orderItem">
+                <return error="true" message="OrderItem [${orderItemSeqId}] not found for Order [${orderId}]"/>
+            </if>
+
+            <set field="currentQuantity" from="orderItem.quantity"/>
+            <set field="currentUnitPrice" from="orderItem.unitPrice"/>
+            <set field="grandTotal" from="orderHeader.first.grandTotal"/>
+
+            <!-- Calculate the new order total and the old order total as per the incoming quantity
+                and the orderItems's current unitPrice and quantity -->
+
+            <set field="oldTotal" from="currentQuantity * (currentUnitPrice ?:0.0)"/>
+            <set field="newTotal" from="quantity * (currentUnitPrice ?:0.0)"/>
+
+            <set field="adjustment" from="newTotal - oldTotal"/>
+
+            <if condition="adjustment != 0">
+                <set field="grandTotal" from="(grandTotal ?: 0.0) + adjustment"/>
+            </if>
+
+            <!-- Update the OrderItem quantity with the incoming quantity -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, quantity:quantity]"/>
+
+            <!-- Update the grandTotal in the OrderHeader -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
+        </actions>
+    </service>
+
+    <service verb="add" noun="TransferOrderItem">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+            <parameter name="productId" required="true"/>
+            <parameter name="quantity" default-value="1" type="Integer"/>
+            <parameter name="shipGroupSeqId" required="true"/>
+            <parameter name="unitPrice" type="BigDecimal" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId"/>
+            <parameter name="orderItemSeqId"/>
+        </out-parameters>
+        <actions>
+
+            <!-- Check if the order is in Created status. -->
+            <!-- If the Order is not in Created status then return a warning. -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader">
+                <econdition field-name="orderId"/>
+                <econdition field-name="statusId" value="ORDER_CREATED"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+            </entity-find>
+
+            <if condition="!orderHeader">
+                <return error="true" message="Order [${orderId}] not in CREATED status. Cannot add new order items."/>
+            </if>
+
+            <!-- Set the OrderItem map to create OrderItem record -->
+            <set field="orderItem" from="[orderId:orderId,quantity:quantity,productId:productId, statusId:'ITEM_CREATED', unitPrice:unitPrice, shipGroupSeqId:shipGroupSeqId,
+                 statuses:[orderId:orderId,statusId:'ITEM_CREATED']]"/>
+
+            <!-- Create the OrderItem with the incoming product. -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem" out-map="context"/>
+
+            <!-- Set the grandTotal field from the unitPrice and quantity -->
+            <set field="grandTotal" from="(orderHeader.first.grandTotal ?: 0) + ((unitPrice ?: 0) * quantity)"/>
+
+            <!--Update the grandTotal in the OrderHeader -->
+            <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
+        </actions>
+    </service>
 </services>

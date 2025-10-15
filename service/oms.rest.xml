@@ -585,6 +585,14 @@ under the License.
             </resource>
 
         </id>
+        <resource name="orderItem">
+            <method type="put">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.update#TransferOrderItem"/>
+            </method>
+            <method type="post">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.add#TransferOrderItem"/>
+            </method>
+        </resource>
     </resource>
 
     <resource name="entityData">
