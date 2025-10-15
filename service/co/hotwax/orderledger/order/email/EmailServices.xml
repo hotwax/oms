@@ -157,7 +157,7 @@ under the License.
                 <econdition field-name="integrationTypeId" value="SHOPIFY_EMAIL"/>
                 <econdition field-name="mappingKey" value="shopifyemail.sandbox"/>
             </entity-find>
-            <set field="order.sandbox" from="sandboxValue?.mappingValue"/>
+            <set field="order.sandbox" from="sandboxValue?.get(0)?.mappingValue"/>
 
             <set field="partyIdTo" from="order.roles?.find { it.roleTypeId == 'BILL_TO_CUSTOMER' }?.partyId "/>
             <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
