@@ -461,11 +461,11 @@
     </service>
 
     <service verb="update" noun="TransferOrderItem">
+        <description>Service to update the Transfer Order Item Quantity.</description>
         <in-parameters>
             <parameter name="orderId" required="true"/>
             <parameter name="orderItemSeqId" required="true"/>
-            <parameter name="quantity" type="Integer"/>
-            <parameter name="unitPrice" type="BigDecimal"/>
+            <parameter name="quantity" type="Integer" required="true"/>
         </in-parameters>
         <actions>
 
@@ -491,21 +491,19 @@
                 <return error="true" message="OrderItem [${orderItemSeqId}] not found for Order [${orderId}]"/>
             </if>
 
-            <set from="orderItem.quantity" field="currentQuantity"/>
-            <set from="orderHeader.first.grandTotal" field="grandTotal"/>
+            <set field="currentQuantity" from="orderItem.quantity"/>
+            <set field="currentUnitPrice" from="orderItem.unitPrice"/>
+            <set field="grandTotal" from="orderHeader.first.grandTotal"/>
 
-            <!-- Calculate difference in quantity and prepare the adjustment for grandTotal -->
-            <if condition="quantity &lt; currentQuantity">
-                <!-- Reduce grandTotal -->
-                <set field="diffQty" from="currentQuantity - quantity"/>
-                <set field="adjustment" from="diffQty * unitPrice"/>
-                <set field="grandTotal" from="grandTotal - adjustment"/>
-            </if>
+            <!-- Calculate the new order total and the old order total as per the incoming quantity
+                and the orderItems's current unitPrice and quantity -->
 
-            <if condition="quantity &gt; currentQuantity">
-                <!-- Increase grandTotal -->
-                <set field="diffQty" from="quantity - currentQuantity"/>
-                <set field="adjustment" from="diffQty * unitPrice"/>
+            <set field="oldTotal" from="currentQuantity * currentUnitPrice"/>
+            <set field="newTotal" from="quantity * currentUnitPrice"/>
+
+            <set field="adjustment" from="newTotal - oldTotal"/>
+
+            <if condition="adjustment != 0">
                 <set field="grandTotal" from="grandTotal + adjustment"/>
             </if>
 
