@@ -474,6 +474,7 @@
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader">
                 <econdition field-name="orderId"/>
                 <econdition field-name="statusId" value="ORDER_CREATED"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
             </entity-find>
 
             <if condition="!orderHeader">
@@ -498,13 +499,13 @@
             <!-- Calculate the new order total and the old order total as per the incoming quantity
                 and the orderItems's current unitPrice and quantity -->
 
-            <set field="oldTotal" from="currentQuantity * currentUnitPrice"/>
-            <set field="newTotal" from="quantity * currentUnitPrice"/>
+            <set field="oldTotal" from="currentQuantity * (currentUnitPrice ?:0.0)"/>
+            <set field="newTotal" from="quantity * (currentUnitPrice ?:0.0)"/>
 
             <set field="adjustment" from="newTotal - oldTotal"/>
 
             <if condition="adjustment != 0">
-                <set field="grandTotal" from="grandTotal + adjustment"/>
+                <set field="grandTotal" from="(grandTotal ?: 0.0) + adjustment"/>
             </if>
 
             <!-- Update the OrderItem quantity with the incoming quantity -->
@@ -521,7 +522,7 @@
             <parameter name="productId" required="true"/>
             <parameter name="quantity" default-value="1" type="Integer"/>
             <parameter name="shipGroupSeqId" required="true"/>
-            <parameter name="unitPrice" type="BigDecimal"/>
+            <parameter name="unitPrice" type="BigDecimal" required="true"/>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId"/>
@@ -534,6 +535,7 @@
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderHeader" list="orderHeader">
                 <econdition field-name="orderId"/>
                 <econdition field-name="statusId" value="ORDER_CREATED"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
             </entity-find>
 
             <if condition="!orderHeader">
@@ -548,7 +550,7 @@
             <service-call name="create#org.apache.ofbiz.order.order.OrderItem" in-map="orderItem" out-map="context"/>
 
             <!-- Set the grandTotal field from the unitPrice and quantity -->
-            <set field="grandTotal" from="orderHeader.first.grandTotal + (unitPrice * quantity)"/>
+            <set field="grandTotal" from="(orderHeader.first.grandTotal ?: 0) + ((unitPrice ?: 0) * quantity)"/>
 
             <!--Update the grandTotal in the OrderHeader -->
             <service-call name="update#org.apache.ofbiz.order.order.OrderHeader" in-map="[orderId:orderId, grandTotal:grandTotal]"/>
