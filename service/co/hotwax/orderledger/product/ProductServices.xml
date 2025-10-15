@@ -1223,6 +1223,7 @@ under the License.
                     def parts = [
                         productJson.handle ?: '',
                         productJson.vendor ?: '',
+                        productJson.requiresShipping ?: '',
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
@@ -1268,6 +1269,7 @@ under the License.
                         title: productJson.title,
                         featureImageUrl: productJson.featuredMedia?.preview?.image?.url,
                         isGiftCard: productJson.isGiftCard,
+                        requiresShipping: productJson.requiresShipping,
                         hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
                         tags: [added: tags, removed: []],
                         features: [added: features, removed: []],
@@ -1315,6 +1317,7 @@ under the License.
             def parts = [
                 productJson.handle ?: '',
                 productJson.vendor ?: '',
+                productJson.requiresShipping ?: '',
                 (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                 (productJson.isGiftCard ?: '').toString(),
                 productJson.title ?: '',
@@ -1327,6 +1330,7 @@ under the License.
                 differenceMap.vendor = productJson.vendor
                 differenceMap.handle = productJson.handle
                 differenceMap.isGiftCard = productJson.isGiftCard
+                differenceMap.requiresShipping = productJson.requiresShipping
                 differenceMap.hasVariantsThatRequireComponents = productJson.hasVariantsThatRequiresComponents
                 differenceMap.featureImageUrl = productJson.featuredMedia?.preview?.image?.url
             }
@@ -1363,9 +1367,18 @@ under the License.
             newFeatures = newFeatures.sort { it.sequenceNumber }
             def newFeaturesHash = hash(newFeatures)
             if (newFeaturesHash != productUpdateHistory.featuresHash) {
-                def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
-                def addedFeatures = (newFeatures - oldFeatures)
-                def removedFeatures = (oldFeatures - newFeatures)
+                def oldFeatures = []
+                oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+
+                // Convert both lists into Sets of identifying tuples (name|value)
+                def oldKeyed = oldFeatures.collect { "${it.name}|${it.value}" } as Set
+                def newKeyed = newFeatures.collect { "${it.name}|${it.value}" } as Set
+
+                def addedKeys = newKeyed - oldKeyed
+                def removedKeys = oldKeyed - newKeyed
+
+                def addedFeatures = newFeatures.findAll { "${it.name}|${it.value}" in addedKeys }
+                def removedFeatures = oldFeatures.findAll { "${it.name}|${it.value}" in removedKeys }
                 if (addedFeatures || removedFeatures) {
                     differenceMap.features = [added: addedFeatures, removed: removedFeatures]
                 }
