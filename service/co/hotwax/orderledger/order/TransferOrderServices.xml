@@ -103,6 +103,11 @@
                         <parameter name="unitPrice"/>
                     </parameter>
                 </parameter>
+                <parameter name="shipGroups" type="List">
+                    <parameter name="shipGroup" type="Map">
+                        <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"/>
+                    </parameter>
+                </parameter>
             </parameter>
         </out-parameters>
         <actions>
@@ -129,6 +134,14 @@
             <set field="order" from="order + [maySplit:orderItemFirst?.maySplit,facilityId:orderItemFirst?.facilityId,
                     orderFacilityId:orderItemFirst?.orderFacilityId, carrierPartyId:orderItemFirst?.carrierPartyId,
                     shipmentMethodTypeId:orderItemFirst?.shipmentMethodTypeId]"/>
+
+            <!-- Get Order Item Ship Group details -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroups">
+                <econdition field-name="orderId"/>
+            </entity-find>
+
+            <!-- Add the ship groups list to the order map -->
+            <set field="order" from="order + [shipGroups:shipGroups]"/>
 
             <set field="order.items" from="[]"/>
             <iterate list="orderItemList" entry="orderItem">
