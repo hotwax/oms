@@ -578,12 +578,16 @@ under the License.
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
                 </method>
             </resource>
+            <resource name="cancel">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.cancel#TransferOrder"/>
+                </method>
+            </resource>
             <resource name="approveWhFulfill" description="Approve WH Fulfill Transfer Order">
                 <method type="post">
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#WhFulfillTransferOrder"/>
                 </method>
             </resource>
-
         </id>
         <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
             <method type="get">

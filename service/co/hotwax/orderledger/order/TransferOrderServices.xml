@@ -473,6 +473,62 @@
         </actions>
     </service>
 
+    <service verb="cancel" noun="TransferOrder">
+        <description>Service to cancel Transfer Order.</description>
+        <in-parameters>
+            <parameter name="orderId" required="true">
+                <description>Transfer Order Id to cancel.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+
+            <!-- Check if the Order is already in Cancelled status. -->
+            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="orderHeaderCount">
+                <econdition field-name="orderId"/>
+                <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                <econdition field-name="statusId" value="ORDER_CANCELLED"/>
+            </entity-find-count>
+
+            <if condition="orderHeaderCount!=0">
+                <return error="true" message="Order ID [${orderId}] is already in Cancelled status. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Check if any Shipment record exists for the given order then return. -->
+            <entity-find-count entity-name="org.apache.ofbiz.shipment.shipment.Shipment" count-field="shipmentCount">
+                <econdition field-name="primaryOrderId" from="orderId"/>
+                <econdition field-name="statusId" operator="in" value="SHIPMENT_PACKED,SHIPMENT_SHIPPED"/>
+            </entity-find-count>
+
+            <if condition="shipmentCount &gt; 0">
+                <return error="true" message="Fulfillment process already started for the order [${orderId}]. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Check if any Shipment Receipt record exists for the order then return. -->
+            <entity-find-count entity-name="org.apache.ofbiz.shipment.receipt.ShipmentReceipt" count-field="shipmentReceiptCount">
+                <econdition field-name="orderId"/>
+            </entity-find-count>
+
+            <if condition="shipmentReceiptCount &gt; 0">
+                <return error="true" message="Receiving process already started for the order [${orderId}]. Cannot cancel the Order."/>
+            </if>
+
+            <!-- Get all the items for the given transfer order id. -->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId"/>
+            </entity-find>
+
+            <!-- Iterate the orderItems list -->
+            <iterate list="orderItems" entry="orderItem">
+                <!-- Cancel the orderItem reservations if any -->
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
+                              in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, cancelQuantity:orderItem.quantity]"/>
+
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus" in-map="[orderId:orderId,
+                        orderItemSeqId:orderItem.orderItemSeqId, statusId:'ITEM_CANCELLED']"/>
+            </iterate>
+        </actions>
+    </service>
+
     <service verb="get" noun="TransferOrderGroups">
         <in-parameters>
             <parameter name="orderName"/>
