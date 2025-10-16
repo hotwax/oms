@@ -473,6 +473,105 @@
         </actions>
     </service>
 
+    <service verb="get" noun="TransferOrderGroups">
+        <in-parameters>
+            <parameter name="orderName"/>
+            <parameter name="productStoreId"/>
+            <parameter name="facilityId"/>
+            <parameter name="orderFacilityId"/>
+            <parameter name="shipmentMethodTypeId"/>
+            <parameter name="carrierPartyId"/>
+            <parameter name="orderStatusId"/>
+            <parameter name="fieldsToSelect" default-value="orderId"/>
+            <parameter name="pageSize" default-value="20" type="Integer"/>
+            <parameter name="pageIndex" default-value="0" type="Integer"/>
+            <parameter name="orderByField" default-value="-orderDate"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="ordersCount" type="Integer"/>
+            <parameter name="orders" type="List"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="pageSize" offset="pageIndex * pageSize" list="orders" distinct="true">
+                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <econdition field-name="facilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="productStoreId" ignore-if-empty="true"/>
+                <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                <econdition field-name="carrierPartyId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId" ignore-if-empty="true"/>
+                <select-field field-name="${fieldsToSelect}"/>
+                <order-by field-name="${orderByField}"/>
+            </entity-find>
+
+            <!-- Set the field ordersCount from the orders list. -->
+            <set field="ordersCount" from="orders_xafind.count()"/>
+        </actions>
+    </service>
+
+    <service verb="get" noun="TransferOrderItems">
+        <in-parameters>
+            <parameter name="orderName"/>
+            <parameter name="orderId"/>
+            <parameter name="facilityId"/>
+            <parameter name="orderFacilityId"/>
+            <parameter name="productId"/>
+            <parameter name="productStoreId"/>
+            <parameter name="shipmentMethodTypeId"/>
+            <parameter name="carrierPartyId"/>
+            <parameter name="orderStatusId"/>
+            <parameter name="pageSize" default-value="20" type="Integer"/>
+            <parameter name="pageIndex" default-value="0" type="Integer"/>
+            <parameter name="orderByField" default-value="-orderDate"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="transferOrderItems" type="List"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" limit="pageSize" offset="pageIndex * pageSize" list="orderItems" distinct="true">
+                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <econdition field-name="orderId" ignore-if-empty="true"/>
+                <econdition field-name="facilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="productId" ignore-if-empty="true"/>
+                <econdition field-name="productStoreId" ignore-if-empty="true"/>
+                <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+                <econdition field-name="carrierPartyId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId" ignore-if-empty="true"/>
+                <order-by field-name="${orderByField}"/>
+            </entity-find>
+
+            <set field="transferOrderItems" from="[]"/>
+
+            <iterate list="orderItems" entry="orderItem">
+                <set field="transferOrderItem" from="orderItem.getPlainValueMap(0)"/>
+
+                <!-- Get total Issued quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                    <econdition field-name="orderId" from="orderItem.orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantity"/>
+                </entity-find>
+
+                <!-- Get total Received Quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
+                    <econdition field-name="orderId" from="orderItem.orderId"/>
+                    <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
+                </entity-find>
+
+                <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
+                <set field="transferOrderItem.shippedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
+
+                <!-- Add the transferOrderItem map to the TransferOrderItems list -->
+                <script>
+                    transferOrderItems.add(transferOrderItem)
+                </script>
+            </iterate>
+        </actions>
+    </service>
+
     <service verb="update" noun="TransferOrderItem">
         <description>Service to update the Transfer Order Item Quantity.</description>
         <in-parameters>
