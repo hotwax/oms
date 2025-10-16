@@ -489,7 +489,7 @@
                 <econdition field-name="statusId" value="ORDER_CANCELLED"/>
             </entity-find-count>
 
-            <if condition="orderHeaderCount">
+            <if condition="orderHeaderCount!=0">
                 <return error="true" message="Order ID [${orderId}] is already in Cancelled status. Cannot cancel the Order."/>
             </if>
 
@@ -499,7 +499,7 @@
                 <econdition field-name="statusId" operator="in" value="SHIPMENT_PACKED,SHIPMENT_SHIPPED"/>
             </entity-find-count>
 
-            <if condition="shipmentCount">
+            <if condition="shipmentCount &gt; 0">
                 <return error="true" message="Fulfillment process already started for the order [${orderId}]. Cannot cancel the Order."/>
             </if>
 
@@ -508,7 +508,7 @@
                 <econdition field-name="orderId"/>
             </entity-find-count>
 
-            <if condition="shipmentReceiptCount">
+            <if condition="shipmentReceiptCount &gt; 0">
                 <return error="true" message="Receiving process already started for the order [${orderId}]. Cannot cancel the Order."/>
             </if>
 
