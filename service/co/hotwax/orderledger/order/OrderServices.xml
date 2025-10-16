@@ -236,6 +236,7 @@ under the License.
 
                 <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
                     <econdition field-name="orderId" from="order.orderId"/>
+                    <date-filter/>
                 </entity-find>
                 <!-- Build items list inside shipGroup -->
                 <set field="shipGroups" from="[]"/>
@@ -424,6 +425,7 @@ under the License.
 
                 <entity-find entity-name="org.apache.ofbiz.shipment.shipment.PicklistShipmentAndRole" list="picklistShipmentAndRoles">
                     <econdition field-name="orderId"/>
+                    <date-filter/>
                 </entity-find>
 
                 <iterate list="orderItemShipments" entry="orderItemShipment">

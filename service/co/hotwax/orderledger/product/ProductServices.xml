@@ -1085,8 +1085,7 @@ under the License.
             <!-- Metafield handling (metafield entries have key/namespace/value and __parentId) -->
             <if condition="productJson.metafields">
                 <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.id)"/>
-                <set field="diffMap" from="[:]"/>
-                <!-- If same handle is used for another virtual product then update the existing product -->
+
                 <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
                     <field-map field-name="internalName" value="V_${productJson.handle}"/>
                 </entity-find-one>
@@ -1104,85 +1103,98 @@ under the License.
                 </entity-find-one>
 
                 <script><![CDATA[
-                    def newMetafields = (productJson.metafields ?: []).collect { mf ->
-                        def key = mf.key
-                        def namespace = mf.namespace
-                        def finalValue = null
+                    def normalizeValue = { val ->
+                        if (val == null) return ""
+                        if (val instanceof Map || val instanceof List)
+                            return ContextJavaUtil.jacksonMapper.writeValueAsString(val)
+                        return val.toString().trim()
+                    }
 
-                        // Case 1: Direct value (not a reference)
-                        if (mf.value && (!mf.reference || !mf.reference.fields)) {
-                            finalValue = mf.value
-                        } else if (mf.reference?.fields) {
-                            // Case 2: Shopify object reference with fields
-                            def refFieldValue = mf.reference.fields.findResult { field ->
-                                field?.value
+                    // --- Extract metafields with (namespace, key, value)
+                    def extractMetafields = { list ->
+                        (list ?: []).collect { mf ->
+                            def key = mf?.key?.toString()?.trim()
+                            def ns  = mf?.namespace?.toString()?.trim()
+                            def val = null
+
+                            // determine value (direct or reference)
+                            if (mf?.value && (!mf?.reference || !mf?.reference?.fields)) {
+                                val = mf.value
+                            } else if (mf?.reference?.fields instanceof List) {
+                                val = mf.reference.fields.find { it?.key == "title" }.value
                             }
-                            finalValue = refFieldValue
+
+                            [namespace: ns, key: key, value: normalizeValue(val)]
                         }
-                        if (finalValue == null) return null
-                        return [
-                            key      : key,
-                            namespace: namespace,
-                            value    : finalValue
-                        ]
-                    }.findAll { it } // Remove nulls
+                        .findAll { it.namespace && it.key } // must have both namespace and key
+                    }
 
-                    // Load old metafields from history
-                    def oldMetafields = ContextJavaUtil.jacksonMapper.readValue(history?.metafields ?: "[]", List.class)
-                    oldMetafields = oldMetafields.collect { [
-                        key: it.key?.toString(),
-                        namespace: it.namespace?.toString(),
-                        value: it.value?.toString()
-                    ] }.findAll { it.key && it.namespace }
+                    def newMetafields = extractMetafields(productJson.metafields)
+                    // Sort by namespace and key
+                    newMetafields = newMetafields.sort { a, b -> (a.namespace <=> b.namespace) ?: (a.key <=> b.key) }
 
-                    // Compute hashes
+                    // --- Load old metafields
+                    def oldMetafields = []
+                    if (history?.metafields) {
+                        try {
+                            oldMetafields = ContextJavaUtil.jacksonMapper.readValue(history.metafields, List.class)
+                        } catch (Throwable ignore) { oldMetafields = [] }
+                    }
+                    oldMetafields = (oldMetafields ?: []).collect {
+                        [namespace: it.namespace?.toString(), key: it.key?.toString(), value: normalizeValue(it.value)]
+                    }.findAll { it.namespace && it.key }
+
+                    // --- Identify added and removed metafields
+                    def added = []
+                    def removed = []
+
+                    // Prepare lookup maps by namespace+key
+                    def oldMap = oldMetafields.collectEntries { [(it.namespace + "|" + it.key): it] }
+                    def newMap = newMetafields.collectEntries { [(it.namespace + "|" + it.key): it] }
+
+                    // Detect added and removed
+                    newMap.each { k, v ->
+                        if (v.value && v.value.trim()) { // has valid value
+                            def oldVal = oldMap[k]?.value
+                            if (oldVal == null || oldVal != v.value) {
+                                added << [namespace: v.namespace, key: v.key, value: v.value]
+                            }
+                        }
+                    }
+
+                    oldMap.each { k, v ->
+                        def newVal = newMap[k]?.value
+                        if (!newVal || newVal.trim() == "") {
+                            removed << [namespace: v.namespace, key: v.key, value: v.value]
+                        }
+                    }
+
                     def newHash = hash(newMetafields)
                     def oldHash = history?.metafieldsHash
-                    if (newHash != oldHash) {
-                        // Indexes for comparison
-                        def oldIndex = oldMetafields.collectEntries { [("${it.key}|${it.namespace}") : it.value] }
-                        def newIndex = newMetafields.collectEntries { [("${it.key}|${it.namespace}") : it.value] }
 
-                        def added = []
-                        def removed = []
+                    def diffMap = [:]
+                    diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
+                    diffMap.remove("metafields")
 
-                        newIndex.each { kn, newVal ->
-                            if (!oldIndex.containsKey(kn)) {
-                                def parts = kn.split("\\|", 2)
-                                added << [key: parts[0], namespace: parts[1], value: newVal]
-                            } else if (oldIndex[kn] != newVal) {
-                                def parts = kn.split("\\|", 2)
-                                removed << [key: parts[0], namespace: parts[1], value: oldIndex[kn]]
-                                added   << [key: parts[0], namespace: parts[1], value: newVal]
-                            }
-                        }
-
-                        // Merge into diffMap.metafields
-                        diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
-                        def diffMetafields = diffMap.metafields ?: [added: [], removed: []]
-                        diffMetafields.added   = (diffMetafields.added + added).unique()
-                        diffMetafields.removed = (diffMetafields.removed + removed).unique()
-                        diffMap.metafields = diffMetafields
-                    } else {
-                        diffMap = ContextJavaUtil.jacksonMapper.readValue(history?.differenceMap ?: "{}", Map.class)
-                        diffMap.metafields = []
+                    if (newHash != oldHash && (added || removed)) {
+                        diffMap.metafields = [added: added, removed: removed]
                     }
-                    // Prepare update
-                        updateMap = [
-                            productId      : virtualProductId,
-                            shopId         : shopId,
-                            systemMessageId: systemMessageId,
-                            metafields     : ContextJavaUtil.jacksonMapper.writeValueAsString(newMetafields),
-                            metafieldsHash : newHash,
-                            differenceMap  : ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
-                        ]
+
+                    def updateMap = [
+                        productId      : virtualProductId,
+                        shopId         : shopId,
+                        systemMessageId: systemMessageId,
+                        metafields     : ContextJavaUtil.jacksonMapper.writeValueAsString(newMetafields),
+                        metafieldsHash : newHash,
+                        differenceMap  : ContextJavaUtil.jacksonMapper.writeValueAsString(diffMap)
+                    ]
                 ]]></script>
+
                 <if condition="updateMap">
                     <service-call name="store#co.hotwax.product.ProductUpdateHistory" in-map="updateMap" transaction="force-new"/>
                 </if>
                 <return/>
             </if>
-
             <set field="virtualProductId" from="co.hotwax.sob.shopify.ShopifyHelper.resolveShopifyGid(productJson.id)"/>
             <set field="forCreate" from="false"/>
 
@@ -1211,6 +1223,7 @@ under the License.
                     def parts = [
                         productJson.handle ?: '',
                         productJson.vendor ?: '',
+                        productJson.requiresShipping ?: '',
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
@@ -1256,6 +1269,7 @@ under the License.
                         title: productJson.title,
                         featureImageUrl: productJson.featuredMedia?.preview?.image?.url,
                         isGiftCard: productJson.isGiftCard,
+                        requiresShipping: productJson.requiresShipping,
                         hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
                         tags: [added: tags, removed: []],
                         features: [added: features, removed: []],
@@ -1303,6 +1317,7 @@ under the License.
             def parts = [
                 productJson.handle ?: '',
                 productJson.vendor ?: '',
+                productJson.requiresShipping ?: '',
                 (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                 (productJson.isGiftCard ?: '').toString(),
                 productJson.title ?: '',
@@ -1315,6 +1330,7 @@ under the License.
                 differenceMap.vendor = productJson.vendor
                 differenceMap.handle = productJson.handle
                 differenceMap.isGiftCard = productJson.isGiftCard
+                differenceMap.requiresShipping = productJson.requiresShipping
                 differenceMap.hasVariantsThatRequireComponents = productJson.hasVariantsThatRequiresComponents
                 differenceMap.featureImageUrl = productJson.featuredMedia?.preview?.image?.url
             }
@@ -1351,9 +1367,18 @@ under the License.
             newFeatures = newFeatures.sort { it.sequenceNumber }
             def newFeaturesHash = hash(newFeatures)
             if (newFeaturesHash != productUpdateHistory.featuresHash) {
-                def oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
-                def addedFeatures = (newFeatures - oldFeatures)
-                def removedFeatures = (oldFeatures - newFeatures)
+                def oldFeatures = []
+                oldFeatures = ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.features ?: "[]", List.class)
+
+                // Convert both lists into Sets of identifying tuples (name|value)
+                def oldKeyed = oldFeatures.collect { "${it.name}|${it.value}" } as Set
+                def newKeyed = newFeatures.collect { "${it.name}|${it.value}" } as Set
+
+                def addedKeys = newKeyed - oldKeyed
+                def removedKeys = oldKeyed - newKeyed
+
+                def addedFeatures = newFeatures.findAll { "${it.name}|${it.value}" in addedKeys }
+                def removedFeatures = oldFeatures.findAll { "${it.name}|${it.value}" in removedKeys }
                 if (addedFeatures || removedFeatures) {
                     differenceMap.features = [added: addedFeatures, removed: removedFeatures]
                 }
