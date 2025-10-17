@@ -1,0 +1,758 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="convert" noun="BopisToShipToStore" transaction="force-new">
+        <description>
+            Convert BOPIS order to Ship-to-Store when item is unavailable at pickup location.
+        </description>
+
+        <in-parameters>
+            <parameter name="orderId" type="String" required="true"/>
+            <parameter name="shipGroupSeqId" type="String" required="true"/>
+            <parameter name="orderItemSeqId" type="String" required="true"/>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message" type="String"/>
+            <parameter name="pickupFacilityId" type="String"/>
+        </out-parameters>
+
+        <actions>
+            <log level="info"
+                 message="========== Converting BOPIS to Ship-to-Store: ${orderId}, shipGroup: ${shipGroupSeqId} =========="/>
+
+            <!-- 1. Get order details -->
+            <log level="info" message="[Step 1] Fetching order details for ${orderId}"/>
+            <service-call name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"
+                          in-map="[orderId:orderId]" out-map="orderResult"/>
+
+            <if condition="!orderResult.orderDetail">
+                <log level="error" message="[Step 1 FAILED] Order ${orderId} not found"/>
+                <return error="true" message="Order ${orderId} not found"/>
+            </if>
+            <log level="info" message="[Step 1 SUCCESS] Order found"/>
+
+            <set field="shipGroups" from="orderResult.orderDetail?.shipGroups ?: []"/>
+            <set field="targetShipGroup" from="shipGroups.find{ it.shipGroupSeqId == shipGroupSeqId }"/>
+
+            <if condition="!targetShipGroup || !targetShipGroup.facilityId">
+                <log level="error" message="[Step 1 FAILED] Ship group ${shipGroupSeqId} not found"/>
+                <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
+            </if>
+
+            <set field="pickupFacilityId" from="targetShipGroup.facilityId"/>
+            <set field="shipmentMethodTypeId" from="targetShipGroup.shipmentMethodTypeId"/>
+            <log level="info"
+                 message="[Step 1 SUCCESS] Pickup facility: ${pickupFacilityId}, Method: ${shipmentMethodTypeId}"/>
+
+            <!-- 2. Validate STOREPICKUP -->
+            <log level="info" message="[Step 2] Validating BOPIS order"/>
+            <set field="isCurrentlyBopis" from="co.hotwax.oms.util.OmsUtil.hasParentType(
+                ec.ecfi, 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType',
+                'shipmentMethodTypeId', shipmentMethodTypeId,
+                'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+
+            <if condition="!isCurrentlyBopis">
+                <log level="error" message="[Step 2 FAILED] Not a BOPIS order"/>
+                <return error="true" message="Order ${orderId} is not a BOPIS order"/>
+            </if>
+            <log level="info" message="[Step 2 SUCCESS] Confirmed BOPIS order"/>
+
+            <!-- 3. Check for existing shipments -->
+            <log level="info" message="[Step 3] Checking for existing shipments"/>
+            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.Shipment" list="existingShipments">
+                <econdition field-name="primaryOrderId" from="orderId"/>
+                <econdition field-name="primaryShipGroupSeqId" from="shipGroupSeqId"/>
+                <econdition field-name="statusId" operator="in"
+                            value="SHIPMENT_APPROVED,SHIPMENT_PACKED,SHIPMENT_SHIPPED"/>
+            </entity-find>
+
+            <if condition="existingShipments">
+                <log level="warn" message="[Step 3 SKIP] Shipment already exists"/>
+                <set field="success" value="true"/>
+                <set field="message" value="Shipment already exists for this order"/>
+                <return/>
+            </if>
+            <log level="info" message="[Step 3 SUCCESS] No existing shipments"/>
+
+            <!-- 4. Get OrderItemShipGroup -->
+            <log level="info" message="[Step 4] Fetching OrderItemShipGroup from database"/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+
+            <if condition="!shipGroup">
+                <log level="error" message="[Step 4 FAILED] OrderItemShipGroup not found"/>
+                <return error="true" message="OrderItemShipGroup not found"/>
+            </if>
+            <log level="info"
+                 message="[Step 4 SUCCESS] Found OrderItemShipGroup - facilityId: ${shipGroup.facilityId}"/>
+
+            <!-- ✅ 5. Cancel reservation FIRST (BEFORE changing facilityId) -->
+            <log level="info" message="[Step 5] Canceling inventory reservation at ${shipGroup.facilityId}"/>
+            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
+                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]"
+                          out-map="cancelResult"
+                          ignore-error="true"/>
+            <log level="info" message="[Step 5 SUCCESS] Reservation cancelled (result: ${cancelResult})"/>
+
+            <!-- ✅ 6. NOW update OrderItemShipGroup to Ship-to-Store -->
+            <log level="info" message="[Step 6] Updating OrderItemShipGroup"/>
+            <log level="info"
+                 message="[Step 6] BEFORE: method=${shipGroup.shipmentMethodTypeId}, facility=${shipGroup.facilityId}"/>
+
+            <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
+            <set field="shipGroup.facilityId" value="_NA_"/>
+            <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
+            <set field="shipGroup.carrierPartyId" value="_NA_"/>
+            <entity-update value-field="shipGroup"/>
+
+            <log level="info" message="[Step 6] AFTER: method=SHIP_TO_STORE, facility=_NA_"/>
+            <log level="info" message="[Step 6 SUCCESS] OrderItemShipGroup updated"/>
+
+            <!-- 7. Update OrderHeader -->
+            <log level="info" message="[Step 7] Updating OrderHeader"/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+
+            <if condition="orderHeader">
+                <set field="orderHeader.originFacilityId" value="_NA_"/>
+                <entity-update value-field="orderHeader"/>
+                <log level="info" message="[Step 7 SUCCESS] OrderHeader updated"/>
+                <else>
+                    <log level="warn" message="[Step 7 SKIP] OrderHeader not found"/>
+                </else>
+            </if>
+
+            <!-- 8. Update order item -->
+            <log level="info" message="[Step 8] Updating OrderItem"/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+            </entity-find-one>
+
+            <if condition="orderItem">
+                <set field="orderItem.statusId" value="ITEM_APPROVED"/>
+                <set field="orderItem.shipGroupSeqId" from="shipGroupSeqId"/>
+                <entity-update value-field="orderItem"/>
+                <log level="info" message="[Step 8 SUCCESS] OrderItem updated"/>
+                <else>
+                    <log level="warn" message="[Step 8 SKIP] OrderItem not found"/>
+                </else>
+            </if>
+
+            <!-- 9. Add tracking attributes -->
+            <log level="info" message="[Step 9] Adding tracking attributes"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
+                          in-map="[orderId:orderId, attrName:'CONVERTED_TO_SHIP_TO_STORE', attrValue:'Y']"
+                          ignore-error="true"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
+                          in-map="[orderId:orderId, attrName:'ORIGINAL_PICKUP_FACILITY', attrValue:pickupFacilityId]"
+                          ignore-error="true"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
+                          in-map="[orderId:orderId, attrName:'SHIP_TO_STORE_DESTINATION', attrValue:pickupFacilityId]"
+                          ignore-error="true"/>
+            <log level="info" message="[Step 9 SUCCESS] Tracking attributes created"/>
+
+            <!-- 10. Update Solr index -->
+            <log level="info" message="[Step 10] Updating Solr index"/>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
+                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]"
+                          ignore-error="true"/>
+            <log level="info" message="[Step 10 SUCCESS] Solr index updated"/>
+
+            <log level="info" message="========== Successfully converted ${orderId} to Ship-to-Store =========="/>
+
+            <set field="success" value="true" type="Boolean"/>
+            <set field="message" value="BOPIS order converted to Ship-to-Store. Awaiting brokering assignment."/>
+        </actions>
+    </service>
+
+
+    <!-- ============================================ -->
+    <!-- 2. Receive Ship-to-Store Shipment at Store -->
+    <!-- ============================================ -->
+<!--    <service verb="receive" noun="ShipToStoreShipment">-->
+<!--        <description>-->
+<!--            Receive Ship-to-Store shipment at destination facility.-->
+<!--            Called when store staff clicks "Arrived" button.-->
+<!--            Reuses existing receive#ProductInventory service.-->
+<!--        </description>-->
+
+<!--        <in-parameters>-->
+<!--            <parameter name="shipmentId" required="true"/>-->
+<!--        </in-parameters>-->
+
+<!--        <out-parameters>-->
+<!--            <parameter name="success" type="Boolean" default-value="false"/>-->
+<!--            <parameter name="receivedItems" type="List"/>-->
+<!--        </out-parameters>-->
+
+<!--        <actions>-->
+<!--            <log level="info" message="[Ship-to-Store] Receiving shipment ${shipmentId}"/>-->
+
+<!--            &lt;!&ndash; Get shipment &ndash;&gt;-->
+<!--            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"-->
+<!--                             value-field="shipment">-->
+<!--                <field-map field-name="shipmentId"/>-->
+<!--            </entity-find-one>-->
+<!--            <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech" list="facilityContacts">-->
+<!--                <econdition field-name="contactMechId" from="shipment.destinationContactMechId"/>-->
+<!--            </entity-find>-->
+
+<!--            <log message="we are here : ${facilityContacts}"/>-->
+
+<!--            <if condition="!shipment">-->
+<!--                <return error="true" message="Shipment ${shipmentId} not found"/>-->
+<!--            </if>-->
+
+<!--            <set field="destinationFacilityId" from="facilityContacts[0].facilityId"/>-->
+<!--            <set field="orderId" from="shipment.primaryOrderId"/>-->
+<!--            <log message="we are here : ${orderId}"/>-->
+<!--            &lt;!&ndash;            <if condition="!destinationFacilityId || destinationFacilityId == '_NA_'">&ndash;&gt;-->
+<!--            &lt;!&ndash;                <return error="true" message="Invalid destination facility for shipment ${shipmentId}"/>&ndash;&gt;-->
+<!--            &lt;!&ndash;            </if>&ndash;&gt;-->
+
+<!--            &lt;!&ndash; Verify Ship-to-Store order &ndash;&gt;-->
+<!--            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"-->
+<!--                             value-field="orderShipGroup">-->
+<!--                <field-map field-name="orderId"/>-->
+<!--                <field-map field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>-->
+<!--            </entity-find-one>-->
+
+<!--            <if condition="orderShipGroup?.shipmentMethodTypeId != 'SHIP_TO_STORE'">-->
+<!--                <return error="true" message="Shipment ${shipmentId} is not a Ship-to-Store order"/>-->
+<!--            </if>-->
+
+<!--            &lt;!&ndash; Get ShipmentItems &ndash;&gt;-->
+<!--            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentItem"-->
+<!--                         list="shipmentItems">-->
+<!--                <econdition field-name="shipmentId"/>-->
+<!--            </entity-find>-->
+
+<!--            <set field="receivedItems" from="[]"/>-->
+
+<!--            &lt;!&ndash; Receive each item using EXISTING receive#ProductInventory &ndash;&gt;-->
+<!--            <iterate list="shipmentItems" entry="shipmentItem">-->
+<!--                <log level="info"-->
+<!--                     message="[Ship-to-Store] Receiving ${shipmentItem.quantity} units of ${shipmentItem.productId}"/>-->
+
+<!--                &lt;!&ndash; ✅ FIX 2: Get CORRECT orderItemSeqId from ItemIssuance &ndash;&gt;-->
+<!--                <entity-find entity-name="org.apache.ofbiz.shipment.issuance.ItemIssuance"-->
+<!--                             list="itemIssuances" limit="1">-->
+<!--                    <econdition field-name="shipmentId" from="shipmentId"/>-->
+<!--                    <econdition field-name="shipmentItemSeqId" from="shipmentItem.shipmentItemSeqId"/>-->
+<!--                </entity-find>-->
+
+<!--                <if condition="!itemIssuances">-->
+<!--                    <log level="error" message="[Ship-to-Store] No ItemIssuance found for shipmentItemSeqId: ${shipmentItem.shipmentItemSeqId}"/>-->
+<!--                    <return error="true" message="Cannot find order item for shipment item ${shipmentItem.shipmentItemSeqId}"/>-->
+<!--                </if>-->
+
+<!--                <set field="itemIssuance" from="itemIssuances[0]"/>-->
+<!--                <set field="orderItemSeqId" from="itemIssuance.orderItemSeqId"/>-->
+
+<!--                <log level="info"-->
+<!--                     message="[Ship-to-Store] Receiving ${shipmentItem.quantity} units of ${shipmentItem.productId} for order item ${orderItemSeqId}"/>-->
+
+<!--                &lt;!&ndash; ✅ Call receive with CORRECT orderItemSeqId &ndash;&gt;-->
+<!--                <service-call name="co.hotwax.poorti.FulfillmentServices.receive#ProductInventory"-->
+<!--                              in-map="[facilityId: destinationFacilityId,-->
+<!--                                   productId: shipmentItem.productId,-->
+<!--                                   orderId: orderId,-->
+<!--                                   orderItemSeqId: orderItemSeqId,-->
+<!--                                   shipmentId: shipmentId,-->
+<!--                                   shipmentItemSeqId: shipmentItem.shipmentItemSeqId,-->
+<!--                                   quantityAccepted: shipmentItem.quantity,-->
+<!--                                   quantityRejected: 0]"-->
+<!--                              out-map="receiveResult"/>-->
+
+<!--                <script>receivedItems.add([-->
+<!--                    productId: shipmentItem.productId,-->
+<!--                    quantity: shipmentItem.quantity,-->
+<!--                    orderItemSeqId: orderItemSeqId,-->
+<!--                    shipmentItemSeqId: shipmentItem.shipmentItemSeqId,-->
+<!--                    receiptId: receiveResult.receiptId-->
+<!--                    ])-->
+<!--                </script>-->
+
+<!--                <log level="info" message="[Ship-to-Store] Successfully received item ${shipmentItem.productId}, receipt: ${receiveResult.receiptId}"/>-->
+<!--            </iterate>-->
+
+<!--            <set field="success" from="true"/>-->
+<!--            <log level="info"-->
+<!--                 message="[Ship-to-Store] Successfully received ${receivedItems.size()} items at facility ${destinationFacilityId}"/>-->
+<!--        </actions>-->
+<!--    </service>-->
+
+    <service verb="receive" noun="ShipToStoreShipment">
+        <description>
+            Receive Ship-to-Store shipment at destination facility.
+            Called when store staff clicks "Arrived" button.
+        </description>
+
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="success" type="Boolean" default-value="false"/>
+            <parameter name="receivedItems" type="List"/>
+        </out-parameters>
+
+        <actions>
+            <!-- ============================================ -->
+            <!-- STEP 1: SERVICE START -->
+            <!-- ============================================ -->
+            <log level="info" message="========================================"/>
+            <log level="info" message="[Ship-to-Store] STEP 1: Service started"/>
+            <log level="info" message="[Ship-to-Store] Input: shipmentId = ${shipmentId}"/>
+            <log level="info" message="========================================"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 2: FETCH SHIPMENT -->
+            <!-- ============================================ -->
+            <log level="info" message="[Ship-to-Store] STEP 2: Fetching shipment data..."/>
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
+                             value-field="shipment">
+                <field-map field-name="shipmentId"/>
+            </entity-find-one>
+
+            <if condition="!shipment">
+                <log level="error" message="[Ship-to-Store] ERROR: Shipment ${shipmentId} not found in database"/>
+                <return error="true" message="Shipment ${shipmentId} not found"/>
+            </if>
+
+            <log level="info" message="[Ship-to-Store] ✓ Shipment found: ${shipment.shipmentId}"/>
+            <log level="info" message="[Ship-to-Store]   - Status: ${shipment.statusId}"/>
+            <log level="info" message="[Ship-to-Store]   - Origin Facility: ${shipment.originFacilityId}"/>
+            <log level="info" message="[Ship-to-Store]   - Destination Contact: ${shipment.destinationContactMechId}"/>
+            <log level="info" message="[Ship-to-Store]   - Primary Order: ${shipment.primaryOrderId}"/>
+            <log level="info" message="[Ship-to-Store]   - Primary ShipGroup: ${shipment.primaryShipGroupSeqId}"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 3: GET DESTINATION FACILITY -->
+            <!-- ============================================ -->
+            <log level="info" message="[Ship-to-Store] STEP 3: Resolving destination facility..."/>
+            <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech"
+                         list="facilityContacts">
+                <econdition field-name="contactMechId" from="shipment.destinationContactMechId"/>
+            </entity-find>
+
+            <log level="info" message="[Ship-to-Store] Found ${facilityContacts?.size() ?: 0} facility contact matches"/>
+
+            <if condition="!facilityContacts">
+                <log level="error" message="[Ship-to-Store] ERROR: No facility found for contactMechId: ${shipment.destinationContactMechId}"/>
+                <return error="true" message="Cannot determine destination facility for shipment ${shipmentId}"/>
+            </if>
+
+<!--            <set field="destinationFacilityId" from="facilityContacts[0].facilityId"/>-->
+            <set field="orderId" from="shipment.primaryOrderId"/>
+
+<!--            <log level="info" message="[Ship-to-Store] ✓ Destination Facility: ${destinationFacilityId}"/>-->
+            <log level="info" message="[Ship-to-Store] ✓ Order ID: ${orderId}"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 4: VERIFY SHIP-TO-STORE ORDER -->
+            <!-- ============================================ -->
+            <log level="info" message="[Ship-to-Store] STEP 4: Verifying Ship-to-Store order..."/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"
+                             value-field="orderShipGroup">
+                <field-map field-name="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
+            </entity-find-one>
+
+            <log level="info" message="[Ship-to-Store] OrderItemShipGroup: ${orderShipGroup}"/>
+            <log level="info" message="[Ship-to-Store]   - Shipment Method: ${orderShipGroup?.shipmentMethodTypeId}"/>
+            <log level="info" message="[Ship-to-Store]   - Facility ID: ${orderShipGroup?.facilityId}"/>
+
+            <if condition="orderShipGroup?.shipmentMethodTypeId != 'SHIP_TO_STORE'">
+                <log level="error" message="[Ship-to-Store] ERROR: Not a Ship-to-Store order. Method: ${orderShipGroup?.shipmentMethodTypeId}"/>
+                <return error="true" message="Shipment ${shipmentId} is not a Ship-to-Store order"/>
+            </if>
+            <set field="destinationFacilityId" from="orderShipGroup.orderFacilityId"/>
+            <log level="info" message="[Ship-to-Store] ✓ Confirmed Ship-to-Store order"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 5: GET SHIPMENT ITEMS -->
+            <!-- ============================================ -->
+            <log level="info" message="[Ship-to-Store] STEP 5: Fetching shipment items..."/>
+            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentItem"
+                         list="shipmentItems">
+                <econdition field-name="shipmentId"/>
+            </entity-find>
+
+            <log level="info" message="[Ship-to-Store] ✓ Found ${shipmentItems.size()} shipment items to receive"/>
+
+            <set field="receivedItems" from="[]"/>
+            <set field="itemCounter" from="0" type="Integer"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 6: ITERATE AND RECEIVE EACH ITEM -->
+            <!-- ============================================ -->
+            <log level="info" message="[Ship-to-Store] STEP 6: Processing items..."/>
+            <log level="info" message="========================================"/>
+
+            <iterate list="shipmentItems" entry="shipmentItem">
+                <set field="itemCounter" from="itemCounter + 1"/>
+
+                <log level="info" message="[Ship-to-Store] --- Item ${itemCounter}/${shipmentItems.size()} ---"/>
+                <log level="info" message="[Ship-to-Store] ShipmentItemSeqId: ${shipmentItem.shipmentItemSeqId}"/>
+                <log level="info" message="[Ship-to-Store] Product: ${shipmentItem.productId}"/>
+                <log level="info" message="[Ship-to-Store] Quantity: ${shipmentItem.quantity}"/>
+
+                <!-- Get ItemIssuance to find orderItemSeqId -->
+                <log level="info" message="[Ship-to-Store] Querying ItemIssuance for order mapping..."/>
+                <entity-find entity-name="org.apache.ofbiz.shipment.issuance.ItemIssuance"
+                             list="itemIssuances" limit="1">
+                    <econdition field-name="shipmentId" from="shipmentId"/>
+                    <econdition field-name="shipmentItemSeqId" from="shipmentItem.shipmentItemSeqId"/>
+                </entity-find>
+
+                <if condition="!itemIssuances">
+                    <log level="error" message="[Ship-to-Store] ERROR: No ItemIssuance found!"/>
+                    <log level="error" message="[Ship-to-Store]   - ShipmentId: ${shipmentId}"/>
+                    <log level="error" message="[Ship-to-Store]   - ShipmentItemSeqId: ${shipmentItem.shipmentItemSeqId}"/>
+                    <return error="true" message="Cannot find order item for shipment item ${shipmentItem.shipmentItemSeqId}"/>
+                </if>
+
+                <set field="itemIssuance" from="itemIssuances[0]"/>
+                <set field="orderItemSeqId" from="itemIssuance.orderItemSeqId"/>
+
+                <log level="info" message="[Ship-to-Store] ✓ ItemIssuance found:"/>
+                <log level="info" message="[Ship-to-Store]   - OrderItemSeqId: ${orderItemSeqId}"/>
+                <log level="info" message="[Ship-to-Store]   - IssuanceId: ${itemIssuance.itemIssuanceId}"/>
+                <log level="info" message="[Ship-to-Store]   - Issued Quantity: ${itemIssuance.quantity}"/>
+
+                <!-- Call receive service -->
+                <log level="info" message="[Ship-to-Store] Calling receive#ProductInventory..."/>
+                <log level="info" message="[Ship-to-Store]   Parameters:"/>
+                <log level="info" message="[Ship-to-Store]     - facilityId: ${destinationFacilityId}"/>
+                <log level="info" message="[Ship-to-Store]     - productId: ${shipmentItem.productId}"/>
+                <log level="info" message="[Ship-to-Store]     - orderId: ${orderId}"/>
+                <log level="info" message="[Ship-to-Store]     - orderItemSeqId: ${orderItemSeqId}"/>
+                <log level="info" message="[Ship-to-Store]     - shipmentId: ${shipmentId}"/>
+                <log level="info" message="[Ship-to-Store]     - shipmentItemSeqId: ${shipmentItem.shipmentItemSeqId}"/>
+                <log level="info" message="[Ship-to-Store]     - quantityAccepted: ${shipmentItem.quantity}"/>
+
+                <service-call name="co.hotwax.poorti.FulfillmentServices.receive#ProductInventory"
+                              in-map="[facilityId: destinationFacilityId,
+                                   productId: shipmentItem.productId,
+                                   orderId: orderId,
+                                   orderItemSeqId: orderItemSeqId,
+                                   shipmentId: shipmentId,
+                                   shipmentItemSeqId: shipmentItem.shipmentItemSeqId,
+                                   quantityAccepted: shipmentItem.quantity,
+                                   quantityRejected: 0]"
+                              out-map="receiveResult"/>
+
+                <log level="info" message="[Ship-to-Store] ✓ receive#ProductInventory completed:"/>
+                <log level="info" message="[Ship-to-Store]   - ReceiptId: ${receiveResult.receiptId}"/>
+                <log level="info" message="[Ship-to-Store]   - InventoryItemId: ${receiveResult.inventoryItemId}"/>
+
+                <script>receivedItems.add([
+                    productId: shipmentItem.productId,
+                    quantity: shipmentItem.quantity,
+                    orderItemSeqId: orderItemSeqId,
+                    shipmentItemSeqId: shipmentItem.shipmentItemSeqId,
+                    receiptId: receiveResult.receiptId,
+                    inventoryItemId: receiveResult.inventoryItemId
+                    ])</script>
+
+                <log level="info" message="[Ship-to-Store] ✓ Item ${itemCounter} successfully received"/>
+                <log level="info" message=""/>
+            </iterate>
+
+            <!-- ============================================ -->
+            <!-- STEP 7: SERVICE COMPLETION -->
+            <!-- ============================================ -->
+            <log level="info" message="========================================"/>
+            <log level="info" message="[Ship-to-Store] STEP 7: Finalizing..."/>
+            <set field="success" from="true"/>
+
+            <log level="info" message="[Ship-to-Store] ✓✓✓ SUCCESS ✓✓✓"/>
+            <log level="info" message="[Ship-to-Store] Summary:"/>
+            <log level="info" message="[Ship-to-Store]   - Shipment: ${shipmentId}"/>
+            <log level="info" message="[Ship-to-Store]   - Order: ${orderId}"/>
+            <log level="info" message="[Ship-to-Store]   - Destination: ${destinationFacilityId}"/>
+            <log level="info" message="[Ship-to-Store]   - Items Received: ${receivedItems.size()}"/>
+            <log level="info" message="[Ship-to-Store]   - Receipts Created: ${receivedItems.collect{it.receiptId}.join(', ')}"/>
+            <log level="info" message="========================================"/>
+        </actions>
+    </service>
+
+<!--    <service verb="handover" noun="ShipToStoreOrder">-->
+<!--        <description>-->
+<!--            Handover Ship-to-Store order to customer at pickup.-->
+<!--            Reduces inventory at store and calls complete service.-->
+<!--        </description>-->
+
+<!--        <in-parameters>-->
+<!--            <parameter name="shipmentId" required="true"/>-->
+<!--        </in-parameters>-->
+
+<!--        <out-parameters>-->
+<!--            <parameter name="success" type="Boolean" default-value="false"/>-->
+<!--            <parameter name="orderId"/>-->
+<!--        </out-parameters>-->
+
+<!--        <actions>-->
+<!--            <log level="info" message="[Handover] Processing customer pickup for shipment ${shipmentId}"/>-->
+
+<!--            &lt;!&ndash; Get shipment &ndash;&gt;-->
+<!--            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"-->
+<!--                             value-field="shipment">-->
+<!--                <field-map field-name="shipmentId"/>-->
+<!--            </entity-find-one>-->
+
+<!--            <if condition="!shipment">-->
+<!--                <return error="true" message="Shipment ${shipmentId} not found"/>-->
+<!--            </if>-->
+
+<!--            <set field="orderId" from="shipment.primaryOrderId"/>-->
+
+<!--            &lt;!&ndash; Verify Ship-to-Store &ndash;&gt;-->
+<!--            <if condition="shipment.shipmentMethodTypeId != 'SHIP_TO_STORE'">-->
+<!--                <return error="true" message="Shipment ${shipmentId} is not Ship-to-Store"/>-->
+<!--            </if>-->
+
+<!--            &lt;!&ndash; ✅ Reuse ship#Shipment to reduce inventory &ndash;&gt;-->
+<!--            <log level="info" message="[Handover] Reducing inventory at destination store"/>-->
+<!--            <service-call name="co.hotwax.poorti.FulfillmentServices.ship#Shipment"-->
+<!--                          in-map="[shipmentId: shipmentId]"/>-->
+
+<!--            <log level="info" message="[Handover] Updating shipment status to DELIVERED"/>-->
+<!--            <service-call name="update#org.apache.ofbiz.shipment.shipment.Shipment"-->
+<!--                          in-map="[shipmentId: shipmentId, statusId: 'SHIPMENT_DELIVERED']"/>-->
+
+<!--            &lt;!&ndash; ✅ Now complete the order &ndash;&gt;-->
+<!--            <log level="info" message="[Handover] Completing order ${orderId}"/>-->
+<!--            <service-call name="co.hotwax.orderledger.order.ShipToStoreServices.complete#ShipToStoreOrder"-->
+<!--                          in-map="[shipmentId: shipmentId]"/>-->
+
+<!--            <set field="success" from="true"/>-->
+<!--            <log level="info" message="[Handover] ✓ Handed over to customer"/>-->
+<!--        </actions>-->
+<!--    </service>-->
+
+    <service verb="handover" noun="ShipToStoreOrder">
+        <description>
+            Handover Ship-to-Store order to customer at pickup.
+            1. Creates ItemIssuance for each shipment item
+            2. Reduces inventory (QOH and ATP) at destination store
+            3. Updates shipment status to DELIVERED
+            4. Completes order
+        </description>
+
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="success" type="Boolean" default-value="false"/>
+            <parameter name="orderId"/>
+            <parameter name="itemsProcessed" type="Integer" default-value="0"/>
+        </out-parameters>
+
+        <actions>
+            <log level="info" message="[Handover] ========================================"/>
+            <log level="info" message="[Handover] Processing customer pickup for shipment ${shipmentId}"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 1: GET AND VALIDATE SHIPMENT -->
+            <!-- ============================================ -->
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
+                             value-field="shipment">
+                <field-map field-name="shipmentId"/>
+            </entity-find-one>
+
+            <if condition="!shipment">
+                <log level="error" message="[Handover] ERROR: Shipment ${shipmentId} not found"/>
+                <return error="true" message="Shipment ${shipmentId} not found"/>
+            </if>
+
+            <set field="orderId" from="shipment.primaryOrderId"/>
+
+            <log level="info" message="[Handover] ✓ Shipment found: ${shipmentId}"/>
+            <log level="info" message="[Handover] ✓ Order: ${orderId}"/>
+            <log level="info" message="[Handover] ✓ Method: ${shipment.shipmentMethodTypeId}"/>
+
+            <!-- Verify Ship-to-Store -->
+            <if condition="shipment.shipmentMethodTypeId != 'SHIP_TO_STORE'">
+                <log level="error" message="[Handover] ERROR: Not a Ship-to-Store shipment"/>
+                <return error="true" message="Shipment ${shipmentId} is not Ship-to-Store"/>
+            </if>
+
+            <!-- Get OrderItemShipGroup for destination facility -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"
+                             value-field="orderShipGroup">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
+            </entity-find-one>
+
+            <set field="destinationFacilityId" from="orderShipGroup.orderFacilityId"/>
+
+            <log level="info" message="[Handover] ✓ Destination facility: ${destinationFacilityId}"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 2: GET ALL SHIPMENT ITEMS -->
+            <!-- ============================================ -->
+            <log level="info" message="[Handover] STEP 2: Getting shipment items..."/>
+
+            <entity-find entity-name="co.hotwax.shipment.ShipmentItemView"
+                         list="shipmentItems">
+                <econdition field-name="shipmentId"/>
+            </entity-find>
+
+            <if condition="!shipmentItems">
+                <log level="error" message="[Handover] ERROR: No items found for shipment"/>
+                <return error="true" message="No items found for shipment ${shipmentId}"/>
+            </if>
+
+            <log level="info" message="[Handover] ✓ Found ${shipmentItems.size()} items to process"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 3: REDUCE INVENTORY FOR EACH ITEM -->
+            <!-- ============================================ -->
+            <log level="info" message="[Handover] STEP 3: Reducing inventory at destination store..."/>
+
+            <set field="processedCount" from="0" type="Integer"/>
+
+            <iterate list="shipmentItems" entry="shipmentItem">
+                <log level="info" message="[Handover] Processing item: Product=${shipmentItem.productId}, Qty=${shipmentItem.quantity}"/>
+
+                <!-- Get InventoryItem at destination facility -->
+                <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                              in-map="[productId: shipmentItem.productId,
+                                       facilityId: destinationFacilityId]"
+                              out-map="findOrCreateResult"/>
+
+                <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+
+                <log level="info" message="[Handover]   - InventoryItemId: ${inventoryItemId}"/>
+
+                <!-- ✅ STEP 3A: CREATE ITEM ISSUANCE -->
+                <log level="info" message="[Handover]   - Creating ItemIssuance..."/>
+
+                <service-call name="create#org.apache.ofbiz.shipment.issuance.ItemIssuance"
+                              in-map="[orderId: shipmentItem.orderId,
+                                       orderItemSeqId: shipmentItem.orderItemSeqId,
+                                       shipGroupSeqId: shipmentItem.shipGroupSeqId,
+                                       shipmentId: shipmentId,
+                                       shipmentItemSeqId: shipmentItem.shipmentItemSeqId,
+                                       inventoryItemId: inventoryItemId,
+                                       issuedDateTime: ec.user.nowTimestamp,
+                                       quantity: shipmentItem.quantity]"
+                              out-map="itemIssuanceOut"/>
+
+                <log level="info" message="[Handover]   ✓ ItemIssuance created: ${itemIssuanceOut.itemIssuanceId}"/>
+
+                <!-- ✅ STEP 3B: CREATE NEGATIVE INVENTORY ITEM DETAIL -->
+                <log level="info" message="[Handover]   - Reducing inventory (QOH: -${shipmentItem.quantity}, ATP: -${shipmentItem.quantity})"/>
+
+                <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
+                              in-map="[inventoryItemId: inventoryItemId,
+                                       effectiveDate: ec.user.nowTimestamp,
+                                       orderId: shipmentItem.orderId,
+                                       orderItemSeqId: shipmentItem.orderItemSeqId,
+                                       shipGroupSeqId: shipmentItem.shipGroupSeqId,
+                                       shipmentId: shipmentId,
+                                       shipmentItemSeqId: shipmentItem.shipmentItemSeqId,
+                                       itemIssuanceId: itemIssuanceOut.itemIssuanceId,
+                                       quantityOnHandDiff: new BigDecimal(-shipmentItem.quantity),
+                                       availableToPromiseDiff: new BigDecimal(-shipmentItem.quantity),
+                                       reasonEnumId: 'VAR_LOST']"
+                              out-map="inventoryDetailOut"/>
+
+                <log level="info" message="[Handover]   ✓ Inventory reduced successfully"/>
+
+                <set field="processedCount" from="processedCount + 1"/>
+            </iterate>
+
+            <log level="info" message="[Handover] ✓ Processed ${processedCount} items"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 4: UPDATE SHIPMENT STATUS TO DELIVERED -->
+            <!-- ============================================ -->
+            <log level="info" message="[Handover] STEP 4: Updating shipment status to DELIVERED..."/>
+
+            <service-call name="update#org.apache.ofbiz.shipment.shipment.Shipment"
+                          in-map="[shipmentId: shipmentId,
+                                   statusId: 'SHIPMENT_DELIVERED']"/>
+
+            <log level="info" message="[Handover] ✓ Shipment status updated to DELIVERED"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 5: COMPLETE ORDER -->
+            <!-- ============================================ -->
+            <log level="info" message="[Handover] STEP 5: Completing order ${orderId}..."/>
+
+            <service-call name="co.hotwax.orderledger.order.ShipToStoreServices.complete#ShipToStoreOrder"
+                          in-map="[shipmentId: shipmentId]"/>
+
+            <log level="info" message="[Handover] ✓ Order completed successfully"/>
+
+            <!-- ============================================ -->
+            <!-- STEP 6: SUCCESS -->
+            <!-- ============================================ -->
+            <set field="success" from="true"/>
+            <set field="itemsProcessed" from="processedCount"/>
+
+            <log level="info" message="[Handover] ========================================"/>
+            <log level="info" message="[Handover] ✓✓✓ SUCCESS ✓✓✓"/>
+            <log level="info" message="[Handover] Summary:"/>
+            <log level="info" message="[Handover]   - Shipment: ${shipmentId} → DELIVERED"/>
+            <log level="info" message="[Handover]   - Order: ${orderId} → COMPLETED"/>
+            <log level="info" message="[Handover]   - Items processed: ${itemsProcessed}"/>
+            <log level="info" message="[Handover]   - Inventory reduced at: ${destinationFacilityId}"/>
+            <log level="info" message="[Handover] ========================================"/>
+        </actions>
+    </service>
+
+
+    <service verb="complete" noun="ShipToStoreOrder">
+        <description>Complete a Ship-to-Store order after customer pickup</description>
+        <in-parameters>
+            <parameter name="shipmentId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId"/>
+        </out-parameters>
+        <actions>
+            <log level="info" message="[Ship-to-Store] Completing order for shipment ${shipmentId}"/>
+
+            <!-- Get shipment -->
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
+                             value-field="shipment">
+                <field-map field-name="shipmentId"/>
+            </entity-find-one>
+
+            <if condition="!shipment">
+                <return error="true" message="Shipment ${shipmentId} not found"/>
+            </if>
+
+            <set field="orderId" from="shipment.primaryOrderId"/>
+
+            <!-- Verify this is a Ship-to-Store order -->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"
+                             value-field="orderShipGroup">
+                <field-map field-name="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
+            </entity-find-one>
+
+            <if condition="orderShipGroup?.shipmentMethodTypeId != 'SHIP_TO_STORE'">
+                <return error="true" message="Order ${orderId} is not a Ship-to-Store order"/>
+            </if>
+            <!-- Complete order (this does EVERYTHING: items, reservations, indexing) -->
+            <service-call name="co.hotwax.oms.order.OrderServices.complete#SalesOrderItemByShipment"
+                          in-map="[shipmentId:shipmentId]"/>
+
+            <log level="info" message="[Ship-to-Store] Order ${orderId} completed successfully"/>
+        </actions>
+    </service>
+
+</services>
