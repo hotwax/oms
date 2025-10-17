@@ -239,6 +239,7 @@
         <alias entity-alias="OH" name="orderName"/>
         <alias entity-alias="OH" name="grandTotal"/>
         <alias entity-alias="OH" name="orderDate"/>
+        <alias entity-alias="OH" name="entryDate"/>
         <alias entity-alias="OH" field="statusId" name="orderStatusId"/>
         <alias entity-alias="OH" name="salesChannelEnumId"/>
         <alias entity-alias="OH" name="orderTypeId"/>
