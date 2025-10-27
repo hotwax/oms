@@ -5,26 +5,29 @@
     <service verb="convert" noun="BopisToShipToStore" transaction="force-new">
         <description>
             Convert BOPIS order to Ship-to-Store when item is unavailable at pickup location.
+            Processes ALL items in the specified ship group.
         </description>
 
         <in-parameters>
             <parameter name="orderId" type="String" required="true"/>
             <parameter name="shipGroupSeqId" type="String" required="true"/>
-            <parameter name="orderItemSeqId" type="String" required="true"/>
         </in-parameters>
 
         <out-parameters>
             <parameter name="success" type="Boolean"/>
             <parameter name="message" type="String"/>
             <parameter name="pickupFacilityId" type="String"/>
+            <parameter name="itemsProcessed" type="Integer"/>
         </out-parameters>
 
         <actions>
-            <log level="info"
-                 message="========== Converting BOPIS to Ship-to-Store: ${orderId}, shipGroup: ${shipGroupSeqId} =========="/>
+            <log level="info" message="========== Converting BOPIS to Ship-to-Store: ${orderId}, shipGroup: ${shipGroupSeqId} =========="/>
 
-            <!-- 1. Get order details -->
+            <!-- ========================================== -->
+            <!-- STEP 1: GET ORDER DETAILS -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 1] Fetching order details for ${orderId}"/>
+
             <service-call name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"
                           in-map="[orderId:orderId]" out-map="orderResult"/>
 
@@ -32,6 +35,7 @@
                 <log level="error" message="[Step 1 FAILED] Order ${orderId} not found"/>
                 <return error="true" message="Order ${orderId} not found"/>
             </if>
+
             <log level="info" message="[Step 1 SUCCESS] Order found"/>
 
             <set field="shipGroups" from="orderResult.orderDetail?.shipGroups ?: []"/>
@@ -44,29 +48,35 @@
 
             <set field="pickupFacilityId" from="targetShipGroup.facilityId"/>
             <set field="shipmentMethodTypeId" from="targetShipGroup.shipmentMethodTypeId"/>
-            <log level="info"
-                 message="[Step 1 SUCCESS] Pickup facility: ${pickupFacilityId}, Method: ${shipmentMethodTypeId}"/>
 
-            <!-- 2. Validate STOREPICKUP -->
+            <log level="info" message="[Step 1 SUCCESS] Pickup facility: ${pickupFacilityId}, Method: ${shipmentMethodTypeId}"/>
+
+            <!-- ========================================== -->
+            <!-- STEP 2: VALIDATE STOREPICKUP -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 2] Validating BOPIS order"/>
+
             <set field="isCurrentlyBopis" from="co.hotwax.oms.util.OmsUtil.hasParentType(
-                ec.ecfi, 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType',
-                'shipmentMethodTypeId', shipmentMethodTypeId,
-                'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+            ec.ecfi, 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType',
+            'shipmentMethodTypeId', shipmentMethodTypeId,
+            'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
 
             <if condition="!isCurrentlyBopis">
                 <log level="error" message="[Step 2 FAILED] Not a BOPIS order"/>
                 <return error="true" message="Order ${orderId} is not a BOPIS order"/>
             </if>
+
             <log level="info" message="[Step 2 SUCCESS] Confirmed BOPIS order"/>
 
-            <!-- 3. Check for existing shipments -->
+            <!-- ========================================== -->
+            <!-- STEP 3: CHECK FOR EXISTING SHIPMENTS -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 3] Checking for existing shipments"/>
+
             <entity-find entity-name="org.apache.ofbiz.shipment.shipment.Shipment" list="existingShipments">
                 <econdition field-name="primaryOrderId" from="orderId"/>
                 <econdition field-name="primaryShipGroupSeqId" from="shipGroupSeqId"/>
-                <econdition field-name="statusId" operator="in"
-                            value="SHIPMENT_APPROVED,SHIPMENT_PACKED,SHIPMENT_SHIPPED"/>
+                <econdition field-name="statusId" operator="in" value="SHIPMENT_APPROVED,SHIPMENT_PACKED,SHIPMENT_SHIPPED"/>
             </entity-find>
 
             <if condition="existingShipments">
@@ -75,10 +85,14 @@
                 <set field="message" value="Shipment already exists for this order"/>
                 <return/>
             </if>
+
             <log level="info" message="[Step 3 SUCCESS] No existing shipments"/>
 
-            <!-- 4. Get OrderItemShipGroup -->
+            <!-- ========================================== -->
+            <!-- STEP 4: GET OrderItemShipGroup -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 4] Fetching OrderItemShipGroup from database"/>
+
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
                 <field-map field-name="orderId" from="orderId"/>
                 <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
@@ -88,21 +102,55 @@
                 <log level="error" message="[Step 4 FAILED] OrderItemShipGroup not found"/>
                 <return error="true" message="OrderItemShipGroup not found"/>
             </if>
-            <log level="info"
-                 message="[Step 4 SUCCESS] Found OrderItemShipGroup - facilityId: ${shipGroup.facilityId}"/>
 
-            <!-- ✅ 5. Cancel reservation FIRST (BEFORE changing facilityId) -->
-            <log level="info" message="[Step 5] Canceling inventory reservation at ${shipGroup.facilityId}"/>
-            <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
-                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]"
-                          out-map="cancelResult"
-                          ignore-error="true"/>
-            <log level="info" message="[Step 5 SUCCESS] Reservation cancelled (result: ${cancelResult})"/>
+            <log level="info" message="[Step 4 SUCCESS] Found OrderItemShipGroup - facilityId: ${shipGroup.facilityId}"/>
 
-            <!-- ✅ 6. NOW update OrderItemShipGroup to Ship-to-Store -->
+            <!-- ========================================== -->
+            <!-- STEP 4B: GET ALL ORDER ITEMS IN SHIP GROUP -->
+            <!-- ========================================== -->
+            <log level="info" message="[Step 4B] Fetching all order items in ship group ${shipGroupSeqId}"/>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
+            </entity-find>
+
+            <if condition="!orderItems">
+                <log level="error" message="[Step 4B FAILED] No order items found in ship group"/>
+                <return error="true" message="No order items found in ship group ${shipGroupSeqId}"/>
+            </if>
+
+            <log level="info" message="[Step 4B SUCCESS] Found ${orderItems.size()} order items"/>
+
+            <!-- ========================================== -->
+            <!-- STEP 5: CANCEL ALL INVENTORY RESERVATIONS -->
+            <!-- ========================================== -->
+            <log level="info" message="[Step 5] Canceling inventory reservations at ${shipGroup.facilityId}"/>
+
+            <set field="cancelledCount" from="0" type="Integer"/>
+
+            <iterate list="orderItems" entry="orderItem">
+                <log level="info" message="[Step 5] Canceling reservation for item ${orderItem.orderItemSeqId} (Qty: ${orderItem.quantity})"/>
+
+                <service-call name="co.hotwax.oms.impl.OrderReservationServices.cancel#OrderItemInventoryReservation"
+                              in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId]"
+                              out-map="cancelResult"
+                              ignore-error="true"/>
+
+                <if condition="cancelResult?.cancelledReservations">
+                    <set field="cancelledCount" from="cancelledCount + cancelResult.cancelledReservations.size()"/>
+                    <log level="info" message="[Step 5] Cancelled ${cancelResult.cancelledReservations.size()} reservation(s) for item ${orderItem.orderItemSeqId}"/>
+                </if>
+            </iterate>
+
+            <log level="info" message="[Step 5 SUCCESS] Cancelled ${cancelledCount} total reservation(s)"/>
+
+            <!-- ========================================== -->
+            <!-- STEP 6: UPDATE OrderItemShipGroup -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 6] Updating OrderItemShipGroup"/>
-            <log level="info"
-                 message="[Step 6] BEFORE: method=${shipGroup.shipmentMethodTypeId}, facility=${shipGroup.facilityId}"/>
+            <log level="info" message="[Step 6] BEFORE: method=${shipGroup.shipmentMethodTypeId}, facility=${shipGroup.facilityId}"/>
 
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.facilityId" value="_NA_"/>
@@ -110,11 +158,14 @@
             <set field="shipGroup.carrierPartyId" value="_NA_"/>
             <entity-update value-field="shipGroup"/>
 
-            <log level="info" message="[Step 6] AFTER: method=SHIP_TO_STORE, facility=_NA_"/>
+            <log level="info" message="[Step 6] AFTER: method=SHIP_TO_STORE, facility=_NA_, orderFacilityId=${pickupFacilityId}"/>
             <log level="info" message="[Step 6 SUCCESS] OrderItemShipGroup updated"/>
 
-            <!-- 7. Update OrderHeader -->
+            <!-- ========================================== -->
+            <!-- STEP 7: UPDATE OrderHeader -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 7] Updating OrderHeader"/>
+
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
                 <field-map field-name="orderId" from="orderId"/>
             </entity-find-one>
@@ -128,49 +179,64 @@
                 </else>
             </if>
 
-            <!-- 8. Update order item -->
-            <log level="info" message="[Step 8] Updating OrderItem"/>
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
-            </entity-find-one>
+            <!-- ========================================== -->
+            <!-- STEP 8: UPDATE ALL ORDER ITEMS -->
+            <!-- ========================================== -->
+            <log level="info" message="[Step 8] Updating ${orderItems.size()} order items"/>
 
-            <if condition="orderItem">
+            <iterate list="orderItems" entry="orderItem">
                 <set field="orderItem.statusId" value="ITEM_APPROVED"/>
                 <set field="orderItem.shipGroupSeqId" from="shipGroupSeqId"/>
                 <entity-update value-field="orderItem"/>
-                <log level="info" message="[Step 8 SUCCESS] OrderItem updated"/>
-                <else>
-                    <log level="warn" message="[Step 8 SKIP] OrderItem not found"/>
-                </else>
-            </if>
+                <log level="info" message="[Step 8] Updated item ${orderItem.orderItemSeqId} to ITEM_APPROVED"/>
+            </iterate>
 
-            <!-- 9. Add tracking attributes -->
+            <log level="info" message="[Step 8 SUCCESS] All order items updated"/>
+
+            <!-- ========================================== -->
+            <!-- STEP 9: ADD TRACKING ATTRIBUTES -->
+            <!-- ========================================== -->
             <log level="info" message="[Step 9] Adding tracking attributes"/>
+
             <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
                           in-map="[orderId:orderId, attrName:'CONVERTED_TO_SHIP_TO_STORE', attrValue:'Y']"
                           ignore-error="true"/>
+
             <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
                           in-map="[orderId:orderId, attrName:'ORIGINAL_PICKUP_FACILITY', attrValue:pickupFacilityId]"
                           ignore-error="true"/>
+
             <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
                           in-map="[orderId:orderId, attrName:'SHIP_TO_STORE_DESTINATION', attrValue:pickupFacilityId]"
                           ignore-error="true"/>
+
             <log level="info" message="[Step 9 SUCCESS] Tracking attributes created"/>
 
-            <!-- 10. Update Solr index -->
-            <log level="info" message="[Step 10] Updating Solr index"/>
-            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
-                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId]"
-                          ignore-error="true"/>
-            <log level="info" message="[Step 10 SUCCESS] Solr index updated"/>
+            <!-- ========================================== -->
+            <!-- STEP 10: UPDATE SOLR INDEX FOR ALL ITEMS -->
+            <!-- ========================================== -->
+            <log level="info" message="[Step 10] Updating Solr index for ${orderItems.size()} items"/>
 
-            <log level="info" message="========== Successfully converted ${orderId} to Ship-to-Store =========="/>
+            <iterate list="orderItems" entry="orderItem">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem"
+                              in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId]"
+                              ignore-error="true"/>
+                <log level="info" message="[Step 10] Indexed item ${orderItem.orderItemSeqId}"/>
+            </iterate>
+
+            <log level="info" message="[Step 10 SUCCESS] Solr index updated for all items"/>
+
+            <!-- ========================================== -->
+            <!-- SUCCESS RESPONSE -->
+            <!-- ========================================== -->
+            <log level="info" message="========== Successfully converted ${orderId} to Ship-to-Store (${orderItems.size()} items) =========="/>
 
             <set field="success" value="true" type="Boolean"/>
-            <set field="message" value="BOPIS order converted to Ship-to-Store. Awaiting brokering assignment."/>
+            <set field="message" value="BOPIS order converted to Ship-to-Store. ${orderItems.size()} items processed. Awaiting brokering assignment."/>
+            <set field="itemsProcessed" from="orderItems.size()"/>
         </actions>
     </service>
+
 
 
     <!-- ============================================ -->
@@ -462,6 +528,10 @@
                     receiptId: receiveResult.receiptId,
                     inventoryItemId: receiveResult.inventoryItemId
                     ])</script>
+
+                <log level="info" message="[DEBUG] Full receiveResult map: ${receiveResult}"/>
+                <log level="info" message="[DEBUG] All keys in receiveResult: ${receiveResult.keySet()}"/>
+
 
                 <log level="info" message="[Ship-to-Store] ✓ Item ${itemCounter} successfully received"/>
                 <log level="info" message=""/>
