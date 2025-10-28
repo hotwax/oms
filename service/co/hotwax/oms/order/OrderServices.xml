@@ -82,7 +82,6 @@ under the License.
             <!-- Update the status of the order item -->
             <set field="orderItemMap" from="orderItem"/>
             <set field="orderItemMap.statusId" from="statusId"/>
-            <log level="info" message="========After Service1 Call Complete#SalesOrderItemByShipment=========Changing status of OrderItem [ID: ${orderId}:${orderItemSeqId}] to ${statusId}"/>
             <service-call name="update#org.apache.ofbiz.order.order.OrderItem" in-map="orderItemMap"/>
 
             <if condition="!statusDateTime">
@@ -97,7 +96,6 @@ under the License.
                 <if condition="orderItem.statusId == 'ITEM_CANCELLED' || orderItem.statusId == 'ITEM_COMPLETED'">
                     <!-- Call checkCancelComplete#Order service to confirm if we need to completely cancel or complete the sales order -->
                     <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId, changeReason:changeReason]"/>
-                    <log level="info" message="============Service2 Corresponding=======OrderItem [ID: ${orderId}:${orderItemSeqId}] status changed to ${statusId}, checking if order needs to be cancelled or completed."/>
                 </if>
             </if>
         </actions>
@@ -140,7 +138,6 @@ under the License.
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_CANCELLED']"/>
                 </then>
                 <else-if condition="anyCompleted &amp;&amp; allCancelledOrCompleted">
-                    <log message="===========after CHeckCancelComplete======Order is Completed with all items cancelled or completed, changing order status to ORDER_COMPLETED." level="info"/>
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus" out-map="context" in-map="[orderId:orderId, setItemStatus:false, statusId:'ORDER_COMPLETED']"/>
                 </else-if>
             </if>
@@ -598,20 +595,18 @@ under the License.
             </entity-find>
             <!-- Adding below handling for the scenario of shipments containing items of multiple orders  -->
             <set field="orderIdSet" from="new HashSet(orderShipmentList*.orderId)"/>
-            <log message="orderIdSet Items: =========We are now Inside SalesORDERiTEMByShipment Service from SECA1============================${orderIdSet}"/>
+
             <iterate list="orderIdSet" entry="orderId">
                 <filter-map-list list="orderShipmentList" to-list="shipmentOrderItemList">
                     <field-map field-name="orderId"/>
                 </filter-map-list>
                 <iterate list="shipmentOrderItemList" entry="shipmentOrderItem">
                     <!-- Update order item status to completed -->
-                    <log message="================Service1=========Change OrderItemStatus about to be called for OrderItemSeqId: ${shipmentOrderItem.orderItemSeqId} of OrderId: ${shipmentOrderItem.orderId}"/>
                     <service-call name="co.hotwax.oms.order.OrderServices.change#OrderItemStatus"
                                   in-map="[orderId:shipmentOrderItem.orderId, orderItemSeqId:shipmentOrderItem.orderItemSeqId,
                             statusId:'ITEM_COMPLETED', checkCancelCompleteOrder:false, statusDatetime:ec.user.nowTimestamp]"/>
                 </iterate>
                 <!-- Call checkCancelComplete#Order service to confirm if we need to mark the sales order as completed -->
-                <log message="================Service2=========Check Cancel Complete Order about to be called for OrderId: ${orderId}"/>
                 <service-call name="co.hotwax.oms.order.OrderServices.checkCancelComplete#Order" in-map="[orderId:orderId]"/>
 
                 <!-- Now call service to inform Shopify about fulfillment complete.

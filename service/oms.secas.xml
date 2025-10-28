@@ -9,14 +9,18 @@
                           ignore-error="true" />
         </actions>
     </seca>
-<!--    <seca id="CancelReservation" service="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" when="tx-commit">-->
-<!--        <actions>-->
-<!--            <log message="===============================================================Cancelling reservation for orderId: ${orderId}, orderItemSeqId: ${orderItemSeqId}, shipGroupSeqId: ${shipGroupSeqId}, inventoryItemId: ${inventoryItemId}" level="info"/>-->
-<!--            <service-call name="co.hotwax.oms.search.SearchServices.update#OISGIRIFulfillmentStatus"-->
-<!--                          in-map="context"-->
-<!--                          ignore-error="true" />-->
-<!--        </actions>-->
-<!--    </seca>-->
+    <!-- We don't need this seca rule as we are not using OISGIR doc from Moqui. Also we already have fulfillment status in order doc which is getting updated on item stats change. -->
+    <!-- Also, in case of redirection of cancelOrderItemShipGrpInvRes, we are are handling deleteOrderItemShipGrpInvRes in HC/OMS separately, so nothing to take care here for deleting reservation
+       Refer MR: https://git.hotwax.co/commerce/oms/-/merge_requests/6050
+     -->
+    <!--
+    <seca id="CancelReservation" service="delete#org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" when="tx-commit">
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.update#OISGIRIFulfillmentStatus"
+                          in-map="context"
+                          ignore-error="true" />
+        </actions>
+    </seca> -->
 
     <seca service="co.hotwax.oms.impl.FulfillmentOrderServices.create#FulfillmentOrderIssuance" when="tx-commit">
         <actions>
