@@ -434,7 +434,6 @@ under the License.
                 <order-by field-name="lastUpdatedStamp"/>
             </entity-find>
             <set field="productId" from="shopifyShopProducts ? shopifyShopProducts[0].productId : null"/>
-            <set field="hasUpdate" from="productId != null ? true : false"/>
             <if condition="diff.identifications">
                 <if condition="productStore.productIdentifierEnumId == 'SHOPIFY_PRODUCT_SKU'">
                     <set field="productIdentifier" from="diff.identifications.sku"/>
@@ -457,6 +456,7 @@ under the License.
                     </if>
                 </if>
             </if>
+            <set field="hasUpdate" from="productId != null ? true : false"/>
 
             <if condition="!productUpdateHistory.parentProductId">
                 <set field="product" from="[:]"/>
