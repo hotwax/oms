@@ -74,4 +74,15 @@
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" transaction="force-new" ignore-error="true"/>
         </actions>
     </seca>
+    <seca id="ShipmentMethodUpdate" service="co.hotwax.orderledger.order.ShipToStoreServices.convert#BopisToShipToStore" when="post-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.reCreate#OrderIndex"
+                          in-map="[orderId:orderId]"
+                          async="true"
+                          ignore-error="true"/>
+        </actions>
+    </seca>
 </secas>

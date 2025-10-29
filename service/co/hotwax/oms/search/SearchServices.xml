@@ -55,6 +55,15 @@ under the License.
             <parameter name="response" type="Map"/>
         </out-parameters>
     </service>
+    <service verb="reCreate" noun="OrderIndex" type="oms-rest" location="service/reCreateOrderIndex" method="post" authenticate="anonymous-view">
+        <description>Updates ORDER and OISGIR indexes in OMS</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="response" type="Map"/>
+        </out-parameters>
+    </service>
     <service verb="index" noun="OrderItemShipGrpInvRes" type="oms-rest" location="service/createOISGIRIndex" method="post" authenticate="anonymous-view">
         <description>Create order index</description>
         <in-parameters>
