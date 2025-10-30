@@ -121,6 +121,16 @@ under the License.
                     <entity name="org.apache.ofbiz.order.order.OrderStatus" operation="list"/>
                 </method>
             </resource>
+            <resource name="ship-to-store">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.ShipToStoreServices.convert#BopisToShipToStore"/>
+                </method>
+            </resource>
+            <resource name="status" description="OrderStatus associated with an Order.">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.order.order.OrderStatus" operation="list"/>
+                </method>
+            </resource>
         </id>
         <resource name="pickupScheduledNotification">
             <method type="post">
