@@ -396,8 +396,9 @@ under the License.
                 <service-call name="co.hotwax.orderledger.system.FeedServices.consume#ProductUpdateWorker"
                               in-map="[productUpdateHistory:productUpdateHistory, shopId:shopId]" out-map="context"
                               transaction="force-new"/>
+                <set field="indexVariants" from="(!hasUpdate &amp;&amp; isVirtual.equals('Y')) ? true : false"/>
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
-                              in-map="[productId:productId, indexVariants:false]" ignore-error="true" transaction="force-new"/>
+                              in-map="[productId:productId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
                 <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
             </iterate>
         </actions>
@@ -413,6 +414,8 @@ under the License.
         </in-parameters>
         <out-parameters>
             <parameter name="productId"/>
+            <parameter name="isVirtual"/>
+            <parameter name="hasUpdate" type="Boolean"/>
         </out-parameters>
         <actions>
             <script>
@@ -453,6 +456,7 @@ under the License.
                     </if>
                 </if>
             </if>
+            <set field="hasUpdate" from="productId != null ? true : false"/>
 
             <if condition="!productUpdateHistory.parentProductId">
                 <set field="product" from="[:]"/>
@@ -489,6 +493,7 @@ under the License.
                 </if>
                 <set field="product.isVirtual" value="Y"/>
                 <set field="product.isVariant" value="N"/>
+                <set field="isVirtual" value="Y"/>
                 <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
 
                 <if condition="!productId">
@@ -762,6 +767,7 @@ under the License.
                     <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
                     <set field="product.isVariant" value="Y"/>
                     <set field="product.isVirtual" value="N"/>
+                    <set field="isVirtual" value="N"/>
                     <if condition="!productId">
                         <set field="product.createdDate" from="ec.user.nowTimestamp"/>
                     </if>
