@@ -23,8 +23,7 @@
         <actions>
 
             <!-- STEP 1: GET ORDER DETAILS -->
-            <service-call name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"
-                          in-map="[orderId:orderId]" out-map="orderResult"/>
+            <service-call name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder" in-map="[orderId:orderId]" out-map="orderResult"/>
 
             <if condition="!orderResult.orderDetail">
                 <log level="error" message="[Step 1 FAILED] Order ${orderId} not found"/>
@@ -106,11 +105,6 @@
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
             <set field="shipGroup.carrierPartyId" value="_NA_"/>
             <entity-update value-field="shipGroup"/>
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGrouptest">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-            </entity-find-one>
-
             <!-- STEP 6.5: RECORD FACILITY CHANGE-->
             <iterate list="orderItems" entry="orderItem">
                 <service-call name="create#co.hotwax.facility.OrderFacilityChange"
@@ -150,17 +144,11 @@
             </iterate>
 
             <!-- STEP 9: ADD TRACKING ATTRIBUTES -->
-            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
-                          in-map="[orderId:orderId, attrName:'CONVERTED_TO_SHIP_TO_STORE', attrValue:'Y']"
-                          ignore-error="true"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute" in-map="[orderId:orderId, attrName:'CONVERTED_TO_SHIP_TO_STORE', attrValue:'Y']" ignore-error="true"/>
 
-            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
-                          in-map="[orderId:orderId, attrName:'ORIGINAL_PICKUP_FACILITY', attrValue:pickupFacilityId]"
-                          ignore-error="true"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute" in-map="[orderId:orderId, attrName:'ORIGINAL_PICKUP_FACILITY', attrValue:pickupFacilityId]" ignore-error="true"/>
 
-            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute"
-                          in-map="[orderId:orderId, attrName:'SHIP_TO_STORE_DESTINATION', attrValue:pickupFacilityId]"
-                          ignore-error="true"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderAttribute" in-map="[orderId:orderId, attrName:'SHIP_TO_STORE_DESTINATION', attrValue:pickupFacilityId]" ignore-error="true"/>
 
             <!-- SUCCESS RESPONSE -->
             <set field="success" value="true" type="Boolean"/>
@@ -185,8 +173,7 @@
 
         <actions>
             <!-- STEP 2: FETCH SHIPMENT -->
-            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
-                             value-field="shipment">
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
                 <field-map field-name="shipmentId"/>
             </entity-find-one>
 
@@ -195,19 +182,18 @@
                 <return error="true" message="Shipment ${shipmentId} not found"/>
             </if>
             <!-- STEP 3: GET DESTINATION FACILITY -->
-            <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactMech"
-                         list="facilityContacts">
-                <econdition field-name="contactMechId" from="shipment.destinationContactMechId"/>
-            </entity-find>
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.FacilityContactMechPurpose" value-field="facilityContact">
+                    <field-map field-name="contactMechId" from="shipment.destinationContactMechId"/>
+                    <field-map field-name="contactMechPurposeTypeId" value="PRIMARY_LOCATION"/>
+                </entity-find-one>
 
-            <if condition="!facilityContacts">
+            <if condition="!facilityContact">
                 <log level="error" message="[Ship-to-Store] ERROR: No facility found for contactMechId: ${shipment.destinationContactMechId}"/>
                 <return error="true" message="Cannot determine destination facility for shipment ${shipmentId}"/>
             </if>
             <set field="orderId" from="shipment.primaryOrderId"/>
             <!-- STEP 4: VERIFY SHIP-TO-STORE ORDER -->
-            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup"
-                             value-field="orderShipGroup">
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="orderShipGroup">
                 <field-map field-name="orderId"/>
                 <field-map field-name="shipGroupSeqId" from="shipment.primaryShipGroupSeqId"/>
             </entity-find-one>
@@ -217,8 +203,7 @@
             </if>
             <set field="destinationFacilityId" from="orderShipGroup.orderFacilityId"/>
             <!-- STEP 5: GET SHIPMENT ITEMS -->
-            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentItem"
-                         list="shipmentItems">
+            <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentItem" list="shipmentItems">
                 <econdition field-name="shipmentId"/>
             </entity-find>
 
@@ -230,8 +215,7 @@
                 <set field="itemCounter" from="itemCounter + 1"/>
 
                 <!-- Get ItemIssuance to find orderItemSeqId -->
-                <entity-find entity-name="org.apache.ofbiz.shipment.issuance.ItemIssuance"
-                             list="itemIssuances" limit="1">
+                <entity-find entity-name="org.apache.ofbiz.shipment.issuance.ItemIssuance" list="itemIssuances" limit="1">
                     <econdition field-name="shipmentId" from="shipmentId"/>
                     <econdition field-name="shipmentItemSeqId" from="shipmentItem.shipmentItemSeqId"/>
                 </entity-find>
@@ -292,8 +276,7 @@
 
         <actions>
             <!-- STEP 1: GET AND VALIDATE SHIPMENT -->
-            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
-                             value-field="shipment">
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
                 <field-map field-name="shipmentId"/>
             </entity-find-one>
 
@@ -319,8 +302,7 @@
             <set field="destinationFacilityId" from="orderShipGroup.orderFacilityId"/>
 
             <!-- STEP 2: GET ALL SHIPMENT ITEMS -->
-            <entity-find entity-name="co.hotwax.shipment.ShipmentItemView"
-                         list="shipmentItems">
+            <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItems">
                 <econdition field-name="shipmentId"/>
             </entity-find>
 
