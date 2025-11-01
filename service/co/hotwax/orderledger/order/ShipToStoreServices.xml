@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+
+    <service verb="convert" noun="BopisToShipToStore" transaction="force-new">
+        <description>
+            Convert BOPIS order to Ship-to-Store when item is unavailable at pickup location.
+            Processes ALL items in the specified ship group.
+        </description>
+
+        <in-parameters>
+            <parameter name="orderId" type="String" required="true"/>
+            <parameter name="shipGroupSeqId" type="String" required="true"/>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="success" type="Boolean"/>
+            <parameter name="message" type="String"/>
+            <parameter name="pickupFacilityId" type="String"/>
+            <parameter name="itemsProcessed" type="Integer"/>
+        </out-parameters>
+
+        <actions>
+<!--            STEP2 : PROCESS ORDER ITEMS IN THE SHIPGROUP-->
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
+            </entity-find>
+
+            <if condition="!orderItems">
+                <log level="error" message="[Convert BOPIS] No order items found in ship group ${shipGroupSeqId}"/>
+                <return error="true" message="No order items found"/>
+            </if>
+
+            <set field="rejectedCount" from="0" type="Integer"/>
+            <iterate list="orderItems" entry="orderItem">
+                <service-call name="co.hotwax.oms.order.OrderServices.reject#OrderItem"
+                              in-map="[orderId: orderItem.orderId,
+                                   orderItemSeqId: orderItem.orderItemSeqId,
+                                   facilityId: pickupFacilityId,
+                                   rejectionReasonId: 'REJ_RSN_DAMAGED']"
+                              out-map="rejectResult"
+                              ignore-error="true"/>
+<!--                Note Existing ENum type id custom dena hai ya new bnega??-->
+
+                <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
+                    <set field="rejectedCount" from="rejectedCount + 1"/>
+                    <log level="info" message="[Convert BOPIS] Successfully rejected item ${orderItem.orderItemSeqId}"/>
+                    <else>
+                        <log level="warn" message="[Convert BOPIS] Failed to reject item ${orderItem.orderItemSeqId}"/>
+                    </else>
+                </if>
+            </iterate>
+
+            <set field="success" value="true" type="Boolean"/>
+            <set field="message" value="BOPIS order converted to Ship-to-Store. ${rejectedCount}/${orderItems.size()} items rejected."/>
+            <set field="itemsProcessed" from="rejectedCount"/>
+        </actions>
+    </service>
+    <service verb="get" noun="ShipToStoreOrders">
+        <description>
+            Service to get Ship-to-Store Orders.
+            By default, returns orders with ORDER_APPROVED status and SHIP_TO_STORE shipment method.
+        </description>
+
+        <in-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Order in OMS.</description>
+            </parameter>
+            <parameter name="orderStatusId" default-value="ORDER_APPROVED">
+                <description>The status of the Order in OMS.</description>
+            </parameter>
+            <parameter name="statusId" default-value="ITEM_APPROVED"/>
+            <parameter name="statusId_op" default-value="in"/>
+            <parameter name="statusId_not" default-value="N"/>
+            <parameter name="orderFacilityId">
+                <description>The pickup facility ID (destination store).</description>
+            </parameter>
+            <parameter name="shipmentMethodTypeId" default-value="SHIP_TO_STORE"/>
+            <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
+            <parameter name="shipmentMethodTypeId_not" default-value="N"/>
+            <parameter name="shipmentStatusId" default-value="SHIPMENT_INPUT">
+                <description>List of comma separated shipment statuses</description>
+            </parameter>
+            <parameter name="shipmentStatusId_op" default-value="in"/>
+            <parameter name="shipmentStatusId_not" default-value="Y"/>
+            <parameter name="keyword">
+                <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
+            </parameter>
+            <parameter name="pageIndex" type="Integer" default="0">
+                <description>Page number to return, starting with zero.</description>
+            </parameter>
+            <parameter name="pageSize" type="Integer" default="20">
+                <description>Number of records per page (default 20).</description>
+            </parameter>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="orders" type="List"/>
+            <parameter name="ordersCount" type="Integer"/>
+        </out-parameters>
+
+        <actions>
+            <log level="info" message="[Get Ship-to-Store Orders] Fetching orders with orderStatusId: ${orderStatusId}, orderFacilityId: ${orderFacilityId}"/>
+
+            <!-- Fetch distinct orders with passed filters -->
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment"
+                         limit="pageSize"
+                         offset="pageIndex * pageSize"
+                         list="ordersList"
+                         distinct="true">
+                <search-form-inputs default-order-by="-orderDate"/>
+                <econdition field-name="orderTypeId" value="SALES_ORDER"/>
+                <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                <econdition field-name="orderStatusId"/>
+                <econditions combine="or">
+                    <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
+                </econditions>
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,orderFacilityId"/>
+            </entity-find>
+
+            <set field="ordersCount" from="ordersListCount"/>
+
+            <!-- Initialize the eligible orders list -->
+            <set field="orders" from="[]"/>
+
+            <iterate list="ordersList" entry="orderHeader">
+                <set field="order" from="orderHeader.getPlainValueMap(0)"/>
+
+                <!-- Fetch eligible ship groups for this order -->
+                <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" list="eligibleShipGroups">
+                    <search-form-inputs/>
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                    <select-field field-name="shipGroupSeqId"/>
+                </entity-find>
+
+                <!-- Extract eligible shipGroupSeqIds -->
+                <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
+
+                <!-- Fetch order items for eligible ship groups -->
+                <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
+                    <search-form-inputs input-fields-map="[statusId: statusId]"/>
+                    <econdition field-name="orderId" from="orderHeader.orderId"/>
+                    <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                    <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
+                    <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
+                    statusId,shippingInstructions,orderFacilityId,facilityId"/>
+                </entity-find>
+
+                <!-- Fetch shipment info (if exists) -->
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
+                    <econdition field-name="orderId" from="order.orderId"/>
+                </entity-find>
+
+                <!-- Build shipGroups structure -->
+                <set field="shipGroups" from="[]"/>
+                <iterate list="orderItems" entry="orderItem">
+                    <set field="existingShipGroup" from="shipGroups.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId }"/>
+                    <set field="existingShipment" from="orderShipments.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId &amp;&amp; it.orderItemSeqId == orderItem.orderItemSeqId }"/>
+
+                    <if condition="existingShipGroup">
+                        <set field="item" from="orderItem.getPlainValueMap(0)"/>
+                        <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
+                        <else>
+                            <set field="shipGroup" from="[:]"/>
+                            <set field="shipGroup.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                            <set field="shipGroup.shipmentMethodTypeId" from="orderItem.shipmentMethodTypeId"/>
+                            <set field="shipGroup.orderFacilityId" from="orderItem.orderFacilityId"/>
+                            <set field="shipGroup.facilityId" from="orderItem.facilityId"/>
+                            <set field="shipGroup.shipmentId" from="existingShipment?.shipmentId"/>
+
+                            <!-- Fetch shipment status if shipment exists -->
+                            <if condition="shipGroup.shipmentId">
+                                <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
+                                    <field-map field-name="shipmentId" from="shipGroup.shipmentId"/>
+                                </entity-find-one>
+                                <set field="shipGroup.shipmentStatusId" from="shipment?.statusId"/>
+                            </if>
+
+                            <set field="item" from="orderItem.getPlainValueMap(0)"/>
+                            <set field="shipGroup.items" from="[item]"/>
+                            <set field="shipGroups" from="shipGroups + shipGroup"/>
+                        </else>
+                    </if>
+                </iterate>
+
+                <set field="order.shipGroups" from="shipGroups"/>
+
+                <!-- Fetch BILL_TO_CUSTOMER role -->
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderRole" value-field="billToCustomer">
+                    <field-map field-name="orderId" from="orderHeader.orderId"/>
+                    <field-map field-name="roleTypeId" value="BILL_TO_CUSTOMER"/>
+                    <select-field field-name="partyId"/>
+                </entity-find-one>
+
+                <if condition="billToCustomer">
+                    <!-- Fetch Person name based on partyId -->
+                    <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person" cache="true">
+                        <field-map field-name="partyId" from="billToCustomer.partyId"/>
+                        <select-field field-name="firstName,lastName"/>
+                    </entity-find-one>
+
+                    <set field="order.customerId" from="billToCustomer.partyId"/>
+                    <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
+                </if>
+
+                <!-- Add this order with its shipGroups and items to final orders list -->
+                <set field="orders" from="orders + order"/>
+            </iterate>
+
+            <log level="info" message="[Get Ship-to-Store Orders] Returning ${orders?.size() ?: 0} orders"/>
+        </actions>
+    </service>
+</services>

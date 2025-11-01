@@ -27,6 +27,11 @@ under the License.
         <method type="post">
             <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="create" masterName="default"/>
         </method>
+        <resource name="ship-to-store" require-authentication="true">
+            <method type="get">
+                    <service name="co.hotwax.orderledger.order.ShipToStoreServices.get#ShipToStoreOrders"/>
+            </method>
+        </resource>
         <id name="orderId">
             <method type="get">
                 <service name="co.hotwax.orderledger.order.OrderServices.get#SalesOrder"/>
@@ -114,6 +119,11 @@ under the License.
             <resource name="facilityChange">
                 <method type="get">
                     <entity name="co.hotwax.facility.OrderFacilityChange" operation="list"/>
+                </method>
+            </resource>
+            <resource name="ship-to-store">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.ShipToStoreServices.convert#BopisToShipToStore"/>
                 </method>
             </resource>
         </id>
