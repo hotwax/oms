@@ -2,7 +2,6 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
 
-
     <service verb="convert" noun="BopisToShipToStore" transaction="force-new">
         <description>
             Convert BOPIS order to Ship-to-Store when item is unavailable at pickup location.
@@ -22,6 +21,22 @@
         </out-parameters>
 
         <actions>
+<!--            STEP1 : VALIDATE INPUT AND SHIPGROUP-->
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
+                <field-map field-name="orderId" from="orderId"/>
+                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+            </entity-find-one>
+
+            <if condition="!shipGroup">
+                <log level="error" message="[Convert BOPIS] Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
+                <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
+            </if>
+
+            <log level="info" message="[Convert BOPIS] Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
+            <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
+            <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
+            <entity-update value-field="shipGroup"/>
+
 <!--            STEP2 : PROCESS ORDER ITEMS IN THE SHIPGROUP-->
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
                 <econdition field-name="orderId" from="orderId"/>
@@ -43,7 +58,6 @@
                                    rejectionReasonId: 'REJ_RSN_DAMAGED']"
                               out-map="rejectResult"
                               ignore-error="true"/>
-<!--                Note Existing ENum type id custom dena hai ya new bnega??-->
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
