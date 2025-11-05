@@ -1540,7 +1540,7 @@ under the License.
                         (variantJson?.image?.url ?: ''),
                         (variantJson.requiresComponents ?: '').toString(),
                         (variantJson.product?.isGiftCard ?: '').toString(),
-                        (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                         (variantJson.inventoryItem?.id ?: '').toString(),
                         (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
                         (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
@@ -1578,7 +1578,7 @@ under the License.
                         sku            : variantJson.sku,
                         title          : variantJson.title,
                         price          : variantJson.price,
-                        requiresShipping  :  (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        requiresShipping  :  (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                         requiresComponents: (variantJson.requiresComponents ?: '').toString(),
                         isGiftCard        : (variantJson.product?.isGiftCard ?: '').toString(),
                         featureImageUrl   : (variantJson.image?.url ?: ''),
@@ -1660,7 +1660,7 @@ under the License.
                     (variantJson.image?.url ?: ''),
                     (variantJson.requiresComponents ?: '').toString(),
                     (variantJson.product?.isGiftCard ?: '').toString(),
-                    (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                    (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                     (variantJson.inventoryItem?.id ?: '').toString(),
                     (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
                     (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
@@ -1671,7 +1671,7 @@ under the License.
                     diffMap.id = currentVariantProductId
                     diffMap.position = variantJson.position
                     diffMap.title = variantJson.title
-                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
+                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
                     diffMap.featureImageUrl = (variantJson.image?.url ?: '')
