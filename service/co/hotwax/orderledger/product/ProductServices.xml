@@ -1674,7 +1674,7 @@ under the License.
                     diffMap.id = currentVariantProductId
                     diffMap.position = variantJson.position
                     diffMap.title = variantJson.title
-                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
+                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
                     diffMap.featureImageUrl = (variantJson.image?.url ?: '')
