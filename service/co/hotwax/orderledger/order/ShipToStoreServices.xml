@@ -2,7 +2,7 @@
 <services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
 
-    <service verb="convert" noun="BopisToShipToStore" transaction="force-new">
+    <service verb="convert" noun="BopisToShipToStore">
         <description>
             Convert BOPIS order to Ship-to-Store when item is unavailable at pickup location.
             Processes ALL items in the specified ship group.
@@ -22,16 +22,15 @@
 
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
-                <field-map field-name="orderId" from="orderId"/>
-                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                <field-map field-name="orderId"/>
+                <field-map field-name="shipGroupSeqId"/>
             </entity-find-one>
-            <set field="pickupFacilityId" from="shipGroup.facilityId"/>
             <if condition="!shipGroup">
                 <log level="error"
                      message="[Convert BOPIS] Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
                 <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
             </if>
-
+            <set field="pickupFacilityId" from="shipGroup?.facilityId"/>
             <log level="info" message="[Convert BOPIS] Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
@@ -40,7 +39,7 @@
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
                 <econdition field-name="orderId" from="orderId"/>
                 <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
-                <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
+                <econdition field-name="statusId" operator="not-in" value="ITEM_CANCELLED,ITEM_COMPLETED"/>
             </entity-find>
 
             <if condition="!orderItems">
@@ -55,8 +54,7 @@
                                    orderItemSeqId: orderItem.orderItemSeqId,
                                    facilityId: pickupFacilityId,
                                    rejectionReasonId: '_NA_']"
-                              out-map="rejectResult"
-                              ignore-error="true"/>
+                              out-map="rejectResult"/>
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
@@ -223,27 +221,6 @@
                 </if>
                 <set field="orders" from="orders + order"/>
             </iterate>
-        </actions>
-    </service>
-    <service verb="update" noun="Shipment">
-        <description>Complete a Ship-to-Store order after customer pickup</description>
-        <in-parameters>
-            <parameter name="shipmentId" required="true"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="orderId"/>
-        </out-parameters>
-        <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
-                <field-map field-name="shipmentId"/>
-            </entity-find-one>
-            <if condition="shipment?.statusId == 'SHIPMENT_DELIVERED'">
-                <set field="orderId" from="shipment.primaryOrderId"/>
-                <return error="true" message="Shipment ${shipmentId} is already delivered"/>
-            </if>
-            <service-call name="update#org.apache.ofbiz.shipment.shipment.Shipment"
-                          in-map="[shipmentId: shipmentId, statusId: 'SHIPMENT_DELIVERED']"/>
-            <set field="orderId" from="shipment.primaryOrderId"/>
         </actions>
     </service>
 </services>
