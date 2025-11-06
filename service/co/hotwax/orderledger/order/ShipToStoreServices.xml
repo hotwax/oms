@@ -14,7 +14,6 @@
         </in-parameters>
 
         <out-parameters>
-            <parameter name="success" type="Boolean"/>
             <parameter name="message" type="String"/>
             <parameter name="pickupFacilityId" type="String"/>
             <parameter name="itemsProcessed" type="Integer"/>
@@ -27,11 +26,11 @@
             </entity-find-one>
             <if condition="!shipGroup">
                 <log level="error"
-                     message="[Convert BOPIS] Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
+                     message="Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
                 <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
             </if>
             <set field="pickupFacilityId" from="shipGroup?.facilityId"/>
-            <log level="info" message="[Convert BOPIS] Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
+            <log level="info" message="Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
             <entity-update value-field="shipGroup"/>
@@ -43,7 +42,7 @@
             </entity-find>
 
             <if condition="!orderItems">
-                <log level="error" message="[Convert BOPIS] No order items found in ship group ${shipGroupSeqId}"/>
+                <log level="error" message="No order items found in ship group ${shipGroupSeqId}"/>
                 <return error="true" message="No order items found"/>
             </if>
 
@@ -53,19 +52,18 @@
                               in-map="[orderId: orderItem.orderId,
                                    orderItemSeqId: orderItem.orderItemSeqId,
                                    facilityId: pickupFacilityId,
-                                   rejectionReasonId: '_NA_']"
+                                   rejectionReasonId: 'CH_BOPIS_TO_STS']"
                               out-map="rejectResult"/>
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
-                    <log level="info" message="[Convert BOPIS] Successfully rejected item ${orderItem.orderItemSeqId}"/>
+                    <log level="info" message="Successfully rejected item ${orderItem.orderItemSeqId}"/>
                     <else>
-                        <log level="warn" message="[Convert BOPIS] Failed to reject item ${orderItem.orderItemSeqId}"/>
+                        <log level="warn" message="Failed to reject item ${orderItem.orderItemSeqId}"/>
                     </else>
                 </if>
             </iterate>
 
-            <set field="success" value="true" type="Boolean"/>
             <set field="message"
                  value="BOPIS order converted to Ship-to-Store. ${rejectedCount}/${orderItems.size()} items rejected."/>
             <set field="itemsProcessed" from="rejectedCount"/>
@@ -73,7 +71,7 @@
     </service>
     <service verb="get" noun="ShipToStoreOrders">
         <description>
-            Service to get Ship-to-Store Orders.
+            Service to get Ship-to-Store Orders,based on provided conditions.
             By default, returns orders with ORDER_APPROVED status and SHIP_TO_STORE shipment method.
         </description>
 

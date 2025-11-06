@@ -1,3 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
+    <Enumeration enumId="CH_BOPIS_TO_STS" enumTypeId="ODR_ITM_CH_REASON" enumCode="BOPIS_TO_STS_CONV" description="Converted to Ship-to-Store from BOPIS" sequenceId="03" />
 </entity-facade-xml>

@@ -37,3 +37,17 @@ To enable the Ship to Store feature, you need to associate the SHIP_TO_STORE shi
   shipmentMethodTypeId="SHIP_TO_STORE"/>
 ````
 
+### Add ENUMERATION related data for Rejection reason
+
+To add a rejection reason for the Ship to Store feature, use the following data:
+
+**Example:**
+````
+<Enumeration
+ enumId="CH_BOPIS_TO_STS" 
+ enumTypeId="ODR_ITM_CH_REASON" 
+ enumCode="BOPIS_TO_STS_CONV" 
+ description="Converted to Ship-to-Store from BOPIS" 
+ sequenceId="<your_sequenceId>" />
+````
+
