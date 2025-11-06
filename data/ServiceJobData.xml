@@ -28,4 +28,7 @@
             cronExpression="0 0 0 * * ?" paused="Y">
         <parameters parameterName="orderIds"/>
     </moqui.service.job.ServiceJob>
+
+    <moqui.service.job.ServiceJob serviceName="co.hotwax.orderledger.order.email.EmailServices.prepare#EmailRequest"
+            cronExpression="0 0 0 * * ?" paused="Y"/>
 </entity-facade-xml>

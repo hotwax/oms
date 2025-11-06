@@ -31,7 +31,7 @@ under the License.
 
             <!-- Call the create#VirtualProduct service -->
             <service-call name="co.hotwax.orderledger.product.ProductServices.create#VirtualProduct"
-                    in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
+                          in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
 
             <!-- Set the parentProductId returned from the create#VirtualProduct service -->
             <set field="parentProductId" from="createVirtualProductOut.productId"/>
@@ -123,7 +123,7 @@ under the License.
 
             <!-- Call create service for Virtual Product -->
             <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                    out-map="createProductOut"/>
+                          out-map="createProductOut"/>
 
             <!-- Set the parentProductId -->
             <set field="productId" from="createProductOut.productId"/>
@@ -200,11 +200,11 @@ under the License.
 
             <!-- Call prepare#ProductCreate for the productVariantJson map -->
             <service-call name="co.hotwax.orderledger.product.ProductServices.prepare#ProductCreate" in-map="[productJson:productVariantJson]"
-                    out-map="prepareProductCreateOut"/>
+                          out-map="prepareProductCreateOut"/>
 
             <!-- Create Product record for the variant product -->
             <service-call name="create#org.apache.ofbiz.product.product.Product" in-map="prepareProductCreateOut.productJson"
-                    out-map="createProductOut"/>
+                          out-map="createProductOut"/>
             <set field="productId" from="createProductOut.productId"/>
 
             <if condition="parentProductId"><then>
@@ -314,7 +314,7 @@ under the License.
 
                 <!-- Call create#VirtualProduct service -->
                 <service-call name="co.hotwax.orderledger.product.ProductServices.create#VirtualProduct"
-                        in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
+                              in-map="[productJson:payload]" out-map="createVirtualProductOut" transaction="force-new"/>
 
                 <!-- Set the parentProductId returned from create#VirtualProduct service -->
                 <set field="parentProductId" from="createVirtualProductOut.productId"/>
@@ -448,7 +448,7 @@ under the License.
                         <set field="productFeatureTypeId" from="productFeatureTypes[0].productFeatureTypeId"/>
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeatureType" in-map="[description:feature.productFeatureTypeDesc.trim()]"
-                                    out-map="createProductFeatureTypeOutput" transaction="force-new"/>
+                                          out-map="createProductFeatureTypeOutput" transaction="force-new"/>
                             <set field="productFeatureTypeId" from="createProductFeatureTypeOutput.productFeatureTypeId"/>
                         </else>
                     </if>
@@ -474,7 +474,7 @@ under the License.
                         </if>
                         <else>
                             <service-call name="create#org.apache.ofbiz.product.feature.ProductFeature" in-map="[productFeatureTypeId:productFeatureTypeId, description:feature.featureDesc.trim()]"
-                                    out-map="createProductFeatureOutput" transaction="force-new"/>
+                                          out-map="createProductFeatureOutput" transaction="force-new"/>
                             <set field="featureAppls" from="featureAppls + [productFeatureId:createProductFeatureOutput.productFeatureId, productFeatureApplTypeId:feature.productFeatureApplTypeId, sequenceNum:feature.sequenceNum]"/>
                         </else>
                     </if>
@@ -734,8 +734,8 @@ under the License.
                         <!-- If not then create a new ProductAssoc record -->
                         <if condition="!productAssocs">
                             <then>
-                            <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
-                            <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                                <service-call name="create#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
+                                <set field="assocs" from="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', sequenceNum:productVariantJson.sequenceNum]"/>
                             </then>
                             <else>
                                 <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="[productIdTo:productVariantJson.productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate:productAssocs.first?.fromDate,sequenceNum:productVariantJson.sequenceNum]"/>
@@ -1072,13 +1072,13 @@ under the License.
                 import org.moqui.impl.context.ContextJavaUtil
 
                 def hash = { listOrMap ->
-                    if (listOrMap instanceof Map) {
-                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
-                    } else if (listOrMap instanceof List) {
-                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
-                    } else {
-                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
-                    }
+                if (listOrMap instanceof Map) {
+                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                } else if (listOrMap instanceof List) {
+                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                } else {
+                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                }
                 }
             </script>
 
@@ -1435,13 +1435,13 @@ under the License.
                 import java.math.RoundingMode
 
                 def hash = { listOrMap ->
-                    if (listOrMap instanceof Map) {
-                        return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
-                    } else if (listOrMap instanceof List) {
-                        return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
-                    } else {
-                        return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
-                    }
+                if (listOrMap instanceof Map) {
+                return DigestUtils.sha256Hex(ContextJavaUtil.jacksonMapper.writeValueAsString(listOrMap.sort()))
+                } else if (listOrMap instanceof List) {
+                return DigestUtils.sha256Hex(listOrMap.collect { it.toString() }.sort().join("||"))
+                } else {
+                return DigestUtils.sha256Hex(listOrMap?.toString() ?: "")
+                }
                 }
             </script>
 
@@ -1540,7 +1540,7 @@ under the License.
                         (variantJson?.image?.url ?: ''),
                         (variantJson.requiresComponents ?: '').toString(),
                         (variantJson.product?.isGiftCard ?: '').toString(),
-                        (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                         (variantJson.inventoryItem?.id ?: '').toString(),
                         (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
                         (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
@@ -1578,7 +1578,7 @@ under the License.
                         sku            : variantJson.sku,
                         title          : variantJson.title,
                         price          : variantJson.price,
-                        requiresShipping  :  (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                        requiresShipping  :  (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                         requiresComponents: (variantJson.requiresComponents ?: '').toString(),
                         isGiftCard        : (variantJson.product?.isGiftCard ?: '').toString(),
                         featureImageUrl   : (variantJson.image?.url ?: ''),
@@ -1660,7 +1660,7 @@ under the License.
                     (variantJson.image?.url ?: ''),
                     (variantJson.requiresComponents ?: '').toString(),
                     (variantJson.product?.isGiftCard ?: '').toString(),
-                    (variantJson.inventoryItem?.requiresShipping ?: '').toString(),
+                    (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                     (variantJson.inventoryItem?.id ?: '').toString(),
                     (variantJson.inventoryItem?.measurement?.weight?.unit ?: '').toString(),
                     (variantJson.inventoryItem?.measurement?.weight?.value ?: '1').toString()
@@ -1671,7 +1671,7 @@ under the License.
                     diffMap.id = currentVariantProductId
                     diffMap.position = variantJson.position
                     diffMap.title = variantJson.title
-                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
+                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : ''),
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
                     diffMap.featureImageUrl = (variantJson.image?.url ?: '')
