@@ -126,6 +126,11 @@ under the License.
                     <service name="co.hotwax.orderledger.order.ShipToStoreServices.convert#BopisToShipToStore"/>
                 </method>
             </resource>
+            <resource name="status" description="OrderStatus associated with an Order.">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.order.order.OrderStatus" operation="list"/>
+                </method>
+            </resource>
         </id>
         <resource name="pickupScheduledNotification">
             <method type="post">
@@ -583,7 +588,35 @@ under the License.
                     <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#StoreFulfillTransferOrder"/>
                 </method>
             </resource>
+            <resource name="cancel">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.cancel#TransferOrder"/>
+                </method>
+            </resource>
+            <resource name="approveWhFulfill" description="Approve WH Fulfill Transfer Order">
+                <method type="post">
+                    <service name="co.hotwax.orderledger.order.TransferOrderServices.approve#WhFulfillTransferOrder"/>
+                </method>
+            </resource>
         </id>
+        <resource name="grouped" description="Get Transfer Orders based on grouping, filters and sorting.">
+            <method type="get">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderGroups"/>
+            </method>
+        </resource>
+        <resource name="items" description="Get Transfer Order Item details based on grouping, filtering and sorting criteria.">
+            <method type="get">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.get#TransferOrderItems"/>
+            </method>
+        </resource>
+        <resource name="orderItem">
+            <method type="put">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.update#TransferOrderItem"/>
+            </method>
+            <method type="post">
+                <service name="co.hotwax.orderledger.order.TransferOrderServices.add#TransferOrderItem"/>
+            </method>
+        </resource>
     </resource>
 
     <resource name="entityData">
