@@ -1,7 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
-    <CarrierShipmentMethod deliveryDays="7" partyId="_NA_" roleTypeId="CARRIER" sequenceNumber="80" shipmentMethodTypeId="SHIP_TO_STORE"/>
-<!--    We need to add ProductStoreShipment related data for shops you want to include ship-to-store orders-->
-<!--    productStoreId would be as you wanted-->
-    <ProductStoreShipmentMeth isTrackingRequired="N" partyId="_NA_" productStoreId="STORE" productStoreShipMethId="10049" roleTypeId="CARRIER" shipmentMethodTypeId="SHIP_TO_STORE"/>
 </entity-facade-xml>
