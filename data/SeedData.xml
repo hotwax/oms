@@ -12,7 +12,7 @@
     <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
 
     <!-- Enumeration for BOPIS to Ship-to-Store conversion rejection reason -->
-    <moqui.basic.Enumeration description="Converted to Ship-to-Store from BOPIS" enumId="CH_BOPIS_TO_STS_TEST"  enumCode="BOPIS_TO_STS_CONV" sequenceId="03"/>
+    <moqui.basic.Enumeration description="Converted to Ship-to-Store from BOPIS" enumId="CH_BOPIS_TO_STS"  enumCode="BOPIS_TO_STS_CONV" sequenceId="03"/>
 
     <!-- TODO: Add receivePath -->
     <!-- SystemMessageType data for consuming New Products Feed -->
