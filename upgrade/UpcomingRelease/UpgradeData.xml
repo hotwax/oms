@@ -7,4 +7,5 @@
     <ProductCategoryMember productId="SEND_QUEUED_EMAILS" productCategoryId="MISC_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
     <moqui.service.job.ServiceJob serviceName="co.hotwax.orderledger.order.email.EmailServices.process#PendingEmailRequests"
         cronExpression="0 0 0 * * ?" paused="Y"/>
+    <Enumeration enumId="CH_BOPIS_TO_STS" enumTypeId="ODR_ITM_CH_REASON" enumCode="BOPIS_TO_STS_CONV" description="Converted to Ship-to-Store from BOPIS" sequenceId="03" />
 </entity-facade-xml>
