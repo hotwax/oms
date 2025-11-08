@@ -36,7 +36,6 @@ under the License.
             <parameter name="emailAddress"/>
         </in-parameters>
         <actions>
-            <log message="========additionalFields=======${additionalFields}"/>
             <if condition="!orderId &amp;&amp; !shipmentId">
                 <return error="true" message="Either Order ID or Shipment ID is required to send email with type: ${emailType}."/>
             </if>
