@@ -1,3 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
+    <moqui.basic.Enumeration enumId="SEND_QUEUED_EMAILS" enumCode="SEND_QUEUED_EMAILS" description="Processes and sends all queued email communications" enumTypeId="ORDER_SYS_JOB"/>
+    <Product productId="SEND_QUEUED_EMAILS" productTypeId="SERVICE" internalName="SEND_QUEUED_EMAILS"
+        productName="Bulk Approve Warehouse Fulfill Transfer Orders" description="Processes and sends all queued email communications"
+        primaryProductCategoryId="MISC_SYS_JOB"/>
+    <ProductCategoryMember productId="SEND_QUEUED_EMAILS" productCategoryId="MISC_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
+    <moqui.service.job.ServiceJob serviceName="co.hotwax.orderledger.order.email.EmailServices.process#PendingEmailRequests"
+        cronExpression="0 0 0 * * ?" paused="Y"/>
 </entity-facade-xml>
