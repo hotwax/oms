@@ -113,7 +113,7 @@
         </out-parameters>
 
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment"
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail"
                          limit="pageSize"
                          offset="pageIndex * pageSize"
                          list="ordersList"
@@ -140,18 +140,19 @@
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,orderFacilityId"/>
                 <order-by field-name="-orderDate"/>
             </entity-find>
-            <set field="ordersCount" from="ordersList?.size() ?: 0"/>
+            <set field="ordersCount" from="0"/>
             <set field="orders" from="[]"/>
 
             <iterate list="ordersList" entry="orderHeader">
                 <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
-                <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" list="eligibleShipGroups">
+                <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail" list="eligibleShipGroups">
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                     <select-field field-name="shipGroupSeqId"/>
                 </entity-find>
 
+              <if condition="eligibleShipGroups">
                 <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
 
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
@@ -218,6 +219,8 @@
                     <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
                 </if>
                 <set field="orders" from="orders + order"/>
+                <set field="ordersCount" from="ordersCount + 1"/>
+              </if>
             </iterate>
         </actions>
     </service>

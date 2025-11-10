@@ -37,3 +37,35 @@ To enable the Ship to Store feature, you need to associate the SHIP_TO_STORE shi
   shipmentMethodTypeId="SHIP_TO_STORE"/>
 ````
 
+### To generate Shipping labels for Ship to Store orders
+You need to add the data carrier wise
+
+**Below is an example for Drivin carrier**
+````
+<CarrierShipmentMethod carrierServiceCode="STS" 
+  deliveryDays="7" 
+  partyId="DRIVIN" 
+  roleTypeId="CARRIER" 
+  shipmentMethodTypeId="SHIP_TO_STORE"/>
+                           
+<ProductStoreShipmentMeth  
+  isTrackingRequired="Y" 
+  partyId="DRIVIN" 
+  productStoreId="ADOC_STORE" 
+  productStoreShipMethId="10132" 
+  roleTypeId="CARRIER" 
+  shipmentGatewayConfigId="DRIVIN_CONFIG" 
+  shipmentMethodTypeId="SHIP_TO_STORE"/>
+
+<ShipmentRequest carrierPartyId="DRIVIN" 
+  requestType="SHIPMENT_ACCEPT" 
+  shipmentMethodTypeId="SHIP_TO_STORE" 
+  serviceName="postMoquiOrder"/>
+    
+<ShipmentRequest carrierPartyId="DRIVIN" 
+  requestType="VOID_LABEL_REQUEST" 
+  shipmentMethodTypeId="SHIP_TO_STORE" 
+  serviceName="voidMoquiOrder"/>
+`````
+
+
