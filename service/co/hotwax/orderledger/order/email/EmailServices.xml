@@ -386,13 +386,14 @@ under the License.
             <!-- Find eligible BOPIS orders -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersIterator" distinct="true">
                 <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
+                <econdition field-name="itemStatusId" value="ITEM_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="facilityId" operator="not-in" value="PICKUP_REJECTED"/>
                 <econdition field-name="entryDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId" ignore-if-empty="true"/>
-                <select-field field-name="orderId,orderDate,facilityId"/>
+                <select-field field-name="orderId,orderDate,facilityId,shipGroupSeqId"/>
                 <use-iterator/>
             </entity-find>
 
@@ -438,9 +439,15 @@ under the License.
 
                     <!-- Calling email service only if order is out of the facility operational hours -->
                     <if condition="isValidOrder">
+                        <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                            <econdition field-name="orderId" from="order.orderId"/>
+                            <econdition field-name="shipGroupSeqId" from="order.shipGroupSeqId"/>
+                            <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId"/>
+                        </entity-find>
+
                         <set field="storeHour" from="[openingHoursMtoS:storeOpenTime,colsingHoursMtoS:storeCloseTime,openingHoursSunday:sundayOpenTime,colsingHoursSunday:sundayCloseTime]"/>
                         <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                                      in-map="[orderId: order.orderId, emailType: emailType, additionalFields:storeHour]" async="true"/>
+                                      in-map="[orderId: order.orderId, orderItems:orderItems, emailType: emailType, additionalFields:storeHour]" async="true"/>
                     </if>
                 </if>
             </iterate>
@@ -491,13 +498,14 @@ under the License.
             <!-- Find eligible BOPIS orders -->
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" list="ordersIterator" distinct="true">
                 <econdition field-name="orderStatusId" value="ORDER_APPROVED"/>
+                <econdition field-name="itemStatusId" value="ITEM_APPROVED"/>
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="shipmentMethodTypeId" value="STOREPICKUP"/>
                 <econdition field-name="facilityId" operator="not-in" value="PICKUP_REJECTED"/>
                 <econdition field-name="entryDate" operator="greater-equals" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <econdition field-name="productStoreId" from="productStoreId"/>
-                <select-field field-name="orderId,facilityId"/>
+                <select-field field-name="orderId,facilityId,shipGroupSeqId"/>
                 <use-iterator/>
             </entity-find>
 
@@ -511,8 +519,14 @@ under the License.
                     <date-filter/>
                 </entity-find>
 
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                    <econdition field-name="orderId" from="order.orderId"/>
+                    <econdition field-name="shipGroupSeqId" from="order.shipGroupSeqId"/>
+                    <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId"/>
+                </entity-find>
+
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                              in-map="[orderId: order.orderId, emailType: emailType, emailAddress: facilityContactDetail?.infoString[0].toString()]" async="true"/>
+                              in-map="[orderId: order.orderId, orderItems:orderItems, emailType: emailType, emailAddress: facilityContactDetail?.infoString[0].toString()]" async="true"/>
             </iterate>
 
             <!-- Update job parameter if jobName is provided -->
