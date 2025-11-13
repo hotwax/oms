@@ -81,12 +81,6 @@ under the License.
                 <select-field field-name="orderId, productStoreId"/>
             </entity-find-one>
 
-            <if condition="additionalFields">
-                <set field="orderData" from="new HashMap(order)"/>
-                <set field="orderData.additionalFields" from="additionalFields"/>
-                <set field="order" from="orderData"/>
-            </if>
-
             <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="systemMessageType">
                 <field-map field-name="systemMessageTypeId" from="enumValue.relatedEnumId"/>
             </entity-find-one>
@@ -98,6 +92,13 @@ under the License.
                 // Using master-detail relationship to fetch all order details
                 order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderId).oneMaster("default")
             </script>
+
+            <if condition="additionalFields">
+                <set field="orderData" from="new HashMap(order)"/>
+                <set field="orderData.additionalFields" from="additionalFields"/>
+                <set field="order" from="orderData"/>
+            </if>
+
             <set field="order.orderDate" from="order.orderDate.toString()"/>
             <iterate list="order.shipGroups" entry="shipGroup">
                 <if condition="orderItems[0]?.shipGroupSeqId == shipGroup.shipGroupSeqId">
