@@ -74,4 +74,22 @@
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" transaction="force-new" ignore-error="true"/>
         </actions>
     </seca>
+
+    <seca id="CompleteShipToStoreOnDelivered" service="update#org.apache.ofbiz.shipment.shipment.Shipment" when="post-commit">
+        <condition>
+            <expression>
+                (oldStatusId == 'SHIPMENT_ARRIVED' &amp;&amp; statusId == 'SHIPMENT_DELIVERED' )
+            </expression>
+        </condition>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
+                <field-map field-name="shipmentId"/>
+            </entity-find-one>
+
+            <if condition="shipment?.shipmentMethodTypeId != 'SHIP_TO_STORE'">
+                <service-call name="co.hotwax.oms.order.OrderServices.complete#SalesOrderItemByShipment" in-map="[shipmentId: shipmentId]"/>
+            </if>
+        </actions>
+    </seca>
+
 </secas>

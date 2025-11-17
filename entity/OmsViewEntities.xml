@@ -330,11 +330,12 @@
         <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
             <key-map field-name="statusId"/>
         </member-entity>
-        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OH">
-            <key-map field-name="orderId"/>
-        </member-entity>
         <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
             <key-map field-name="orderId"/>
+        </member-entity>
+        <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="shipGroupSeqId"/>
         </member-entity>
         <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderShipment" join-from-alias="OI" join-optional="true">
             <key-map field-name="orderId"/>
@@ -359,6 +360,8 @@
 
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
 
+        <alias entity-alias="OI" name="orderItemSeqId"/>
+
         <alias entity-alias="OISG" name="shipGroupSeqId"/>
         <alias entity-alias="OISG" name="shipmentMethodTypeId"/>
         <alias entity-alias="OISG" name="orderFacilityId"/>
@@ -369,7 +372,6 @@
         <alias entity-alias="OISG" name="shippingInstructions"/>
 
         <alias entity-alias="OS" name="shipmentId"/>
-        <alias entity-alias="OS" name="orderItemSeqId"/>
 
         <alias entity-alias="S" name="shipmentTypeId"/>
         <alias entity-alias="S" field="statusId" name="shipmentStatusId"/>

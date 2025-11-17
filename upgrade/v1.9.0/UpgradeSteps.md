@@ -37,8 +37,9 @@ To enable the Ship to Store feature, you need to associate the SHIP_TO_STORE shi
   shipmentMethodTypeId="SHIP_TO_STORE"/>
 ````
 
-### To generate Shipping labels for Ship to Store orders
-You need to add the data carrier wise
+### Generating Shipping Labels for Ship-to-Store Orders
+To generate shipping labels for STS orders, prepare the data separately for each carrier.
+Use the example below as a template and update it with your carrier-specific details.
 
 **Below is an example for Drivin carrier**
 ````
