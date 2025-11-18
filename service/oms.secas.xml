@@ -86,7 +86,7 @@
                 <field-map field-name="shipmentId"/>
             </entity-find-one>
 
-            <if condition="shipment?.shipmentMethodTypeId != 'SHIP_TO_STORE'">
+            <if condition="shipment?.shipmentMethodTypeId == 'SHIP_TO_STORE'">
                 <service-call name="co.hotwax.oms.order.OrderServices.complete#SalesOrderItemByShipment" in-map="[shipmentId: shipmentId]"/>
             </if>
         </actions>
