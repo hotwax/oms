@@ -1519,6 +1519,9 @@ under the License.
                         </if>
                     </else>
                 </if>
+                <else>
+                    <return type="warning" message="Product identifier not found, skipping product import: ${variantProductId}"/>
+                </else>
             </if>
 
             <entity-find-one entity-name="co.hotwax.product.ProductUpdateHistory" value-field="productUpdateHistory">
