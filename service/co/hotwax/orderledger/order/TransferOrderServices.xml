@@ -33,9 +33,9 @@
             <parameter name="orderName">
                 <description>The order name of Transfer Order.</description>
             </parameter>
-            <parameter name="statusFlowId">
+            <parameter name="statusFlowId" type="List">
                 <description>
-                    The ID of the Status Flow in OMS for Transfer Orders.
+                    The list of IDs of the Status Flow in OMS for Transfer Orders.
                     Eg. TO_Fulfill_Only, TO_Fulfill_And_Receive, TO_Receive_Only.
                 </description>
             </parameter>
