@@ -85,8 +85,8 @@
             <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment" value-field="shipment">
                 <field-map field-name="shipmentId"/>
             </entity-find-one>
-
-            <if condition="shipment?.shipmentMethodTypeId == 'SHIP_TO_STORE'">
+            <set field="hasParentType" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi ,'org.apache.ofbiz.shipment.shipment.Shipment', 'shipmentMethodTypeId', shipment?.shipmentMethodTypeId, 'parentTypeId', 'SHIP_TO_STORE')" type="Boolean"/>
+            <if condition= "hasParentType">
                 <service-call name="co.hotwax.oms.order.OrderServices.complete#SalesOrderItemByShipment" in-map="[shipmentId: shipmentId]"/>
             </if>
         </actions>
