@@ -95,7 +95,6 @@
                 <description>List of comma separated shipment statuses</description>
             </parameter>
             <parameter name="shipmentStatusId_op" default-value="in"/>
-            <!--            <parameter name="shipmentStatusId_not" default-value="N"/>-->
             <parameter name="keyword">
                 <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
             </parameter>
@@ -113,11 +112,7 @@
         </out-parameters>
 
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail"
-                         limit="pageSize"
-                         offset="pageIndex * pageSize"
-                         list="ordersList"
-                         distinct="true">
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
@@ -140,9 +135,8 @@
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,orderFacilityId"/>
                 <order-by field-name="-orderDate"/>
             </entity-find>
-            <set field="ordersCount" from="0"/>
             <set field="orders" from="[]"/>
-
+            <set field="ordersCount" from="ordersList?.size()"/>
             <iterate list="ordersList" entry="orderHeader">
                 <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
@@ -151,76 +145,74 @@
                     <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                     <select-field field-name="shipGroupSeqId"/>
                 </entity-find>
+                <if condition="eligibleShipGroups">
+                    <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
 
-              <if condition="eligibleShipGroups">
-                <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
-
-                <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
-                    <econdition field-name="orderId" from="orderHeader.orderId"/>
-                    <econdition field-name="statusId" operator="in" from="statusId" ignore-if-empty="true"/>
-                    <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
-                    <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
-                    <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
+                    <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
+                        <econdition field-name="orderId" from="orderHeader.orderId"/>
+                        <econdition field-name="statusId" operator="in" from="statusId" ignore-if-empty="true"/>
+                        <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
+                        <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
+                        <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId,shipmentMethodTypeId,productId,quantity,unitPrice,
                     statusId,shippingInstructions,orderFacilityId,facilityId"/>
-                </entity-find>
+                    </entity-find>
 
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
-                    <econdition field-name="orderId" from="order.orderId"/>
-                </entity-find>
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
+                        <econdition field-name="orderId" from="order.orderId"/>
+                    </entity-find>
 
-                <set field="shipGroups" from="[]"/>
-                <iterate list="orderItems" entry="orderItem">
-                    <set field="existingShipGroup"
-                         from="shipGroups.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId }"/>
-                    <set field="existingShipment"
-                         from="orderShipments.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId &amp;&amp; it.orderItemSeqId == orderItem.orderItemSeqId }"/>
+                    <set field="shipGroups" from="[]"/>
+                    <iterate list="orderItems" entry="orderItem">
+                        <set field="existingShipGroup"
+                             from="shipGroups.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId }"/>
+                        <set field="existingShipment"
+                             from="orderShipments.find{ it.shipGroupSeqId == orderItem.shipGroupSeqId &amp;&amp; it.orderItemSeqId == orderItem.orderItemSeqId }"/>
 
-                    <if condition="existingShipGroup">
-                        <set field="item" from="orderItem.getPlainValueMap(0)"/>
-                        <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
-                        <else>
-                            <set field="shipGroup" from="[:]"/>
-                            <set field="shipGroup.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
-                            <set field="shipGroup.shipmentMethodTypeId" from="orderItem.shipmentMethodTypeId"/>
-                            <set field="shipGroup.orderFacilityId" from="orderItem.orderFacilityId"/>
-                            <set field="shipGroup.facilityId" from="orderItem.facilityId"/>
-                            <set field="shipGroup.shipmentId" from="existingShipment?.shipmentId"/>
-                            <if condition="shipGroup.shipmentId">
-                                <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
-                                                 value-field="shipment">
-                                    <field-map field-name="shipmentId" from="shipGroup.shipmentId"/>
-                                </entity-find-one>
-                                <set field="shipGroup.shipmentStatusId" from="shipment?.statusId"/>
-                            </if>
-
+                        <if condition="existingShipGroup">
                             <set field="item" from="orderItem.getPlainValueMap(0)"/>
-                            <set field="shipGroup.items" from="[item]"/>
-                            <set field="shipGroups" from="shipGroups + shipGroup"/>
-                        </else>
-                    </if>
-                </iterate>
+                            <set field="existingShipGroup.items" from="existingShipGroup.items + item"/>
+                            <else>
+                                <set field="shipGroup" from="[:]"/>
+                                <set field="shipGroup.shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                                <set field="shipGroup.shipmentMethodTypeId" from="orderItem.shipmentMethodTypeId"/>
+                                <set field="shipGroup.orderFacilityId" from="orderItem.orderFacilityId"/>
+                                <set field="shipGroup.facilityId" from="orderItem.facilityId"/>
+                                <set field="shipGroup.shipmentId" from="existingShipment?.shipmentId"/>
+                                <if condition="shipGroup.shipmentId">
+                                    <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.Shipment"
+                                                     value-field="shipment">
+                                        <field-map field-name="shipmentId" from="shipGroup.shipmentId"/>
+                                    </entity-find-one>
+                                    <set field="shipGroup.shipmentStatusId" from="shipment?.statusId"/>
+                                </if>
 
-                <set field="order.shipGroups" from="shipGroups"/>
+                                <set field="item" from="orderItem.getPlainValueMap(0)"/>
+                                <set field="shipGroup.items" from="[item]"/>
+                                <set field="shipGroups" from="shipGroups + shipGroup"/>
+                            </else>
+                        </if>
+                    </iterate>
 
-                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderRole" value-field="billToCustomer">
-                    <field-map field-name="orderId" from="orderHeader.orderId"/>
-                    <field-map field-name="roleTypeId" value="BILL_TO_CUSTOMER"/>
-                    <select-field field-name="partyId"/>
-                </entity-find-one>
+                    <set field="order.shipGroups" from="shipGroups"/>
 
-                <if condition="billToCustomer">
-                    <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person"
-                                     cache="true">
-                        <field-map field-name="partyId" from="billToCustomer.partyId"/>
-                        <select-field field-name="firstName,lastName"/>
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderRole" value-field="billToCustomer">
+                        <field-map field-name="orderId" from="orderHeader.orderId"/>
+                        <field-map field-name="roleTypeId" value="BILL_TO_CUSTOMER"/>
+                        <select-field field-name="partyId"/>
                     </entity-find-one>
 
-                    <set field="order.customerId" from="billToCustomer.partyId"/>
-                    <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
+                    <if condition="billToCustomer">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person"
+                                         cache="true">
+                            <field-map field-name="partyId" from="billToCustomer.partyId"/>
+                            <select-field field-name="firstName,lastName"/>
+                        </entity-find-one>
+
+                        <set field="order.customerId" from="billToCustomer.partyId"/>
+                        <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
+                    </if>
+                    <set field="orders" from="orders + order"/>
                 </if>
-                <set field="orders" from="orders + order"/>
-                <set field="ordersCount" from="ordersCount + 1"/>
-              </if>
             </iterate>
         </actions>
     </service>
