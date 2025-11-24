@@ -79,10 +79,10 @@
             <parameter name="orderId">
                 <description>The ID of the Order in OMS.</description>
             </parameter>
-            <parameter name="orderStatusId" default-value="ORDER_APPROVED">
+            <parameter name="orderStatusId" default-value="ORDER_APPROVED" type="List">
                 <description>The status of the Order in OMS.</description>
             </parameter>
-            <parameter name="statusId" default-value="ITEM_APPROVED"/>
+            <parameter name="statusId" default-value="ITEM_APPROVED" type="List"/>
             <parameter name="statusId_op" default-value="in"/>
             <parameter name="statusId_not" default-value="N"/>
             <parameter name="orderFacilityId">
@@ -91,7 +91,7 @@
             <parameter name="shipmentMethodTypeId" default-value="SHIP_TO_STORE"/>
             <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
             <parameter name="shipmentMethodTypeId_not" default-value="N"/>
-            <parameter name="shipmentStatusId">
+            <parameter name="shipmentStatusId" type="List">
                 <description>List of comma separated shipment statuses</description>
             </parameter>
             <parameter name="shipmentStatusId_op" default-value="in"/>
