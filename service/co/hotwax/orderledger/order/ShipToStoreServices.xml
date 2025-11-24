@@ -117,6 +117,7 @@
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
+
                 <econditions combine="or">
                     <econdition field-name="shipmentId" operator="is-null"/>
                     <econditions combine="and">
@@ -125,6 +126,7 @@
                                     ignore-if-empty="true"/>
                     </econditions>
                 </econditions>
+
                 <econditions combine="or">
                     <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
                     <econdition field-name="orderId" operator="like" value="%${keyword}%"
@@ -132,11 +134,12 @@
                     <econdition field-name="orderName" operator="like" value="%${keyword}%"
                                 ignore="keyword == null || keyword == ''"/>
                 </econditions>
-                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc,orderDate,orderFacilityId"/>
+
+                <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderDate,orderFacilityId"/>
                 <order-by field-name="-orderDate"/>
             </entity-find>
             <set field="orders" from="[]"/>
-            <set field="ordersCount" from="ordersList?.size()"/>
+            <set field="ordersCount" from="ordersList_xafind.count()"/>
             <iterate list="ordersList" entry="orderHeader">
                 <set field="order" from="orderHeader.getPlainValueMap(0)"/>
 
