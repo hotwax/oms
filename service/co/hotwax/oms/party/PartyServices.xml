@@ -161,7 +161,6 @@
                     </if>
                 </if>
             </if>
-            <log message="------------partyID__________${partyId}"/>
         </actions>
     </service>
 </services>
