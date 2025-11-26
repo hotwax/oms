@@ -82,7 +82,6 @@
 
             <if condition="partyId">
                 <log level="info" message="store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
-                <set field="partyUpdateMap" from="[partyId:partyId]"/>
                  <if condition="party.statusId != partyStatusId">
                     <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
                         <service-call name="update#org.apache.ofbiz.party.party.Party"
