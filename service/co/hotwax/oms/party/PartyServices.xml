@@ -33,7 +33,7 @@
             <set field="partyStatusId" from="status == 'T' ? 'PARTY_DISABLED' : 'PARTY_ENABLED'"/>
             <log level="info" message="store#Picker start partyId=${partyId}, externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
 
-            <if condition="!externalPartyId && !partyId">
+            <if condition="!externalPartyId &amp;&amp; !partyId">
                 <script>ec.message.addError("Either partyId or externalPartyId is required")</script>
             </if>
             <if condition="!status">
@@ -43,7 +43,7 @@
             </else-if>
             </if>
 
-            <if condition="!facilityId && externalFacilityId">
+            <if condition="!facilityId &amp;&amp; externalFacilityId">
                 <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" limit="1">
                     <econdition field-name="externalId" from="externalFacilityId"/>
                 </entity-find>
@@ -55,13 +55,25 @@
                 </if>
             </if>
 
-            <if condition="!partyId && externalPartyId">
+            <if condition="!partyId &amp;&amp; externalPartyId">
                 <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
                     <econdition field-name="externalId" from="externalPartyId"/>
                 </entity-find>
                 <if condition="partyList">
                     <set field="party" from="partyList[0]"/>
                     <set field="partyId" from="party.partyId"/>
+                    <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
+                </if>
+            </if>
+            <if condition="partyId &amp;&amp; !party">
+                <entity-find-one entity-name="org.apache.ofbiz.party.party.Party" value-field="party">
+                    <field-map field-name="partyId" from="partyId"/>
+                </entity-find-one>
+                <if condition="!party">
+                    <script>ec.message.addError("Party not found for partyId ${partyId}")</script>
+                <else>
+                    <log level="info" message="store#Picker found party by partyId=${partyId}"/>
+                </else>
                 </if>
             </if>
             <if condition="ec.message.hasError()">
@@ -110,6 +122,7 @@
                 <service-call name="create#org.apache.ofbiz.party.party.Party" out-map="createPartyOut"
                               in-map="[partyTypeId:'PERSON', externalId:externalPartyId, statusId:partyStatusId]"/>
                 <set field="partyId" from="createPartyOut.partyId"/>
+                <log level="info" message="store#Picker created new partyId=${partyId} for externalPartyId=${externalPartyId}"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="[partyId:partyId, firstName:firstName, lastName:lastName]"/>
 
                 <if condition="emailAddress">
@@ -144,7 +157,6 @@
                 </if>
             </if>
 
-            <set field="context.partyId" from="partyId"/>
         </actions>
     </service>
 </services>
