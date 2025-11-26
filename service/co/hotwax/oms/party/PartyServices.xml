@@ -86,15 +86,10 @@
                 <set field="partyUpdateMap" from="[partyId:partyId]"/>
                 <if condition="party.statusId != partyStatusId">
                     <set field="partyUpdateMap.statusId" from="partyStatusId"/>
-                </if>
-                <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
-                    <set field="partyUpdateMap.externalId" value=""/>
-                </if>
-                <if condition="partyUpdateMap.size() &gt; 1">
-                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="partyUpdateMap"/>
-                    <if condition="partyUpdateMap.externalId != null">
-                        <log level="info" message="store#Picker cleared externalId for party ${partyId} on termination"/>
+                    <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
+                        <set field="partyUpdateMap.externalId" value=""/>
                     </if>
+                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="partyUpdateMap"/>
                 </if>
 
                 <if condition="partyStatusId == 'PARTY_ENABLED'">
