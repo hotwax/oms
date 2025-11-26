@@ -82,13 +82,18 @@
 
             <if condition="partyId">
                 <log level="info" message="store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
-                <if condition="party.statusId != partyStatusId">
-                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:partyStatusId]"/>
+                <set field="partyUpdateMap" from="[partyId:partyId]"/>
+                 <if condition="party.statusId != partyStatusId">
+                    <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
+                        <service-call name="update#org.apache.ofbiz.party.party.Party"
+                                      in-map="[partyId:partyId, statusId:partyStatusId, externalId:'']"/>
+                        <log level="info" message="store#Picker cleared externalId for party ${partyId} on termination"/>
+                    <else>
+                        <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:partyStatusId]"/>
+                    </else>
+                    </if>
                 </if>
-                <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
-                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, externalId:'']"/>
-                    <log level="info" message="store#Picker cleared externalId for party ${partyId} on termination"/>
-                </if>
+            </if>
                 <if condition="partyStatusId == 'PARTY_ENABLED'">
                     <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
                         <econdition field-name="partyId" from="partyId"/>
@@ -156,7 +161,7 @@
                     </if>
                 </if>
             </if>
-
+            <log message="------------partyID__________${partyId}"/>
         </actions>
     </service>
 </services>
