@@ -5,7 +5,7 @@
     <service verb="store" noun="Picker">
         <description>
             Translated from the legacy Ofbiz pickerDataSetup. Creates or re-enables a picker (person) by externalPartyId,
-            validates status/dates/facility, manages PartyRole, assigns facility roles, and expires roles when terminated.
+            validates status/facility, manages PartyRole, and links the party to a facility.
         </description>
         <in-parameters>
             <parameter name="externalPartyId" required="true"/>
@@ -14,29 +14,18 @@
             <parameter name="emailAddress"/>
             <parameter name="contactNumber"/>
             <parameter name="externalFacilityId"/>
-            <parameter name="roleTypeId" default-value="PICKER"/>
+            <parameter name="facilityId">
+                <description>Optional direct facilityId. If provided, externalFacilityId will be ignored.</description>
+            </parameter>
+            <parameter name="roleTypeId" default-value="WAREHOUSE_PICKER"/>
             <parameter name="status" required="true">
                 <description>Expected values: A (active) or T (terminated).</description>
-            </parameter>
-            <parameter name="fromDate"/>
-            <parameter name="thruDate"/>
-            <parameter name="roleTypeIds" type="List">
-                <description>Optional additional roleTypeIds to include alongside roleTypeId.</description>
             </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="partyId"/>
-            <parameter name="facilityId"/>
-            <parameter name="fromDate" type="Timestamp"/>
-            <parameter name="thruDate" type="Timestamp"/>
         </out-parameters>
         <actions>
-            <set field="nowTs" from="ec.user.nowTimestamp"/>
-            <set field="todayStart" from="java.sql.Timestamp.valueOf(nowTs.toLocalDateTime().toLocalDate().atStartOfDay())"/>
-
-            <set field="roleTypes"
-                 from="(((roleTypeIds ?: []) + (roleTypeId ? [roleTypeId] : []) + ((externalFacilityId &amp;&amp; externalFacilityId == '0') ? ['EMPLOYEE'] : [])).findAll{it}).unique()"/>
-
             <set field="partyStatusId" from="status == 'T' ? 'PARTY_DISABLED' : 'PARTY_ENABLED'"/>
             <log level="info" message="store#Picker start externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
 
@@ -53,31 +42,12 @@
             </else-if>
             </if>
 
-            <if condition="fromDate &amp;&amp; fromDate != 'NULL'">
-                <set field="fromDateTs" from="ec.l10n.parseTimestamp(fromDate, 'MM/dd/yyyy', null, null)"/>
-                <if condition="!fromDateTs">
-                    <script>ec.message.addError("Invalid fromDate - expected format MM/dd/yyyy: ${fromDate}")</script>
-                </if>
-            </if>
-            <if condition="thruDate &amp;&amp; thruDate != 'NULL'">
-                <set field="thruDateTs" from="ec.l10n.parseTimestamp(thruDate, 'MM/dd/yyyy', null, null)"/>
-                <if condition="!thruDateTs">
-                    <script>ec.message.addError("Invalid thruDate - expected format MM/dd/yyyy: ${thruDate}")</script>
-                </if>
-            </if>
-            <if condition="!fromDateTs &amp;&amp; fromDate != 'NULL'">
-                <set field="fromDateTs" from="ec.user.nowTimestamp"/>
-            </if>
-            <if condition="!thruDateTs &amp;&amp; status == 'T'">
-                <set field="thruDateTs" from="nowTs"/>
-            </if>
-
-            <if condition="externalFacilityId">
+            <if condition="!facilityId && externalFacilityId">
                 <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" limit="1">
                     <econdition field-name="externalId" from="externalFacilityId"/>
                 </entity-find>
                 <if condition="!facilityList">
-                    <script>ec.message.addError("Facility with facility Id: ${externalFacilityId} Does Not Exists.")</script>
+                    <script>ec.message.addError("Facility with external Id: ${externalFacilityId} Does Not Exists.")</script>
                 <else>
                     <set field="facilityId" from="facilityList[0].facilityId"/>
                 </else>
@@ -104,15 +74,30 @@
                     <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:'PARTY_DISABLED']"/>
                 </if>
                 <if condition="status == 'A'">
-                    <iterate list="roleTypes" entry="roleType">
-                        <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
+                    <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
+                        <econdition field-name="partyId" from="partyId"/>
+                        <econdition field-name="roleTypeId" from="roleTypeId"/>
+                    </entity-find>
+                    <if condition="!partyRoleList">
+                        <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
+                    </if>
+                    <if condition="facilityId">
+                        <log level="info" message="store#Picker (existing) linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                        <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityParty" list="existingFp" limit="1">
+                            <econdition field-name="facilityId" from="facilityId"/>
                             <econdition field-name="partyId" from="partyId"/>
-                            <econdition field-name="roleTypeId" from="roleType"/>
+                            <econdition field-name="roleTypeId" from="roleTypeId"/>
+                            <date-filter/>
                         </entity-find>
-                        <if condition="!partyRoleList">
-                            <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleType]"/>
+                        <if condition="!existingFp">
+                            <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
+                                          in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
+                            <if condition="facilityPartyResp.error">
+                                <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                                <return error="true" message="${facilityPartyResp.errorMessage}"/>
+                            </if>
                         </if>
-                    </iterate>
+                    </if>
                 </if>
             </if>
 
@@ -127,9 +112,9 @@
                     <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="emailOut"
                                   in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:emailAddress]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
-                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, fromDate:fromDateTs, allowSolicitation:'Y']"/>
+                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, allowSolicitation:'Y']"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose" ignore-error="true"
-                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_EMAIL', fromDate:fromDateTs]"/>
+                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_EMAIL']"/>
                 </if>
                 <if condition="contactNumber">
                     <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="phoneOut"
@@ -137,41 +122,25 @@
                     <service-call name="create#org.apache.ofbiz.party.contact.TelecomNumber"
                                   in-map="[contactMechId:phoneOut.contactMechId, contactNumber:contactNumber]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
-                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId, fromDate:fromDateTs]"/>
+                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose" ignore-error="true"
-                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_PHONE', fromDate:fromDateTs]"/>
+                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_PHONE']"/>
                 </if>
 
-                <iterate list="roleTypes" entry="roleType">
-                    <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
-                        <econdition field-name="partyId" from="partyId"/>
-                        <econdition field-name="roleTypeId" from="roleType"/>
-                    </entity-find>
-                    <if condition="!partyRoleList">
-                        <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleType]"/>
-                    </if>
-                </iterate>
+                <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
 
                 <if condition="facilityId">
-                    <log level="info" message="store#Picker linking party ${partyId} to facility ${facilityId} as WAREHOUSE_PICKER"/>
-                    <iterate list="['WAREHOUSE_PICKER']" entry="facRole">
-                        <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="pickerRole" limit="1">
-                            <econdition field-name="partyId" from="partyId"/>
-                            <econdition field-name="roleTypeId" from="facRole"/>
-                        </entity-find>
-                        <if condition="!pickerRole">
-                            <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:facRole]"/>
-                        </if>
-                    </iterate>
-                    <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty"
-                                  in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:'WAREHOUSE_PICKER', fromDate:fromDateTs, thruDate:thruDateTs]"/>
+                    <log level="info" message="store#Picker linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                    <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
+                                  in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
+                    <if condition="facilityPartyResp.error">
+                        <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                        <return error="true" message="${facilityPartyResp.errorMessage}"/>
+                    </if>
                 </if>
             </if>
 
             <set field="context.partyId" from="partyId"/>
-            <set field="context.facilityId" from="facilityId"/>
-            <set field="context.fromDate" from="fromDateTs"/>
-            <set field="context.thruDate" from="thruDateTs"/>
         </actions>
     </service>
 </services>
