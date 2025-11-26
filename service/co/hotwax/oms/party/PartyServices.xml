@@ -55,27 +55,25 @@
                 </if>
             </if>
 
-            <if condition="!partyId &amp;&amp; externalPartyId">
-                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
-                    <econdition field-name="externalId" from="externalPartyId"/>
-                </entity-find>
-                <if condition="partyList">
-                    <set field="party" from="partyList[0]"/>
-                    <set field="partyId" from="party.partyId"/>
-                    <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
-                </if>
-            </if>
-            <if condition="partyId &amp;&amp; !party">
+            <if condition="partyId">
                 <entity-find-one entity-name="org.apache.ofbiz.party.party.Party" value-field="party">
                     <field-map field-name="partyId" from="partyId"/>
                 </entity-find-one>
                 <if condition="!party">
                     <script>ec.message.addError("Party not found for partyId ${partyId}")</script>
-                <else>
-                    <log level="info" message="store#Picker found party by partyId=${partyId}"/>
-                </else>
                 </if>
             </if>
+
+            <if condition="!partyId &amp;&amp; externalPartyId">
+                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
+                    <econdition field-name="externalId" from="externalPartyId"/>
+                </entity-find>
+                <if condition="partyList">
+                    <set field="partyId" from="partyList[0]?.partyId"/>
+                    <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
+                </if>
+            </if>
+            
             <if condition="ec.message.hasError()">
                 <return/>
             </if>
@@ -132,19 +130,13 @@
                     <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="emailOut"
                                   in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:emailAddress]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
-                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, allowSolicitation:'Y']"/>
-                    <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose" ignore-error="true"
-                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_EMAIL']"/>
+                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, allowSolicitation:'N']"/>
                 </if>
                 <if condition="contactNumber">
-                    <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="phoneOut"
-                                  in-map="[contactMechTypeId:'TELECOM_NUMBER']"/>
-                    <service-call name="create#org.apache.ofbiz.party.contact.TelecomNumber"
-                                  in-map="[contactMechId:phoneOut.contactMechId, contactNumber:contactNumber]"/>
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber" out-map="phoneOut"
+                                  in-map="[contactNumber:contactNumber]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
                                   in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId]"/>
-                    <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose" ignore-error="true"
-                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_PHONE']"/>
                 </if>
 
                 <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
