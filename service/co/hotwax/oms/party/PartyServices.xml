@@ -8,7 +8,11 @@
             validates status/facility, manages PartyRole, and links the party to a facility.
         </description>
         <in-parameters>
-            <parameter name="externalPartyId" required="true"/>
+            <parameter name="partyId"/>
+            <parameter name="externalPartyId"/>
+            <parameter name="deleteExternalId" type="Boolean" default-value="false">
+                <description>When true and the party is terminated, externalId will be cleared from the Party record.</description>
+            </parameter>
             <parameter name="firstName" required="true"/>
             <parameter name="lastName"/>
             <parameter name="emailAddress"/>
@@ -27,13 +31,10 @@
         </out-parameters>
         <actions>
             <set field="partyStatusId" from="status == 'T' ? 'PARTY_DISABLED' : 'PARTY_ENABLED'"/>
-            <log level="info" message="store#Picker start externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
+            <log level="info" message="store#Picker start partyId=${partyId}, externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
 
-            <if condition="!externalPartyId">
-                <script>ec.message.addError("External Party Id is required")</script>
-            </if>
-            <if condition="!firstName">
-                <script>ec.message.addError("First Name is required")</script>
+            <if condition="!externalPartyId && !partyId">
+                <script>ec.message.addError("Either partyId or externalPartyId is required")</script>
             </if>
             <if condition="!status">
                 <script>ec.message.addError("Status is required - Should be either 'T' or 'A'. T stands for Inactive and A stands for Active users")</script>
@@ -54,26 +55,29 @@
                 </if>
             </if>
 
-            <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
-                <econdition field-name="externalId" from="externalPartyId"/>
-            </entity-find>
-            <if condition="partyList">
-                <set field="party" from="partyList[0]"/>
-                <set field="partyId" from="party.partyId"/>
+            <if condition="!partyId && externalPartyId">
+                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
+                    <econdition field-name="externalId" from="externalPartyId"/>
+                </entity-find>
+                <if condition="partyList">
+                    <set field="party" from="partyList[0]"/>
+                    <set field="partyId" from="party.partyId"/>
+                </if>
             </if>
             <if condition="ec.message.hasError()">
                 <return/>
             </if>
 
             <if condition="partyId">
-                <log level="info" message="store#Picker existing party ${partyId}, status=${status}"/>
-                <if condition="status == 'A' &amp;&amp; party.statusId != 'PARTY_ENABLED'">
-                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:'PARTY_ENABLED']"/>
+                <log level="info" message="store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
+                <if condition="party.statusId != partyStatusId">
+                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:partyStatusId]"/>
                 </if>
-                <if condition="status == 'T' &amp;&amp; party.statusId != 'PARTY_DISABLED'">
-                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, statusId:'PARTY_DISABLED']"/>
+                <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
+                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="[partyId:partyId, externalId:'']"/>
+                    <log level="info" message="store#Picker cleared externalId for party ${partyId} on termination"/>
                 </if>
-                <if condition="status == 'A'">
+                <if condition="partyStatusId == 'PARTY_ENABLED'">
                     <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
                         <econdition field-name="partyId" from="partyId"/>
                         <econdition field-name="roleTypeId" from="roleTypeId"/>
