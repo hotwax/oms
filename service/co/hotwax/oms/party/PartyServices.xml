@@ -96,7 +96,7 @@
                         <log level="info" message="store#Picker cleared externalId for party ${partyId} on termination"/>
                     </if>
                 </if>
-            </if>
+
                 <if condition="partyStatusId == 'PARTY_ENABLED'">
                     <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
                         <econdition field-name="partyId" from="partyId"/>
