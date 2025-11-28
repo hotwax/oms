@@ -90,7 +90,6 @@
             </parameter>
             <parameter name="shipmentMethodTypeId" default-value="SHIP_TO_STORE"/>
             <parameter name="shipmentMethodTypeId_op" default-value="equals"/>
-            <parameter name="shipmentMethodTypeId_not" default-value="N"/>
             <parameter name="shipmentStatusId" type="List">
                 <description>List of comma separated shipment statuses</description>
             </parameter>
@@ -112,7 +111,8 @@
         </out-parameters>
 
         <actions>
-            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail" limit="pageSize" offset="pageIndex * pageSize" list="ordersList" distinct="true">
+            <set field="pageOffset" from="pageIndex * pageSize"/>
+            <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail" limit="pageSize" offset="pageOffset" list="ordersList" distinct="true">
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>

@@ -327,9 +327,7 @@
     <view-entity entity-name="OrderHeaderItemShipmentDetail" package="co.hotwax.oms.order">
         <description>Optimized view for order and shipment queries with OrderHeader, OrderItemShipGroup, OrderShipment, and Shipment data. Used for order fulfillment operations including Ship-to-Store and standard shipping</description>
         <member-entity entity-alias="OH" entity-name="org.apache.ofbiz.order.order.OrderHeader"/>
-        <member-entity entity-alias="SI" entity-name="moqui.basic.StatusItem" join-from-alias="OH">
-            <key-map field-name="statusId"/>
-        </member-entity>
+
         <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
             <key-map field-name="orderId"/>
         </member-entity>
@@ -357,8 +355,6 @@
         <alias entity-alias="OH" field="externalId" name="orderExternalId"/>
         <alias entity-alias="OH" name="productStoreId"/>
         <alias entity-alias="OH" name="statusFlowId"/>
-
-        <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
 
         <alias entity-alias="OI" name="orderItemSeqId"/>
 
