@@ -68,9 +68,26 @@ under the License.
                 </entity-find>
             </if>
 
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumValue">
+                <field-map field-name="enumId" from="emailType"/>
+            </entity-find-one>
+
+            <!-- If no enumValue then return -->
+            <if condition="!enumValue || !enumValue.relatedEnumId">
+                <return error="true" message="Related SystemMessageType to create SystemMessage for ${emailType} not defined, not creating related system message."/>
+            </if>
+
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="order">
                 <select-field field-name="orderId, productStoreId"/>
             </entity-find-one>
+
+            <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="systemMessageType">
+                <field-map field-name="systemMessageTypeId" from="enumValue.relatedEnumId"/>
+            </entity-find-one>
+            <if condition="!systemMessageType">
+                <return error="true" message="Related SystemMessageType with ID ${systemMessageType.systemMessageTypeId} not defined, not creating system message."/>
+            </if>
+
             <script>
                 // Using master-detail relationship to fetch all order details
                 order = ec.entity.find("org.apache.ofbiz.order.order.OrderHeader").condition("orderId", orderId).oneMaster("default")
@@ -167,36 +184,21 @@ under the License.
             </if>
 
             <set field="orderDetail" from="['productStoreId': order.productStoreId, 'messageData': order, 'emailType': emailType, 'emailAddress': emailAddress, 'systemMessageRemoteId': productStoreEmailSetting.systemMessageRemoteId, 'subject': productStoreEmailSetting.subject]"/>
-            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM', statusId:'COM_IN_PROGRESS',
-                    content: org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), datetimeStarted: ec.user.nowTimestamp, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress]" out-map="communicationEvent"/>
+            <service-call name="org.moqui.impl.SystemMessageServices.queue#SystemMessage"
+                          in-map="[systemMessageTypeId:enumValue.relatedEnumId,
+                    messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
+            <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
+                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress]" out-map="communicationEvent"/>
             <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:order.orderId, communicationEventId:communicationEvent.communicationEventId]"/>
         </actions>
     </service>
 
-    <service verb="process" noun="PendingEmailRequests">
-        <actions>
-            <entity-find entity-name="org.apache.ofbiz.party.communication.CommunicationEvent" list="commEventList">
-                <econdition field-name="communicationEventTypeId" value="SYS_MSG_EMAIL_COMM"/>
-                <econdition field-name="statusId" value="COM_IN_PROGRESS"/>
-                <select-field field-name="communicationEventId"/>
-
-                <order-by field-name="-datetimeStarted"/>
-            </entity-find>
-            <iterate list="commEventList" entry="commEvent">
-                <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailRequest"
-                    in-map="[communicationEventId: commEvent.communicationEventId]" async="true" ignore-error="true"/>
-            </iterate>
-        </actions>
-    </service>
-
     <service verb="send" noun="EmailRequest">
-        <in-parameters>
-            <parameter name="communicationEventId" required="true"/>
-        </in-parameters>
+        <implements service="org.moqui.impl.SystemMessageServices.send#SystemMessage"/>
         <actions>
-            <entity-find-one entity-name="org.apache.ofbiz.party.communication.CommunicationEvent" value-field="communicationEvent"/>
+            <entity-find-one entity-name="moqui.service.message.SystemMessageAndType" value-field="systemMessage"/>
 
-            <set field="payload" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(communicationEvent.content, Map.class)"/>
+            <set field="payload" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(systemMessage.messageText, Map.class)"/>
 
             <if condition="!payload || !payload.productStoreId || !payload.emailType">
                 <return error="true" message="Payload must contain productStoreId and emailType."/>
@@ -233,7 +235,7 @@ under the License.
             if (!url.endsWith("/")) {
                 url += "/"
             }
-            url += 'communication/email'
+            url += systemMessage.sendPath
             restClient.uri(url)
 
             // Add Content-Type header
@@ -253,16 +255,11 @@ under the License.
             RestClient.RestResponse restResponse = restClient.call()
             statusCode = restResponse.getStatusCode()
             response = restResponse.jsonObject()
+
+            if (restResponse.statusCode < 200 || restResponse.statusCode >= 300) {
+                ec.message.addError("Unsuccessful with status code: ${statusCode} and response: ${response}")
+            }
         ]]></script>
-        <if condition="(restResponse.statusCode &lt; 200 || restResponse.statusCode &gt;= 300)">
-            <set field="communicationEvent.statusId" value="COM_BOUNCED"/>
-            <service-call name="update#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="communicationEvent"/>
-            <message error="true">Unsuccessful with status code: ${statusCode} and response: ${response}</message>
-            <else>
-                <set field="communicationEvent.statusId" value="COM_COMPLETE"/>
-                <service-call name="update#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="communicationEvent"/>
-            </else>
-        </if>
         </actions>
     </service>
     <service verb="generate" noun="OrderUpdateUrl" allow-remote="true">
