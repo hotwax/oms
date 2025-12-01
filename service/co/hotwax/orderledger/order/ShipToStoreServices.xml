@@ -191,7 +191,9 @@
 
                                 <set field="item" from="orderItem.getPlainValueMap(0)"/>
                                 <set field="shipGroup.items" from="[item]"/>
+                                <if condition="!shipGroup.shipmentId || (shipmentStatusId &amp;&amp; shipmentStatusId.contains(shipGroup.shipmentStatusId))">
                                 <set field="shipGroups" from="shipGroups + shipGroup"/>
+                                </if>
                             </else>
                         </if>
                     </iterate>
