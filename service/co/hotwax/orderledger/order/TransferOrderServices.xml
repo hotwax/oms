@@ -7,7 +7,7 @@
             Service to get all Transfer Orders.
             By default, the service will return orders with status ORDER_APPROVED.
             This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
-            originFacilityId, destinationFacilityId and orderName.
+            originFacilityId, destinationFacilityId and keyword(orderId or orderName).
         </description>
         <in-parameters>
             <parameter name="orderId">
@@ -30,9 +30,6 @@
                     The list of source Facility IDs in OMS to exclude for the Transfer Orders.
                     Eg. To exclude the Rejected TOs in the Receiving App, send the parameter with value as REJECTED_ITM_PARKING.</description>
             </parameter>
-            <parameter name="orderName">
-                <description>The order name of Transfer Order.</description>
-            </parameter>
             <parameter name="statusFlowId" type="List">
                 <description>
                     The list of IDs of the Status Flow in OMS for Transfer Orders.
@@ -44,6 +41,9 @@
             </parameter>
             <parameter name="limit" type="Integer" default="20">
                 <description>Number of records per page (default 20).</description>
+            </parameter>
+            <parameter name="keyword">
+                <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
             </parameter>
         </in-parameters>
         <out-parameters>
@@ -65,8 +65,12 @@
                 <econdition field-name="itemStatusId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" from="excludeOriginFacilityIds" ignore-if-empty="true" operator="not-in"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econditions combine="or">
+                    <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
+                    <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
+                    <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
+                </econditions>
                 <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
-                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
             </entity-find>
         </actions>
