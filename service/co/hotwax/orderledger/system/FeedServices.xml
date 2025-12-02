@@ -170,6 +170,8 @@ under the License.
                                 }
                             }
                             if (skipProductImport) {
+                                variants.clear()
+                                metafields.clear()
                                 continue
                             }
                             // Process previous virtual group
@@ -241,7 +243,7 @@ under the License.
 
 
                                         if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                            added = sortedAssocs.findAll { it !in existingAssocsSorted }.collect { [id: it[0], sequenceNumber: it[1]] }
+                                            added = sortedAssocs.findAll { it[0] !in existingAssocsSorted*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                             removed = existingAssocsSorted.findAll { it[0] !in sortedAssocs*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                             existingDiffMap.assocs = [added: added, removed: removed]
                                             updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
@@ -278,6 +280,8 @@ under the License.
                         additionalParameters.each { paramName, paramValue ->
                             if (virtualProduct.containsKey(paramName) && compareValues(virtualProduct[paramName], paramValue)) {
                                skipProductImport = true
+                               variants.clear()
+                               metafields.clear()
                                return
                             }
                         }
@@ -345,7 +349,7 @@ under the License.
                                 existingAssocsHash = productUpdateHistory?.assocsHash
 
                                 if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                    added = sortedAssocs.findAll { it !in existingAssocsSorted }.collect { [id: it[0], sequenceNumber: it[1]] }
+                                    added = sortedAssocs.findAll { it[0] !in existingAssocsSorted*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                     removed = existingAssocsSorted.findAll { it[0] !in sortedAssocs*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                     existingDiffMap.assocs = [added: added, removed: removed]
                                     updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
@@ -429,6 +433,8 @@ under the License.
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
                 <field-map field-name="productStoreId" from="shopifyShop.productStoreId"/>
             </entity-find-one>
+            <entity-find-related-one value-field="productStore" relationship-name="org.apache.ofbiz.product.store.ProductStoreSetting" to-value-field="skipProductTypeUpdateSetting" cache="true"/>
+            <set field="skipProductTypeUpdate" from="skipProductTypeUpdateSetting.settingValue" type="Boolean"/>
             <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="shopifyShopProducts">
                 <econdition field-name="shopifyProductId" from="productUpdateHistory.productId"/>
                 <order-by field-name="lastUpdatedStamp"/>
@@ -480,16 +486,19 @@ under the License.
                     <set field="requireComponents" from="diff.hasVariantsThatRequireComponents" type="Boolean"/>
                 </if>
 
-                <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                <!-- Read from first variant for requireShipping if false then set to DIGITAL_GOOD -->
-                <if condition="requiresShipping &amp;&amp; requiresShipping == false">
-                    <set field="product.productTypeId" value="DIGITAL_GOOD"/>
-                </if>
-                <if condition="requireComponents">
-                    <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
-                </if>
-                <if condition="isGiftCard">
+                <!-- Skip updating product type if product is updated -->
+                <if condition="!skipProductTypeUpdate || !hasUpdate">
                     <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                    <!-- Read from first variant for requireShipping if false then set to DIGITAL_GOOD -->
+                    <if condition="requiresShipping &amp;&amp; requiresShipping == false">
+                        <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                    </if>
+                    <if condition="requireComponents">
+                        <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                    </if>
+                    <if condition="isGiftCard">
+                        <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                    </if>
                 </if>
                 <set field="product.isVirtual" value="Y"/>
                 <set field="product.isVariant" value="N"/>
@@ -667,7 +676,8 @@ under the License.
                                 <date-filter/>
                             </entity-find>
                             <if condition="productAssocs">
-                                <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                                <set field="productAssocs[0].thruDate" from="ec.user.nowTimestamp"/>
+                                <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
                             </if>
                         </if>
                     </iterate>
@@ -747,21 +757,23 @@ under the License.
                     <if condition="diff.featureImageUrl">
                         <set field="product.detailImageUrl" from="diff.featureImageUrl"/>
                     </if>
-
-                    <set field="product.productTypeId" value="FINISHED_GOOD"/>
-                    <if condition="diff.requiresShipping">
-                        <if condition="!diff.requiresShipping.toBoolean()">
-                            <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                    <!-- Skip updating product type if product is updated -->
+                    <if condition="!skipProductTypeUpdate || !hasUpdate">
+                        <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                        <if condition="diff.requiresShipping">
+                            <if condition="!diff.requiresShipping.toBoolean()">
+                                <set field="product.productTypeId" value="DIGITAL_GOOD"/>
+                            </if>
                         </if>
-                    </if>
-                    <if condition="diff.requiresComponents">
-                        <if condition="diff.requiresComponents.toBoolean()">
-                            <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                        <if condition="diff.requiresComponents">
+                            <if condition="diff.requiresComponents.toBoolean()">
+                                <set field="product.productTypeId" value="MARKETING_PKG_PICK"/>
+                            </if>
                         </if>
-                    </if>
-                    <if condition="diff.isGiftCard">
-                        <if condition="diff.isGiftCard.toBoolean()">
-                            <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                        <if condition="diff.isGiftCard">
+                            <if condition="diff.isGiftCard.toBoolean()">
+                                <set field="product.productTypeId" value="FINISHED_GOOD"/>
+                            </if>
                         </if>
                     </if>
                     <set field="product.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
