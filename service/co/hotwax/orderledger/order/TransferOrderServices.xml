@@ -6,13 +6,10 @@
         <description>
             Service to get all Transfer Orders.
             By default, the service will return orders with status ORDER_APPROVED.
-            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
+            This supports filtering on the basis of parameters orderStatusId, itemStatusId,
             originFacilityId, destinationFacilityId and keyword(orderId or orderName).
         </description>
         <in-parameters>
-            <parameter name="orderId">
-                <description>The ID of the Transfer Order in OMS.</description>
-            </parameter>
             <parameter name="orderStatusId" default-value="ORDER_APPROVED">
                 <description>The ID of the status of the Transfer Order in OMS.</description>
             </parameter>
@@ -60,13 +57,11 @@
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipGroup" limit="limit" offset="pageIndex" list="orders" distinct="true">
                 <search-form-inputs default-order-by="orderDate"/>
                 <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
-                <econdition field-name="orderId" ignore-if-empty="true"/>
                 <econdition field-name="orderStatusId"/>
                 <econdition field-name="itemStatusId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" from="excludeOriginFacilityIds" ignore-if-empty="true" operator="not-in"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
                 <econditions combine="or">
-                    <econdition field-name="orderId" from="orderId" ignore-if-empty="true"/>
                     <econdition field-name="orderId" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                     <econdition field-name="orderName" operator="like" value="%${keyword}%" ignore="keyword == null || keyword == ''"/>
                 </econditions>
