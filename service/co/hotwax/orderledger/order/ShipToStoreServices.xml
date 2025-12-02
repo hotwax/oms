@@ -186,14 +186,14 @@
                                                      value-field="shipment">
                                         <field-map field-name="shipmentId" from="shipGroup.shipmentId"/>
                                     </entity-find-one>
-                                <if condition="!shipGroup.shipmentId || (shipmentStatusId &amp;&amp; shipmentStatusId.contains(shipGroup.shipmentStatusId))">
                                 <set field="shipGroup.shipmentStatusId" from="shipment?.statusId"/>
-                                </if>
                                 </if>
 
                                 <set field="item" from="orderItem.getPlainValueMap(0)"/>
                                 <set field="shipGroup.items" from="[item]"/>
+                                <if condition="!shipGroup.shipmentId || (shipmentStatusId &amp;&amp; shipmentStatusId.contains(shipGroup.shipmentStatusId))">
                                 <set field="shipGroups" from="shipGroups + shipGroup"/>
+                                </if>
                             </else>
                         </if>
                     </iterate>
