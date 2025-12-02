@@ -33,6 +33,12 @@
             <parameter name="orderName">
                 <description>The order name of Transfer Order.</description>
             </parameter>
+            <parameter name="statusFlowId" type="List">
+                <description>
+                    The list of IDs of the Status Flow in OMS for Transfer Orders.
+                    Eg. TO_Fulfill_Only, TO_Fulfill_And_Receive, TO_Receive_Only.
+                </description>
+            </parameter>
             <parameter name="pageIndex" type="Integer" default="0">
                 <description>Page number to return, starting with zero.</description>
             </parameter>

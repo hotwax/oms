@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="store" noun="Picker">
+        <description>
+            Translated from the legacy Ofbiz pickerDataSetup. Creates or re-enables a picker (person) by externalPartyId,
+            validates status/facility, manages PartyRole, and links the party to a facility.
+        </description>
+        <in-parameters>
+            <parameter name="partyId"/>
+            <parameter name="externalPartyId"/>
+            <parameter name="deleteExternalId" type="Boolean" default-value="false">
+                <description>When true and the party is terminated, externalId will be cleared from the Party record.</description>
+            </parameter>
+            <parameter name="firstName" required="true"/>
+            <parameter name="lastName"/>
+            <parameter name="emailAddress"/>
+            <parameter name="contactNumber"/>
+            <parameter name="externalFacilityId"/>
+            <parameter name="facilityId">
+                <description>Optional direct facilityId. If provided, externalFacilityId will be ignored.</description>
+            </parameter>
+            <parameter name="roleTypeId" default-value="WAREHOUSE_PICKER"/>
+            <parameter name="status" required="true">
+                <description>Expected values: A (active) or T (terminated).</description>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId"/>
+        </out-parameters>
+        <actions>
+            <set field="partyStatusId" from="status == 'T' ? 'PARTY_DISABLED' : 'PARTY_ENABLED'"/>
+            <log level="info" message="store#Picker start partyId=${partyId}, externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
+
+            <if condition="!externalPartyId &amp;&amp; !partyId">
+                <script>ec.message.addError("Either partyId or externalPartyId is required")</script>
+            </if>
+            <if condition="!status">
+                <script>ec.message.addError("Status is required - Should be either 'T' or 'A'. T stands for Inactive and A stands for Active users")</script>
+            <else-if condition="!(status in ['T','A'])">
+                <script>ec.message.addError("Invalid Status value - Status should be either 'T' or 'A'. T stands for Inactive and A stands for Active users")</script>
+            </else-if>
+            </if>
+
+            <if condition="!facilityId &amp;&amp; externalFacilityId">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" limit="1">
+                    <econdition field-name="externalId" from="externalFacilityId"/>
+                </entity-find>
+                <if condition="!facilityList">
+                    <script>ec.message.addError("Facility with external Id: ${externalFacilityId} Does Not Exists.")</script>
+                <else>
+                    <set field="facilityId" from="facilityList[0].facilityId"/>
+                </else>
+                </if>
+            </if>
+
+            <if condition="partyId">
+                <entity-find-one entity-name="org.apache.ofbiz.party.party.Party" value-field="party">
+                    <field-map field-name="partyId" from="partyId"/>
+                </entity-find-one>
+                <if condition="!party">
+                    <script>ec.message.addError("Party not found for partyId ${partyId}")</script>
+                </if>
+            </if>
+
+            <if condition="!partyId &amp;&amp; externalPartyId">
+                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
+                    <econdition field-name="externalId" from="externalPartyId"/>
+                </entity-find>
+                <if condition="partyList">
+                    <set field="partyId" from="partyList[0]?.partyId"/>
+                    <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
+                </if>
+            </if>
+            
+            <if condition="ec.message.hasError()">
+                <return/>
+            </if>
+
+            <if condition="partyId">
+                <set field="context.partyId" from="partyId"/>
+                <log level="info" message="store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
+                <set field="partyUpdateMap" from="[partyId:partyId]"/>
+                <if condition="party.statusId != partyStatusId">
+                    <set field="partyUpdateMap.statusId" from="partyStatusId"/>
+                    <if condition="deleteExternalId &amp;&amp; partyStatusId == 'PARTY_DISABLED' &amp;&amp; party.externalId">
+                        <set field="partyUpdateMap.externalId" value=""/>
+                    </if>
+                    <service-call name="update#org.apache.ofbiz.party.party.Party" in-map="partyUpdateMap"/>
+                </if>
+
+                <if condition="partyStatusId == 'PARTY_ENABLED'">
+                    <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList" limit="1">
+                        <econdition field-name="partyId" from="partyId"/>
+                        <econdition field-name="roleTypeId" from="roleTypeId"/>
+                    </entity-find>
+                    <if condition="!partyRoleList">
+                        <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
+                    </if>
+                    <if condition="facilityId">
+                        <log level="info" message="store#Picker (existing) linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                        <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityParty" list="existingFp" limit="1">
+                            <econdition field-name="facilityId" from="facilityId"/>
+                            <econdition field-name="partyId" from="partyId"/>
+                            <econdition field-name="roleTypeId" from="roleTypeId"/>
+                            <date-filter/>
+                        </entity-find>
+                        <if condition="!existingFp">
+                            <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
+                                          in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
+                            <if condition="facilityPartyResp.error">
+                                <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                                <return error="true" message="${facilityPartyResp.errorMessage}"/>
+                            </if>
+                        </if>
+                    </if>
+                </if>
+            </if>
+
+            <if condition="!partyId &amp;&amp; 'statusId' == 'PARTY_ENABLED'">
+                <log level="info" message="store#Picker creating new party for externalPartyId=${externalPartyId}"/>
+                <service-call name="create#org.apache.ofbiz.party.party.Party" out-map="createPartyOut"
+                              in-map="[partyTypeId:'PERSON', externalId:externalPartyId, statusId:partyStatusId]"/>
+                <set field="partyId" from="createPartyOut.partyId"/>
+                <log level="info" message="store#Picker created new partyId=${partyId} for externalPartyId=${externalPartyId}"/>
+                <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="[partyId:partyId, firstName:firstName, lastName:lastName]"/>
+
+                <if condition="emailAddress">
+                    <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="emailOut"
+                                  in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:emailAddress]"/>
+                    <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
+                                  in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, allowSolicitation:'N']"/>
+                </if>
+                <if condition="contactNumber">
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber" out-map="phoneOut"
+                                  in-map="[contactNumber:contactNumber]"/>
+                    <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
+                                  in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId]"/>
+                </if>
+
+                <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
+
+                <if condition="facilityId">
+                    <log level="info" message="store#Picker linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                    <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
+                                  in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
+                    <if condition="facilityPartyResp.error">
+                        <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                        <return error="true" message="${facilityPartyResp.errorMessage}"/>
+                    </if>
+                </if>
+            </if>
+        </actions>
+    </service>
+</services>
