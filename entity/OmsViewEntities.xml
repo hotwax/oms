@@ -42,7 +42,7 @@
         <alias name="inventoryItemId" entity-alias="OISGIR"/>
         <alias name="reservedQty" field="quantity" entity-alias="OISGIR"/>
         <alias name="reservedProductId" field="productId" entity-alias="II"/>
-        <alias name="locationSeqId" field="locationSeqId" entity-alias="II"/>
+        <alias name="locationSeqId" entity-alias="II"/>
     </view-entity>
 
     <view-entity entity-name="PartyNameDetail" package="co.hotwax.party.party">
