@@ -6,8 +6,8 @@
         <description>
             Service to get all Transfer Orders.
             By default, the service will return orders with status ORDER_APPROVED.
-            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
-            originFacilityId, destinationFacilityId and orderName.
+            This supports filtering on the basis of parameters orderId, orderName, orderStatusId, itemStatusId,
+            originFacilityId, destinationFacilityId and keyword(orderId or orderName).
         </description>
         <in-parameters>
             <parameter name="orderId">
@@ -45,6 +45,9 @@
             <parameter name="limit" type="Integer" default="20">
                 <description>Number of records per page (default 20).</description>
             </parameter>
+            <parameter name="keyword">
+                <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="orders" type="List"/>
@@ -65,8 +68,12 @@
                 <econdition field-name="itemStatusId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" from="excludeOriginFacilityIds" ignore-if-empty="true" operator="not-in"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econditions combine="or">
+                    <econdition field-name="orderId" operator="like" value="${keyword}%" ignore="keyword == null || keyword == ''"/>
+                    <econdition field-name="orderName" operator="like" value="${keyword}%" ignore="keyword == null || keyword == ''"/>
+                </econditions>
                 <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
-                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <econdition field-name="orderName" operator="like" value="${orderName}%" ignore="!orderName"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
             </entity-find>
         </actions>
