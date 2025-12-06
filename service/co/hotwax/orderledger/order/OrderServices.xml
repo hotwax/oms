@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://moqui.org/xsd/service-definition-3.xsd">
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
 
     <!-- Service to cancel multiple sales order item(s) -->
     <service verb="cancel" noun="SalesOrderItems">
@@ -548,6 +548,82 @@ under the License.
                 </entity-find>
                 <set field="orderDetail.paymentPreferences" from="orderPaymentPreferences"/>
             </if>
+        </actions>
+    </service>
+
+    <service verb="create" noun="SalesOrder">
+        <description>Create a Sales Order</description>
+        <in-parameters>
+            <!-- TODO define all params of order payload map -->
+            <parameter name="payload" type="Map" required="true">
+                <parameter name="email"/>
+                <parameter name="customer" type="Map" required="true"/>
+                <parameter name="billing_address" type="Map"/>
+                <parameter name="shipping_address" type="Map"/>
+                <parameter name="identifications" type="List"/>
+                <parameter name="adjustments" type="List"/>
+                <parameter name="attributes" type="List"/>
+                <parameter name="paymentPreferences" type="List"/>
+                <parameter name="shipGroups" type="List" required="true">
+                    <parameter name="shipGroup" type="Map">
+                        <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" include="nonpk"/>
+                        <parameter name="items" type="List" required="true">
+                            <parameter name="itemMap" type="Map">
+                                <auto-parameters entity-name="org.apache.ofbiz.order.order.orderItem" include="nonpk"/>
+                            </parameter>
+                        </parameter>
+                    </parameter>
+                </parameter>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId">
+                <description>The ID of the Sales Order created in OMS.</description>
+            </parameter>
+        </out-parameters>
+        <actions>
+            <!-- Validate order, check if order with the externalId already exists -->
+            <if condition="payload.externalId">
+                <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderHeader" count-field="orderCount">
+                    <econdition field-name="externalId" from="payload.externalId"/>
+                    <econdition field-name="orderTypeId" value="SALES_ORDER"/>
+                </entity-find-count>
+
+                <if condition="orderCount &gt; 0">
+                    <message error="true">Order [External ID: ${payload.externalId}] - Duplicate detected, sales order already exists.</message>
+                </if>
+            </if>
+
+            <!-- TODO Validate Facility.
+                    check scenario of simple delivery order with single ship group, mixed cart, pos order etc -->
+
+            <!-- Validate customer, check if customer with the externalId already exists -->
+            <set field="payload.roles" from="[]"/>
+            <if condition="!payload.customer.partyId">
+                <!-- TODO findOrCreate#Person implementation in separate PR in oms -->
+                <service-call name="co.hotwax.oms.order.PartyServices.findOrCreate#Person" in-map="payload.customer" out-map="customerOut"/>
+                <set field="payload.customer.partyId" from="customerOut.partyId"/>
+            </if>
+            <!-- TODO check and update roleTypeId below
+                        - roles like BILL_TO_CUSTOMER, END_USER_CUSTOMER, PLACING_CUSTOMER, SHIP_TO_CUSTOMER -->
+            <set field="payload.roles" from="payload.roles + [partyId:payload.customer.partyId, roleTypeId:'SHIP_TO_CUSTOMER']"/>
+
+            <!-- Validate if productId exits in shipGroups.items -->
+            <iterate list="payload.shipGroups[0].items" entry="item">
+                <if condition="!item.productId">
+                    <message error="true">Order [External ID: ${payload.externalId}] - Missing productId in shipGroups.items</message>
+                </if>
+            </iterate>
+            <check-errors/>
+
+            <!-- Billing Address -->
+
+
+            <!-- Shipping Address -->
+
+            <!-- Call the OOTB create order service -->
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="payload" out-map="orderOut"/>
+            <set field="orderId" from="orderOut.orderId"/>
         </actions>
     </service>
 </services>
