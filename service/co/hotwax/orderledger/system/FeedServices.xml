@@ -433,8 +433,11 @@ under the License.
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
                 <field-map field-name="productStoreId" from="shopifyShop.productStoreId"/>
             </entity-find-one>
-            <entity-find-related-one value-field="productStore" relationship-name="org.apache.ofbiz.product.store.ProductStoreSetting" to-value-field="skipProductTypeUpdateSetting" cache="true"/>
-            <set field="skipProductTypeUpdate" from="skipProductTypeUpdateSetting.settingValue" type="Boolean"/>
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="skipProductTypeUpdateSetting" cache="true">
+                <field-map field-name="productStoreId" from="shopifyShop.productStoreId"/>
+                <field-map field-name="settingTypeEnumId" value="UPDATE_PRODUCT_TYPE"/>
+            </entity-find-one>
+            <set field="skipProductTypeUpdate" from="skipProductTypeUpdateSetting?.settingValue" type="Boolean"/>
             <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="shopifyShopProducts">
                 <econdition field-name="shopifyProductId" from="productUpdateHistory.productId"/>
                 <order-by field-name="lastUpdatedStamp"/>
