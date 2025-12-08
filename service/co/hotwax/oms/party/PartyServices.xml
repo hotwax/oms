@@ -69,7 +69,8 @@
                     <econdition field-name="externalId" from="externalPartyId"/>
                 </entity-find>
                 <if condition="partyList">
-                    <set field="partyId" from="partyList[0]?.partyId"/>
+                    <set field="party" from="partyList[0]"/>
+                    <set field="partyId" from="party.partyId"/>
                     <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
                 </if>
             </if>
@@ -118,7 +119,7 @@
                 </if>
             </if>
 
-            <if condition="!partyId &amp;&amp; 'statusId' == 'PARTY_ENABLED'">
+            <if condition="!partyId &amp;&amp; partyStatusId == 'PARTY_ENABLED'">
                 <log level="info" message="store#Picker creating new party for externalPartyId=${externalPartyId}"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Party" out-map="createPartyOut"
                               in-map="[partyTypeId:'PERSON', externalId:externalPartyId, statusId:partyStatusId]"/>
