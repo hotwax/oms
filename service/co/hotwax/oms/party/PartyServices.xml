@@ -69,8 +69,8 @@
                     <econdition field-name="externalId" from="externalPartyId"/>
                 </entity-find>
                 <if condition="partyList">
-                    <set field="partyId" from="partyList[0]?.partyId"/>
                     <set field="party" from="partyList[0]"/>
+                    <set field="partyId" from="party.partyId"/>
                     <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
                 </if>
             </if>
