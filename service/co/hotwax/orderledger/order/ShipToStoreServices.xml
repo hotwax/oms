@@ -207,14 +207,13 @@
                     </entity-find-one>
 
                     <if condition="billToCustomer">
-                        <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person"
-                                         cache="true">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
                             <field-map field-name="partyId" from="billToCustomer.partyId"/>
                             <select-field field-name="firstName,lastName"/>
                         </entity-find-one>
 
                         <set field="order.customerId" from="billToCustomer.partyId"/>
-                        <set field="order.customerName" from="person.firstName + ' ' + person.lastName"/>
+                        <set field="order.customerName" from="person.firstName + ' ' + (person.lastName ?: '')"/>
                     </if>
                     <set field="orders" from="orders + order"/>
                 </if>
