@@ -191,14 +191,10 @@
                 boolean isFileCreated =  productFacilityDetailFile.exists();
                 if (!isFileCreated) {
                     csvFilePath = null;
+                    return;
                 }
             </script>
-            <if condition="!isFileCreated">
-                <log message="CSV file not prepared."/>
-                <else>
-                    <log message="CSV file prepared successfully."/>
-                </else>
-            </if>
+            <log message="CSV file prepared successfully."/>
         </actions>
     </service>
     <service verb="get" noun="Products" authenticate="false" transaction-timeout="7200">
