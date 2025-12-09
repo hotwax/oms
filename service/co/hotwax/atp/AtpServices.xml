@@ -90,40 +90,40 @@
                 viewIndexLast = paginationValues.viewIndexLast
                 viewIndexList = (1..viewIndexLast).toList()
             </script>
-<!--            <iterate list="viewIndexList" entry="viewIndex">-->
-<!--                <service-call name="co.hotwax.atp.AtpServices.get#Products"-->
-<!--                        in-map="serviceCtx + [viewIndex: viewIndex*viewSize]"-->
-<!--                        out-map="productResult"/>-->
-<!--                <if condition="productResult.productDetail &amp;&amp; productResult.productDetail.totalCount > 0">-->
-<!--                    <set field="productGroups" from="productResult.productDetail.productGroups"/>-->
-<!--                    <iterate list="productGroups" entry="productGroup">-->
-<!--                        <set field="products" from="productGroup.doclist.docs"/>-->
-<!--                        <set field="virtualProduct" from="products.find { it.isVirtual == 'true' }"/>-->
-<!--                        <iterate list="products" entry="product">-->
-<!--                            &lt;!&ndash;skip virtual product&ndash;&gt;-->
-<!--                            <if condition="product.isVirtual == 'true'">-->
-<!--                                <continue/>-->
-<!--                            </if>-->
-<!--                            &lt;!&ndash;considering tags are always managed on virtual product, hence copying virtual product tags to it's variant &ndash;&gt;-->
-<!--                            <if condition="product.isVariant == 'true' &amp;&amp; virtualProduct">-->
-<!--                                <set field="product.tags" from="virtualProduct.tags"/>-->
-<!--                            </if>-->
-<!--                            <script>-->
-<!--                                kieSession.setGlobal("productFacilityDetail", productFacilityDetail);-->
-<!--                                kieSession.insert(product);-->
-<!--                                int numberOfRulesFired = kieSession.fireAllRules();-->
-<!--                            </script>-->
-<!--                        </iterate>-->
-<!--                    </iterate>-->
-<!--                    <if condition="productFacilityDetail.values()">-->
-<!--                    <service-call name="co.hotwax.atp.AtpServices.prepare#ProductFacilityCsv"-->
-<!--                            in-map="[products: productFacilityDetail.values(), systemMessageTypeId: 'ExportProductFacilityDetail', csvFilePath: csvFilePath]"-->
-<!--                            out-map="result"/>-->
-<!--                    <set field="csvFilePath" from="result.csvFilePath"/>-->
-<!--                    <set field="productFacilityDetail" from="[:]"/>-->
-<!--                    </if>-->
-<!--                </if>-->
-<!--            </iterate>-->
+            <iterate list="viewIndexList" entry="viewIndex">
+                <service-call name="co.hotwax.atp.AtpServices.get#Products"
+                        in-map="serviceCtx + [viewIndex: viewIndex*viewSize]"
+                        out-map="productResult"/>
+                <if condition="productResult.productDetail &amp;&amp; productResult.productDetail.totalCount > 0">
+                    <set field="productGroups" from="productResult.productDetail.productGroups"/>
+                    <iterate list="productGroups" entry="productGroup">
+                        <set field="products" from="productGroup.doclist.docs"/>
+                        <set field="virtualProduct" from="products.find { it.isVirtual == 'true' }"/>
+                        <iterate list="products" entry="product">
+                            <!--skip virtual product-->
+                            <if condition="product.isVirtual == 'true'">
+                                <continue/>
+                            </if>
+                            <!--considering tags are always managed on virtual product, hence copying virtual product tags to it's variant -->
+                            <if condition="product.isVariant == 'true' &amp;&amp; virtualProduct">
+                                <set field="product.tags" from="virtualProduct.tags"/>
+                            </if>
+                            <script>
+                                kieSession.setGlobal("productFacilityDetail", productFacilityDetail);
+                                kieSession.insert(product);
+                                int numberOfRulesFired = kieSession.fireAllRules();
+                            </script>
+                        </iterate>
+                    </iterate>
+                    <if condition="productFacilityDetail.values()">
+                    <service-call name="co.hotwax.atp.AtpServices.prepare#ProductFacilityCsv"
+                            in-map="[products: productFacilityDetail.values(), systemMessageTypeId: 'ExportProductFacilityDetail', csvFilePath: csvFilePath]"
+                            out-map="result"/>
+                    <set field="csvFilePath" from="result.csvFilePath"/>
+                    <set field="productFacilityDetail" from="[:]"/>
+                    </if>
+                </if>
+            </iterate>
             </if>
             <script>
                 kieSession.dispose();
@@ -187,12 +187,18 @@
                     try (Writer outFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(csvFilePath, true)))) {
                         outFile.append(data);
                     }
-                } else {
+                }
+                boolean isFileCreated =  productFacilityDetailFile.exists();
+                if (!isFileCreated) {
                     csvFilePath = null;
-                    return;
                 }
             </script>
-            <log message="CSV file prepared successfully."/>
+            <if condition="!isFileCreated">
+                <log message="CSV file not prepared."/>
+                <else>
+                    <log message="CSV file prepared successfully."/>
+                </else>
+            </if>
         </actions>
     </service>
     <service verb="get" noun="Products" authenticate="false" transaction-timeout="7200">
