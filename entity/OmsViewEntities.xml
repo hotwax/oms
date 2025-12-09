@@ -495,4 +495,13 @@
             <econdition entity-alias="OH" field-name="orderTypeId" value="TRANSFER_ORDER"/>
         </entity-condition>
     </view-entity>
+    <view-entity entity-name="ReservedInventorySummary" package="co.hotwax.inventory">
+        <member-entity entity-name="org.apache.ofbiz.order.order.OrderItemShipGrpInvRes" entity-alias="OISGIR"/>
+        <member-entity entity-name="org.apache.ofbiz.product.facility.ProductFacility" entity-alias="PF" join-from-alias="OISGIR">
+            <key-map field-name="inventoryItemId"/>
+        </member-entity>
+        <alias entity-alias="PF" name="productId"/>
+        <alias entity-alias="PF" name="facilityId"/>
+        <alias entity-alias="OISGIR" name="quantity" function="sum"/>
+    </view-entity>
 </entities>
