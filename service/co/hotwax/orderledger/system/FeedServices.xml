@@ -178,7 +178,7 @@ under the License.
                             if (virtualProduct) {
                                 variantIds = []
                                 if (variants?.get(0)) {
-                                    virtualProduct.put("requiresShipping", variants[0].inventoryItem.requiresShipping.toString())
+                                    virtualProduct.put("requiresShipping", variants[0].inventoryItem.requiresShipping != null ? variants[0].inventoryItem.requiresShipping.toString() : '')
                                 }
                                 virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                                     .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
@@ -288,7 +288,7 @@ under the License.
                         if (!skipProductImport) {
                         def variantIds = []
                         if (variants?.get(0)) {
-                            virtualProduct.put("requiresShipping", variants[0].inventoryItem.requiresShipping.toString())
+                            virtualProduct.put("requiresShipping", variants[0].inventoryItem.requiresShipping ? variants[0].inventoryItem.requiresShipping.toString() : '')
                         }
                         virtualResult = ec.service.sync().name("co.hotwax.orderledger.product.ProductServices.compare#VirtualProduct")
                             .parameters([productJson: virtualProduct, systemMessageId: systemMessageId, shopId: shopId])
