@@ -115,7 +115,7 @@
             <entity-find entity-name="co.hotwax.oms.order.OrderHeaderItemShipmentDetail" limit="pageSize" offset="pageOffset" list="ordersList" distinct="true">
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="orderFacilityId" ignore-if-empty="true"/>
-                <econdition field-name="orderStatusId"/>
+                <econdition field-name="orderStatusId" operator="in" from="orderStatusId"/>
                 <econdition field-name="shipmentMethodTypeId" ignore-if-empty="true"/>
 
                 <econditions combine="or">
