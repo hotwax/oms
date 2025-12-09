@@ -1223,7 +1223,7 @@ under the License.
                     def parts = [
                         productJson.handle ?: '',
                         productJson.vendor ?: '',
-                        productJson.requiresShipping ?: '',
+                        productJson.requiresShipping != null ? productJson.requiresShipping.toString() : '',
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
@@ -1269,7 +1269,7 @@ under the License.
                         title: productJson.title,
                         featureImageUrl: productJson.featuredMedia?.preview?.image?.url,
                         isGiftCard: productJson.isGiftCard,
-                        requiresShipping: productJson.requiresShipping,
+                        requiresShipping: productJson.requiresShipping != null ? productJson.requiresShipping.toString() : '',
                         hasVariantsThatRequiresComponents: productJson.hasVariantsThatRequiresComponents,
                         tags: [added: tags, removed: []],
                         features: [added: features, removed: []],
@@ -1317,7 +1317,7 @@ under the License.
             def parts = [
                 productJson.handle ?: '',
                 productJson.vendor ?: '',
-                productJson.requiresShipping ?: '',
+                productJson.requiresShipping != null ? productJson.requiresShipping.toString() : '',
                 (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                 (productJson.isGiftCard ?: '').toString(),
                 productJson.title ?: '',
@@ -1330,7 +1330,7 @@ under the License.
                 differenceMap.vendor = productJson.vendor
                 differenceMap.handle = productJson.handle
                 differenceMap.isGiftCard = productJson.isGiftCard
-                differenceMap.requiresShipping = productJson.requiresShipping
+                differenceMap.requiresShipping = productJson.requiresShipping != null ? productJson.requiresShipping.toString() : ''
                 differenceMap.hasVariantsThatRequireComponents = productJson.hasVariantsThatRequiresComponents
                 differenceMap.featureImageUrl = productJson.featuredMedia?.preview?.image?.url
             }
