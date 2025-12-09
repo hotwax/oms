@@ -42,7 +42,7 @@
     <!-- SECA to index order in Solr when order status becomes COMPLETED or CANCELLED -->
     <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
         <condition>
-            <expression>statusChanged &amp;&amp; (statusId == 'ORDER_COMPLETED' || statusId == 'ORDER_CANCELLED')</expression>
+            <expression>statusChanged</expression>
         </condition>
         <actions>
             <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
