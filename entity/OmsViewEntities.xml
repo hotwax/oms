@@ -498,6 +498,11 @@
         <member-entity entity-alias="OI" entity-name="org.apache.ofbiz.order.order.OrderItem" join-from-alias="OH">
             <key-map field-name="orderId"/>
         </member-entity>
+        <member-entity entity-alias="OS" entity-name="org.apache.ofbiz.order.order.OrderStatus" join-from-alias="OI">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+            <key-map field-name="statusId"/>
+        </member-entity>
         <member-entity entity-alias="OISG" entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" join-from-alias="OI">
             <key-map field-name="orderId"/>
             <key-map field-name="shipGroupSeqId"/>
@@ -543,6 +548,9 @@
 
         <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
+
+        <alias entity-alias="OS" name="statusDatetime"/>
+
         <entity-condition>
             <econdition entity-alias="OH" field-name="orderTypeId" value="TRANSFER_ORDER"/>
         </entity-condition>
