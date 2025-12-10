@@ -40,7 +40,7 @@
     </seca>
 
     <!-- SECA to index order in Solr when order status becomes COMPLETED or CANCELLED -->
-    <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="post-commit">
+    <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
         <condition>
             <expression>statusChanged</expression>
         </condition>
