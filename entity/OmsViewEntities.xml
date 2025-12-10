@@ -495,4 +495,43 @@
             <econdition entity-alias="OH" field-name="orderTypeId" value="TRANSFER_ORDER"/>
         </entity-condition>
     </view-entity>
+
+    <view-entity entity-name="ProductFacilityAndGroupAtp" package="co.hotwax.facility">
+        <member-entity entity-alias="PF" entity-name="org.apache.ofbiz.product.facility.ProductFacility"/>
+        <member-entity entity-alias="F" entity-name="org.apache.ofbiz.product.facility.Facility" join-from-alias="PF">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="FT" entity-name="org.apache.ofbiz.product.facility.FacilityType" join-from-alias="F">
+            <key-map field-name="facilityTypeId"/>
+        </member-entity>
+        <member-entity entity-alias="FGM" entity-name="org.apache.ofbiz.product.facility.FacilityGroupMember" join-from-alias="F">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="FG" entity-name="org.apache.ofbiz.product.facility.FacilityGroup" join-from-alias="FGM">
+            <key-map field-name="facilityGroupId"/>
+        </member-entity>
+        <member-entity entity-alias="PSF" entity-name="org.apache.ofbiz.product.store.ProductStoreFacility" join-from-alias="PF">
+            <key-map field-name="facilityId"/>
+        </member-entity>
+        <member-entity entity-alias="PR" entity-name="org.apache.ofbiz.product.product.Product" join-from-alias="PF">
+            <key-map field-name="productId"/>
+        </member-entity>
+        <alias name="productId" entity-alias="PF"/>
+        <alias name="psfFromDate" entity-alias="PSF" field="fromDate"/>
+        <alias name="psfThruDate" entity-alias="PSF" field="thruDate"/>
+        <alias name="fromDate" entity-alias="FGM"/>
+        <alias name="thruDate" entity-alias="FGM"/>
+        <alias name="allowBrokering" entity-alias="PF"/>
+        <alias name="productStoreId" entity-alias="PSF"/>
+        <alias name="facilityGroupTypeId" entity-alias="FG"/>
+        <alias name="facilityParentTypeId" field="parentTypeId" entity-alias="FT"/>
+        <alias name="atp" field="computedLastInventoryCount" entity-alias="PF" function="sum"/>
+        <alias name="lastInventoryCount" entity-alias="PF" function="sum"/>
+
+        <entity-condition>
+            <having-econditions>
+                <econdition field-name="lastInventoryCount" operator="greater-equals" value="0"/>
+            </having-econditions>
+        </entity-condition>
+    </view-entity>
 </entities>
