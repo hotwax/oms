@@ -94,7 +94,7 @@ under the License.
         <in-parameters>
             <parameter name="productStoreId" required="true"/>
             <parameter name="facilityGroupId"/>
-            <parameter name="productIds" type="List"/>
+            <parameter name="productId" type="List"/>
             <parameter name="sku" type="List"/>
         </in-parameters>
         <out-parameters>
