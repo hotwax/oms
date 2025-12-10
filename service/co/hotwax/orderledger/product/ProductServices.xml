@@ -1223,7 +1223,7 @@ under the License.
                     def parts = [
                         productJson.handle ?: '',
                         productJson.vendor ?: '',
-                        productJson.requiresShipping != null ? productJson.requiresShipping.toString() : '',
+                        (productJson.requiresShipping ?: '').toString(),
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
