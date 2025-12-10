@@ -524,6 +524,7 @@
         <alias name="allowBrokering" entity-alias="PF"/>
         <alias name="productStoreId" entity-alias="PSF"/>
         <alias name="facilityGroupTypeId" entity-alias="FG"/>
+        <alias name="facilityGroupId" entity-alias="FG"/>
         <alias name="facilityParentTypeId" field="parentTypeId" entity-alias="FT"/>
         <alias name="atp" field="computedLastInventoryCount" entity-alias="PF" function="sum"/>
         <alias name="lastInventoryCount" entity-alias="PF" function="sum"/>
