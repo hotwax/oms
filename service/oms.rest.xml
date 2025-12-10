@@ -645,4 +645,13 @@ under the License.
             <entity name="org.apache.ofbiz.party.communication.CommunicationEvent" operation="create"/>
         </method>
     </resource>
+
+    <resource name="getProductOnlineAtp">
+        <method type="post">
+            <service name="co.hotwax.oms.product.InventoryServices.get#ProductOnlineAtp"/>
+        </method>
+        <method type="get">
+            <service name="co.hotwax.oms.product.InventoryServices.get#ProductOnlineAtp"/>
+        </method>
+    </resource>
 </resource>
