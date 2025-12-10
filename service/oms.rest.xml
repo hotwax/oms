@@ -636,10 +636,7 @@ under the License.
         </method>
     </resource>
 
-    <resource name="getProductOnlineAtp">
-        <method type="post">
-            <service name="co.hotwax.oms.product.InventoryServices.get#ProductOnlineAtp"/>
-        </method>
+    <resource name="getProductOnlineAtp" require-authentication="anonymous-all">
         <method type="get">
             <service name="co.hotwax.oms.product.InventoryServices.get#ProductOnlineAtp"/>
         </method>

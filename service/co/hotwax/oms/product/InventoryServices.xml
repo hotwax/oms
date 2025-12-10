@@ -95,24 +95,24 @@ under the License.
             <parameter name="productStoreId" required="true"/>
             <parameter name="facilityGroupId"/>
             <parameter name="productIds" type="List"/>
-            <parameter name="skus" type="List"/>
+            <parameter name="sku" type="List"/>
         </in-parameters>
         <out-parameters>
-            <parameter name="onlineAtp" type="List"/>
+            <parameter name="productOnlineAtp" type="List"/>
         </out-parameters>
         <actions>
-            <if condition="!productIds &amp;&amp; !sku">
-                <return error="true" message="Either productIds or sku are required."/>
+            <if condition="!productId &amp;&amp; !sku">
+                <return error="true" message="Either productId or sku are required."/>
             </if>
 
             <set field="productSkuMap" from="[:]"/>
-            <if condition="!productIds">
+            <if condition="!productId">
                 <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productList" use-clone="true">
                     <econdition field-name="internalName" operator="in" from="sku"/>
                     <select-field field-name="productId,internalName"/>
                 </entity-find>
                 <if condition="productList">
-                    <set field="productIds" from="productList*.productId"/>
+                    <set field="productId" from="productList*.productId"/>
                 </if>
                 <iterate list="productList" entry="p">
                     <set field="productSkuMap[p.productId]" from="p.internalName"/>
@@ -120,7 +120,7 @@ under the License.
             </if>
 
             <entity-find entity-name="co.hotwax.facility.ProductFacilityAndGroupAtp" list="productFacilityAtpList" use-clone="true">
-                <econdition field-name="productId" from="productIds" operator="in"/>
+                <econdition field-name="productId" from="productId" operator="in"/>
                 <econdition field-name="productStoreId" from="productStoreId"/>
                 <econditions combine="or">
                     <econdition field-name="allowBrokering" operator="is-null"/>
@@ -142,7 +142,7 @@ under the License.
                 <set field="reserveInventory" from="true"/>
 
                 <entity-find entity-name="co.hotwax.warehouse.VirtualFacilityOrderItemCount" list="virtualQueueCountList" use-clone="true">
-                    <econdition field-name="productId" from="productIds" operator="in"/>
+                    <econdition field-name="productId" from="productId" operator="in"/>
                     <econdition field-name="itemStatusId" operator="not-in" from="['ITEM_CANCELLED', 'ITEM_COMPLETED', 'ITEM_REJECTED']"/>
                     <select-field field-name="productId,itemCount"/>
                 </entity-find>
@@ -152,15 +152,15 @@ under the License.
                 </iterate>
             </if>
 
-            <set field="onlineAtp" from="[]"/>
+            <set field="productOnlineAtp" from="[]"/>
             <iterate list="productFacilityAtpList" entry="productFacility">
-                <set field="productId" from="productFacility.productId"/>
+                <set field="currProductId" from="productFacility.productId"/>
                 <set field="atp" from="productFacility.atp ?: 0.0" type="BigDecimal"/>
 
                 <!-- Check Allow brokering at global level and threshold value -->
                 <entity-find entity-name="co.hotwax.warehouse.ProductFacilityAndGroup" list="configProductFacilityList" cache="true" use-clone="true">
                     <econdition field-name="facilityTypeId" value="CONFIGURATION"/>
-                    <econdition field-name="productId" from="productId"/>
+                    <econdition field-name="productId" from="currProductId"/>
                     <econdition field-name="facilityGroupId" from="facilityGroupId" ignore-if-empty="true"/>
                     <select-field field-name="allowBrokering,minimumStock"/>
                     <order-by field-name="-minimumStock"/>
@@ -171,12 +171,12 @@ under the License.
 
                 <set field="configProductFacility" from="configProductFacilityList.getAt(0)"/>
                 <set field="threshold" from="configProductFacility?.minimumStock ?: 0.0" type="BigDecimal"/>
-                <set field="atp" from="atp.subtract(threshold).subtract(virtualQueueCountMap[productId]?:0.0)" type="BigDecimal"/>
+                <set field="atp" from="atp.subtract(threshold).subtract(virtualQueueCountMap[currProductId]?:0.0)" type="BigDecimal"/>
 
                 <if condition="configProductFacility &amp;&amp; 'N'.equals(configProductFacility?.allowBrokering)">
                     <set field="atp" from="0.0"/>
                 </if>
-                <script>onlineAtp.add([productId: productId, sku: productSkuMap[productId], atp: atp])</script>
+                <script>productOnlineAtp.add([productId: currProductId, sku: productSkuMap[currProductId], atp: atp])</script>
             </iterate>
         </actions>
     </service>
