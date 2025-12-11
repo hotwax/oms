@@ -1,5 +1,8 @@
 package co.hotwax.common;
 
+import java.sql.Timestamp;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -20,4 +23,12 @@ public class CommerceUtil {
         return result;
     }
 
+    public static Timestamp convertDateTimeToZone(Timestamp dateTime, ZoneId fromZoneId, ZoneId toZoneId) {
+        if (dateTime == null) { return null; }
+        if (fromZoneId == null || toZoneId == null || fromZoneId.equals(toZoneId)) { return dateTime; }
+
+        ZonedDateTime fromDateTime = dateTime.toLocalDateTime().atZone(fromZoneId);
+        ZonedDateTime toDateTime = fromDateTime.withZoneSameInstant(toZoneId);
+        return Timestamp.from(toDateTime.toInstant());
+    }
 }
