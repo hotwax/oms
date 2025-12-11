@@ -188,6 +188,11 @@
                         outFile.append(data);
                     }
                 }
+                boolean isFileCreated =  productFacilityDetailFile.exists();
+                if (!isFileCreated) {
+                    csvFilePath = null;
+                    return;
+                }
             </script>
             <log message="CSV file prepared successfully."/>
         </actions>
