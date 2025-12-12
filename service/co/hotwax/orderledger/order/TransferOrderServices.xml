@@ -655,7 +655,7 @@
                 </entity-find>
 
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
-                <set field="transferOrderItem.shippedQuantity" from="shipmentItemList?.first?.quantity"/>
+                <set field="transferOrderItem.shippedQuantity" from="shipmentItemList*.quantity.sum() ?: 0"/>
                 <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
 
                 <!-- Add the transferOrderItem map to the TransferOrderItems list -->
