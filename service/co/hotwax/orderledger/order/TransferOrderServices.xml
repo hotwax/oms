@@ -640,8 +640,8 @@
             <iterate list="orderItems" entry="orderItem">
                 <set field="transferOrderItem" from="orderItem.getPlainValueMap(0)"/>
 
-                <!-- Get total Issued quantity for the item -->
-                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                <!-- Get total Shipped quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
                     <econdition field-name="orderId" from="orderItem.orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
@@ -655,7 +655,7 @@
                 </entity-find>
 
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
-                <set field="transferOrderItem.shippedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                <set field="transferOrderItem.shippedQuantity" from="shipmentItemList?.first?.quantity"/>
                 <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
 
                 <!-- Add the transferOrderItem map to the TransferOrderItems list -->
