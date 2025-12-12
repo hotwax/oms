@@ -57,4 +57,16 @@ under the License.
         <documents dataDocumentId="OmsProduct"/>
     </moqui.entity.feed.DataFeed>
     -->
+    <dataDocuments dataDocumentId="SecurityGroupAndPermission" documentName="SecurityGroupAndPermission"
+                   primaryEntityName="org.apache.ofbiz.security.securitygroup.SecurityGroupPermission" documentTitle="Security Group And Permission">
+        <fields fieldSeqId="01" fieldPath="groupId"/>
+        <fields fieldSeqId="02" fieldPath="permissionId"/>
+        <fields fieldSeqId="03" fieldPath="fromDate"/>
+        <fields fieldSeqId="04" fieldPath="thruDate"/>
+
+        <fields fieldSeqId="05" fieldNameAlias="groupName" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:groupName"/>
+        <fields fieldSeqId="06" fieldNameAlias="description" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:description"/>
+
+        <fields fieldSeqId="07" fieldNameAlias="permissionDescription" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityPermission:description"/>
+    </dataDocuments>
 </entity-facade-xml>
