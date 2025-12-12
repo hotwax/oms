@@ -165,7 +165,7 @@
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
 
                 <!-- Get total Issued quantity for the item -->
-                <!-- NOTE: We are not getting total issued quantity from ShipmentItemView instead of ItemIssuanceSummary
+                <!-- NOTE: We are now getting total issued quantity from ShipmentItemView instead of ItemIssuanceSummary
                         since no issuance done for the WH Fulfilled Transfer Orders -->
                 <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
                     <econdition field-name="orderId" from="orderId"/>
