@@ -178,6 +178,7 @@ under the License.
                     <set field="backOrderCount" from="prendingOrderCountList.find { it.facilityId == 'BACKORDER_PARKING' }?.itemCount ?: 0.0" type="BigDecimal"/>
                     <if condition="preOrderCount > 0.0 || backOrderCount > 0.0">
                         <script>productOnlineAtp.add([productId: currProductId, sku: productSkuMap[currProductId], atp: 0.0])</script>
+                        <continue/>
                     </if>
                 </if>
                 <set field="atp" from="productFacility.atp ?: 0.0" type="BigDecimal"/>
@@ -201,7 +202,7 @@ under the License.
                 <if condition="configProductFacility &amp;&amp; 'N'.equals(configProductFacility?.allowBrokering)">
                     <set field="atp" from="0.0"/>
                 </if>
-                <script>productOnlineAtp.add([productId: currProductId, sku: productSkuMap[currProductId], atp: atp])</script>
+                <script>productOnlineAtp.add([productId: currProductId, sku: productSkuMap[currProductId], atp: Math.max(0.0, atp)])</script>
             </iterate>
         </actions>
     </service>
