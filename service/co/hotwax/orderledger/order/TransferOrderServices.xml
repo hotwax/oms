@@ -436,12 +436,12 @@
                 <message error="true">Transfer Order [ID: ${orderId}] is already in Approved status.</message>
             </if>
 
-            <!-- Check the Product Store Setting for RECEIVE_BY_FULFILL - If true or null, then there should be at-least 1 Shipment in OMS for the Transfer Order -->
+            <!-- Check the Product Store Setting for RECEIVE_BY_FULFILL - If true, then there should be at-least 1 Shipment in OMS for the Transfer Order -->
             <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="psSettingReceiveByFulfill">
                 <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
                 <field-map field-name="settingTypeEnumId" value="RECEIVE_BY_FULFILL"/>
             </entity-find-one>
-            <set field="psSettingReceiveByFulfillValue" from="psSettingReceiveByFulfill ? (psSettingReceiveByFulfill.settingValue ?: 'true') : 'false'"/>
+            <set field="psSettingReceiveByFulfillValue" from="psSettingReceiveByFulfill?.settingValue?.toLowerCase() == 'true' ? 'true' : 'false'"/>
 
             <!-- If RECEIVE_BY_FULFILL = true, validate at least one shipment exists -->
             <if condition="psSettingReceiveByFulfillValue == 'true'">
