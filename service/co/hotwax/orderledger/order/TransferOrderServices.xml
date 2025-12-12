@@ -173,7 +173,7 @@
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
-                <set field="totalShippedQty" from="shipmentItemList*.quantity.sum()"/>
+                <set field="totalShippedQty" from="shipmentItemList*.quantity.sum() ?: 0"/>
 
                  <!-- Get total Received Quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
