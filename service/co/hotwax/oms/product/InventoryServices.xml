@@ -191,6 +191,7 @@ under the License.
                 </entity-find>
                 <filter-map-list list="configProductFacilityList" to-list="configProductFacilityList">
                     <date-filter/>
+                    <date-filter from-field-name="psfFromDate" thru-field-name="psfThruDate"/>
                 </filter-map-list>
 
                 <set field="configProductFacility" from="configProductFacilityList.getAt(0)"/>
