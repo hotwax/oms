@@ -65,8 +65,9 @@ under the License.
         <fields fieldSeqId="04" fieldPath="thruDate"/>
 
         <fields fieldSeqId="05" fieldNameAlias="groupName" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:groupName"/>
-        <fields fieldSeqId="06" fieldNameAlias="description" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:description"/>
+        <fields fieldSeqId="06" fieldNameAlias="groupTypeEnumId" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:groupTypeEnumId"/>
+        <fields fieldSeqId="07" fieldNameAlias="description" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityGroup:description"/>
 
-        <fields fieldSeqId="07" fieldNameAlias="permissionDescription" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityPermission:description"/>
+        <fields fieldSeqId="08" fieldNameAlias="permissionDescription" fieldPath="org.apache.ofbiz.security.securitygroup.SecurityPermission:description"/>
     </dataDocuments>
 </entity-facade-xml>
