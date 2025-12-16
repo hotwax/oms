@@ -652,6 +652,7 @@
                 <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
                     <econdition field-name="orderId" from="orderItem.orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
 
