@@ -15,6 +15,10 @@
     <moqui.basic.Enumeration description="The BOPIS Order Completion Notification." enumCode="HANDOVER_BOPIS_ORDER" enumId="HANDOVER_BOPIS_ORDER" enumName="BOPIS Order Handover/Completion" enumTypeId="PRDS_EMAIL" relatedEnumId="SendBOPISCompletionEmail"/>
     <moqui.basic.Enumeration description="Create event on Klaviyo" enumCode="CREATE_KLAVIYO_EVENT" enumId="CREATE_KLAVIYO_EVENT" enumName="Create Klaviyo Event" enumTypeId="PRDS_EMAIL" relatedEnumId="CreateKlaviyoEvent"/>
 
+    <!-- Placeholder SystemMessageRemote used as the default UNIGATE config referenced by ProductStoreEmailSetting entries -->
+    <moqui.service.message.SystemMessageRemote systemMessageRemoteId="UNIGATE_CONFIG"
+        description="Default Unigate configuration placeholder for OMS email notifications"/>
+
     <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="REJECT_BOPIS_ORDER" productStoreId="STORE" subject="Reject BOPIS Order Item" systemMessageRemoteId="UNIGATE_CONFIG"/>
     <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="CANCEL_BOPIS_ORDER" productStoreId="STORE" subject="BOPIS Order Cancellation Email" systemMessageRemoteId="UNIGATE_CONFIG"/>
     <org.apache.ofbiz.product.store.ProductStoreEmailSetting emailType="READY_FOR_PICKUP" productStoreId="STORE" subject="Ready To Pick-Up Notification" systemMessageRemoteId="UNIGATE_CONFIG"/>
