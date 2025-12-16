@@ -165,11 +165,16 @@
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
 
                 <!-- Get total Issued quantity for the item -->
-                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
-                    <econdition field-name="orderId"/>
+                <!-- NOTE: We are now getting total issued quantity from ShipmentItemView instead of ItemIssuanceSummary
+                        since no issuance done for the WH Fulfilled Transfer Orders -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
+                    <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
+                <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
+                <set field="totalShippedQty" from="shipmentItemList*.quantity.sum() ?: 0"/>
 
                  <!-- Get total Received Quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
@@ -178,7 +183,7 @@
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
 
-                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:itemIssuanceList?.first?.quantity, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
+                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:totalShippedQty, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
             </iterate>
         </actions>
     </service>
@@ -636,10 +641,11 @@
             <iterate list="orderItems" entry="orderItem">
                 <set field="transferOrderItem" from="orderItem.getPlainValueMap(0)"/>
 
-                <!-- Get total Issued quantity for the item -->
-                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                <!-- Get total Shipped quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
                     <econdition field-name="orderId" from="orderItem.orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
 
@@ -651,7 +657,7 @@
                 </entity-find>
 
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
-                <set field="transferOrderItem.shippedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                <set field="transferOrderItem.shippedQuantity" from="shipmentItemList*.quantity.sum() ?: 0"/>
                 <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
 
                 <!-- Add the transferOrderItem map to the TransferOrderItems list -->
