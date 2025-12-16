@@ -170,6 +170,7 @@
                 <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
