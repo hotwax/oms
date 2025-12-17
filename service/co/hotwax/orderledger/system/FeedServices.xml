@@ -681,6 +681,13 @@ under the License.
                             <if condition="productAssocs">
                                 <set field="productAssocs[0].thruDate" from="ec.user.nowTimestamp"/>
                                 <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                                <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="variantShopifyShopProduct">
+                                    <econdition field-name="shopId"/>
+                                    <econdition field-name="productId" from="productAssocs[0].productIdTo"/>
+                                </entity-find>
+                                <if condition="variantShopifyShopProduct">
+                                    <service-call name="delete#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopId, shopifyProductId:variantShopifyShopProduct[0].shopifyProductId]"/>
+                                </if>
                             </if>
                         </if>
                     </iterate>
