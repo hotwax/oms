@@ -1485,7 +1485,7 @@ under the License.
                     <econdition field-name="productId" from="products?.first?.productId"/>
                     <order-by field-name="lastUpdatedStamp"/>
                 </entity-find>
-                <set field="activeCurrentShopifyShopRecords" from="shopifyShopProducts?.find { it.shopId == shopId }"/>
+                <set field="activeCurrentShopifyShopRecords" from="shopifyShopProducts?.findAll { it.shopId == shopId }" type="List"/>
                 <if condition="activeCurrentShopifyShopRecords">
                     <iterate list="activeCurrentShopifyShopRecords" entry="activeCurrentShopifyShop">
                         <if condition="activeCurrentShopifyShop.shopifyProductId != variantProductId">
