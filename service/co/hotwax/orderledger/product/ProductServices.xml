@@ -1494,6 +1494,7 @@ under the License.
                                           transaction="force-new"/>
                             <service-call name="delete#co.hotwax.product.ProductUpdateHistory"
                                           in-map="[productId:activeCurrentShopifyShop.shopifyProductId, shopId:shopId]" transaction="force-new"/>
+                            <set field="shopifyShopProducts" from="shopifyShopProducts.findAll { it.shopifyProductId != activeCurrentShopifyShop.shopifyProductId }"/>
                         </if>
                     </iterate>
                 </if>
