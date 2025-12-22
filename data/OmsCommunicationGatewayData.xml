@@ -2,6 +2,8 @@
 
 <entity-facade-xml type="ext">
 
+    <!-- EnumerationType for OMS system message type enum and relationship -->
+    <moqui.basic.EnumerationType description="OMS System Message Type Enum" enumTypeId="OMSMessageTypeEnum"/>
     <moqui.basic.Enumeration enumId="SendReadyForPickupEmail" description="Send Ready for Pickup Email" enumTypeId="OMSMessageTypeEnum"/>
     <moqui.basic.Enumeration enumId="SendBOPISRejectionEmail" description="Send BOPIS Rejection Email" enumTypeId="OMSMessageTypeEnum"/>
     <moqui.basic.Enumeration enumId="SendBOPISCancellationEmail" description="Send BOPIS Cancellation Email" enumTypeId="OMSMessageTypeEnum"/>

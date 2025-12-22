@@ -5,6 +5,9 @@
     <!-- SystemMessageType data for Error Feed file -->
     <moqui.service.message.SystemMessageType systemMessageTypeId="FeedErrorFile"/>
 
+    <!-- Parent SystemMessageType record for incoming and outgoing local feed file system message types -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="LocalFeedFile" description="Local Feed File"/>
+
     <!-- Enumeration for product type keyword -->
     <moqui.basic.Enumeration description="Product Type Enumeration" enumId="KWT_PROD_TYPE" enumTypeId="KEYWORD_TYPE" enumCode="PRODUCT_TYPE"/>
 
