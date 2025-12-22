@@ -1492,6 +1492,25 @@ under the License.
                             <service-call name="delete#co.hotwax.shopify.ShopifyShopProduct"
                                           in-map="[shopId:shopId, shopifyProductId:activeCurrentShopifyShop.shopifyProductId]"
                                           transaction="force-new"/>
+                            <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
+                                <econdition field-name="productIdTo" from="activeCurrentShopifyShop.productId"/>
+                                <econdition field-name="productAssocTypeId" value="PRODUCT_VARIANT"/>
+                                <date-filter/>
+                                <select-field field-name="productId,fromDate"/>
+                            </entity-find>
+                            <if condition="productAssocs">
+                                <entity-find entity-name="co.hotwax.shopify.ShopifyShopProduct" list="parentShopifyShopProducts">
+                                    <econdition field-name="productId" operator="in" from="productAssocs*.productId"/>
+                                    <econdition field-name="shopId" from="shopId"/>
+                                </entity-find>
+                                <if condition="parentShopifyShopProducts">
+                                    <iterate list="parentShopifyShopProducts" entry="parentShopifyShopProduct">
+                                        <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc"
+                                                      in-map="[productIdTo:activeCurrentShopifyShop.productId, productId:parentShopifyShopProduct.productId, productAssocTypeId:'PRODUCT_VARIANT', fromDate: productAssocs.find {it -> it.productId == parentShopifyShopProduct.productId }.fromDate, thruDate: ec.user.nowTimestamp]"
+                                                      transaction="force-new"/>
+                                    </iterate>
+                                </if>
+                            </if>
                             <service-call name="delete#co.hotwax.product.ProductUpdateHistory"
                                           in-map="[productId:activeCurrentShopifyShop.shopifyProductId, shopId:shopId]" transaction="force-new"/>
                             <set field="shopifyShopProducts" from="shopifyShopProducts.findAll { it.shopifyProductId != activeCurrentShopifyShop.shopifyProductId }"/>
