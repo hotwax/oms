@@ -649,5 +649,8 @@ under the License.
         <method type="post">
             <entity name="org.apache.ofbiz.party.communication.CommunicationEvent" operation="create"/>
         </method>
+        <method type="get">
+            <service name="co.hotwax.orderledger.order.email.EmailServices.get#CommunicationEvents"/>
+        </method>
     </resource>
 </resource>
