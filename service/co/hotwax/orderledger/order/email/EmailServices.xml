@@ -97,9 +97,7 @@ under the License.
                 <set field="orderData" from="new HashMap(order)"/>
                 <set field="orderData.additionalFields" from="additionalFields"/>
                 <set field="order" from="orderData"/>
-                <if condition="additionalFields.reasonEnumId">
-                    <set field="reasonEnumId" from="additionalFields.reasonEnumId"/>
-                </if>
+                <set field="reasonEnumId" from="additionalFields?.reasonEnumId"/>
             </if>
 
             <set field="order.orderDate" from="order.orderDate.toString()"/>
