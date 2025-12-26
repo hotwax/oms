@@ -555,6 +555,7 @@
 
         <alias entity-alias="ODRF" field="facilityName" name="orderFacilityName"/>
         <alias entity-alias="F" name="facilityName"/>
+        <alias name="orderFacilityExternalId" field="externalId" entity-alias="F"/>
 
         <alias entity-alias="PS" field="externalId" name="productStoreExternalId"/>
         <alias entity-alias="SI" name="orderStatusDesc" field="description"/>
