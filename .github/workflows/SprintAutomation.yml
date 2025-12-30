@@ -1,0 +1,22 @@
+name: Project Sprint Management  # This shows in the Actions sidebar
+run-name: "Move work items to next iteration - ${{ github.event.schedule }}" # This shows in the run list
+
+on:
+  schedule:
+    - cron: '0 5 * * 1' # Runs at 05:00 on Monday
+  workflow_dispatch:   # Add this to test it manually right now!
+
+jobs:
+  move-to-next-iteration:
+    name: Move to next iteration
+    runs-on: ubuntu-latest
+    steps:
+    - uses: blombard/move-to-next-iteration@master
+      with:
+        owner: hotwax
+        number: 13
+        token: ${{ secrets.SPRINT_AUTOMATION }}
+        iteration-field: Sprint
+        iteration: last
+        new-iteration: current
+        statuses: 'Approved,In Progress'
