@@ -3,7 +3,7 @@ run-name: "Move work items to next iteration - ${{ github.event.schedule }}" # T
 
 on:
   schedule:
-    - cron: '0 5 * * 1' # Runs at 05:00 on Monday
+    - cron: '30 23 * * 0' # Runs at 05:00 AM IST on Monday
   workflow_dispatch:   # Add this to test it manually right now!
 
 jobs:
@@ -17,6 +17,6 @@ jobs:
         number: 13
         token: ${{ secrets.SPRINT_AUTOMATION }}
         iteration-field: Sprint
-        iteration: last
+        iteration: <current
         new-iteration: current
         statuses: 'Approved,In Progress'
