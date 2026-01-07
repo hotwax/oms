@@ -40,15 +40,15 @@
     </seca>
 
     <!-- SECA to index order in Solr when order status becomes COMPLETED or CANCELLED -->
-    <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="post-commit">
-        <condition>
-            <expression>statusChanged</expression>
-        </condition>
-        <actions>
-            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
-                          ignore-error="true" />
-        </actions>
-    </seca>
+<!--    <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="post-commit">-->
+<!--        <condition>-->
+<!--            <expression>statusChanged</expression>-->
+<!--        </condition>-->
+<!--        <actions>-->
+<!--            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"-->
+<!--                          ignore-error="true" />-->
+<!--        </actions>-->
+<!--    </seca>-->
     <seca id="OrderItemCompleted" service="update#org.apache.ofbiz.order.order.OrderItem" when="post-commit">
         <condition>
             <expression>statusChanged &amp;&amp; statusId == 'ITEM_COMPLETED'</expression>
