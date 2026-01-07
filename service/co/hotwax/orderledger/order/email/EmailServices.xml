@@ -189,7 +189,7 @@ under the License.
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress, reasonEnumId:reasonEnumId]" out-map="communicationEvent"/>
+                    content: org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress, reasonEnumId:reasonEnumId]" out-map="communicationEvent"/>
             <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:order.orderId, communicationEventId:communicationEvent.communicationEventId]"/>
         </actions>
     </service>
