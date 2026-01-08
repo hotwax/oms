@@ -42,6 +42,11 @@ under the License.
             <method type="delete">
                 <entity name="org.apache.ofbiz.order.order.OrderHeader" operation="delete"/>
             </method>
+            <resource name="shopifyRefunds">
+                <method type="post">
+                    <service name="co.hotwax.shopify.return.ShopifyReturnServices.create#ShopifyRefunds"/>
+                </method>
+            </resource>
             <resource name="items">
                 <method type="get">
                     <entity name="org.apache.ofbiz.order.order.OrderItem" operation="list"/>
