@@ -97,6 +97,7 @@ under the License.
                 <set field="orderData" from="new HashMap(order)"/>
                 <set field="orderData.additionalFields" from="additionalFields"/>
                 <set field="order" from="orderData"/>
+                <set field="reasonEnumId" from="additionalFields?.reasonEnumId"/>
             </if>
 
             <set field="order.orderDate" from="order.orderDate.toString()"/>
@@ -188,7 +189,7 @@ under the License.
                           in-map="[systemMessageTypeId:enumValue.relatedEnumId,
                     messageText:org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), productStoreId:order.productStoreId]" out-map="systemMessage"/>
             <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[communicationEventTypeId:'SYS_MSG_EMAIL_COMM',
-                    content: orderDetail, datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress]" out-map="communicationEvent"/>
+                    content: org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(orderDetail), datetimeStarted: ec.user.nowTimestamp, messageId: systemMessage.systemMessageId, partyIdTo: partyIdTo, toString: emailAddress, subject: productStoreEmailSetting.subject, fromAddress: productStoreEmailSetting.fromAddress, reasonEnumId:reasonEnumId]" out-map="communicationEvent"/>
             <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:order.orderId, communicationEventId:communicationEvent.communicationEventId]"/>
         </actions>
     </service>
@@ -601,6 +602,26 @@ under the License.
                 </iterate>
             </iterate>
             <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
+        </actions>
+    </service>
+    <service verb="get" noun="CommunicationEvents" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="communicationEventId"/>
+            <parameter name="orderIds" type="List"/>
+            <parameter name="communicationEventTypeId"/>
+            <parameter name="reasonEnumId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="communicationEventList" type="List"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="co.hotwax.integration.CommunicationEventAndOrder" list="communicationEventList">
+                <econdition field-name="communicationEventId" from="communicationEventId" ignore-if-empty="true"/>
+                <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <econdition field-name="communicationEventTypeId" from="communicationEventTypeId" ignore-if-empty="true"/>
+                <econdition field-name="reasonEnumId" from="reasonEnumId" ignore-if-empty="true"/>
+                <select-field field-name="communicationEventId,orderId,communicationEventTypeId,content,statusId"/>
+            </entity-find>
         </actions>
     </service>
 </services>
