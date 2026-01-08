@@ -71,8 +71,10 @@ under the License.
             <parameter name="dataDocumentId" required="true"/>
             <parameter name="pageIndex" type="Integer" default-value="0"/>
             <parameter name="pageSize" type="Integer" default-value="20"/>
-            <parameter name="customParametersMap" type="Map"/>
+            <parameter name="customParametersMap" type="Map" default="[:]"/>
             <parameter name="filterByDate" type="Boolean" default-value="false"/>
+            <parameter name="fieldsToSelect"/>
+            <parameter name="distinct" type="Boolean" default-value="false"/>
         </in-parameters>
         <out-parameters>
             <parameter name="entityValueList" type="List"/>
@@ -80,14 +82,33 @@ under the License.
         <actions>
             <set field="entityName" from="'DataDocument.' + dataDocumentId"/>
             <if condition="filterByDate">
-                <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
-                    <search-form-inputs input-fields-map="context + customParametersMap"/>
-                    <date-filter/>
-                </entity-find>
+                <if condition="distinct">
+                    <entity-find entity-name="${entityName}" list="entityValueList" distinct="true" cache="false">
+                        <search-form-inputs input-fields-map="context + customParametersMap"/>
+                        <date-filter/>
+                        <select-field field-name="${fieldsToSelect}"/>
+                    </entity-find>
+                    <else>
+                        <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
+                            <search-form-inputs input-fields-map="context + customParametersMap"/>
+                            <date-filter/>
+                            <select-field field-name="${fieldsToSelect}"/>
+                        </entity-find>
+                    </else>
+                </if>
             <else>
-                <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
-                    <search-form-inputs input-fields-map="context + customParametersMap"/>
-                </entity-find>
+                <if condition="distinct">
+                    <entity-find entity-name="${entityName}" list="entityValueList" distinct="true" cache="false">
+                        <search-form-inputs input-fields-map="context + customParametersMap"/>
+                        <select-field field-name="${fieldsToSelect}"/>
+                    </entity-find>
+                    <else>
+                        <entity-find entity-name="${entityName}" list="entityValueList" cache="false">
+                            <search-form-inputs input-fields-map="context + customParametersMap"/>
+                            <select-field field-name="${fieldsToSelect}"/>
+                        </entity-find>
+                    </else>
+                </if>
             </else>
             </if>
         </actions>

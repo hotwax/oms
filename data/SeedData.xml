@@ -73,4 +73,8 @@
                                              description="Product Updates Feed New"
                                              consumeServiceName="co.hotwax.orderledger.system.FeedServices.consume#UpdatedProductHistories"/>
     <moqui.basic.Enumeration description="Products Updates Feed" enumId="ProductUpdatesFeedNew" enumTypeId="OMSMessageTypeEnum"/>
+
+    <!-- Product Store Setting for Receive items against fulfillment, mainly will be used for Wh Fulfilled TOs -->
+    <moqui.basic.Enumeration enumId="RECEIVE_BY_FULFILL" enumTypeId="PROD_STR_STNG" description="Receive items against fulfillment" enumName="Receive by fulfillment"/>
+    <org.apache.ofbiz.product.store.ProductStoreSetting productStoreId="STORE" settingTypeEnumId="RECEIVE_BY_FULFILL" settingValue="false"/>
 </entity-facade-xml>

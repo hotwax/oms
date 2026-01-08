@@ -38,6 +38,17 @@
                           ignore-error="true" />
         </actions>
     </seca>
+
+    <!-- SECA to index order in Solr when order status becomes COMPLETED or CANCELLED -->
+    <seca id="OrderHeaderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
+        <condition>
+            <expression>statusChanged</expression>
+        </condition>
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]"
+                          ignore-error="true" />
+        </actions>
+    </seca>
     <seca id="OrderItemCompleted" service="update#org.apache.ofbiz.order.order.OrderItem" when="post-commit">
         <condition>
             <expression>statusChanged &amp;&amp; statusId == 'ITEM_COMPLETED'</expression>
@@ -72,6 +83,13 @@
             <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
             <set field="orderItems" from="cancelledItems"/>
             <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" transaction="force-new" ignore-error="true"/>
+        </actions>
+    </seca>
+
+    <seca id="pickerUpdate" service="co.hotwax.oms.party.PartyServices.store#Picker"
+          when="post-service">
+        <actions>
+            <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
 </secas>

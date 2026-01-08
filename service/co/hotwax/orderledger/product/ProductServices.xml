@@ -1030,7 +1030,12 @@ under the License.
             <set field="newTotalCost" from="unitCost * affectedQuantity"/>
             <set field="totalNewQuantity" from="oldQoh + affectedQuantity"/>
             <set field="totalCost" from="oldTotalCost + newTotalCost"/>
-            <set field="weightedAvgCost" from="(totalNewQuantity &gt; 0) ? (totalCost.divide(totalNewQuantity as BigDecimal, 2, java.math.RoundingMode.HALF_UP)) : 0.0"/>
+            <if condition="oldTotalCost &lt;= 0">
+                <set field="weightedAvgCost" from="unitCost"/>
+                <else>
+                    <set field="weightedAvgCost" from="(totalNewQuantity &gt; 0) ? (totalCost.divide(totalNewQuantity as BigDecimal, 2, java.math.RoundingMode.HALF_UP)) : 0.0"/>
+                </else>
+            </if>
 
             <!-- Create new ProductAverageCost record -->
             <set field="productAverageCostMap" from="[
@@ -1223,7 +1228,7 @@ under the License.
                     def parts = [
                         productJson.handle ?: '',
                         productJson.vendor ?: '',
-                        productJson.requiresShipping ?: '',
+                        (productJson.requiresShipping ?: '').toString(),
                         (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                         (productJson.isGiftCard ?: '').toString(),
                         productJson.title ?: '',
@@ -1317,7 +1322,7 @@ under the License.
             def parts = [
                 productJson.handle ?: '',
                 productJson.vendor ?: '',
-                productJson.requiresShipping ?: '',
+                (productJson.requiresShipping ?: '').toString(),
                 (productJson.hasVariantsThatRequiresComponents ?: '').toString(),
                 (productJson.isGiftCard ?: '').toString(),
                 productJson.title ?: '',
@@ -1674,7 +1679,7 @@ under the License.
                     diffMap.id = currentVariantProductId
                     diffMap.position = variantJson.position
                     diffMap.title = variantJson.title
-                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping ?: '').toString()
+                    diffMap.requiresShipping = (variantJson.inventoryItem?.requiresShipping != null ? variantJson.inventoryItem.requiresShipping.toString() : '')
                     diffMap.requiresComponents = (variantJson.requiresComponents ?: '').toString()
                     diffMap.isGiftCard = (variantJson.product?.isGiftCard ?: '').toString()
                     diffMap.featureImageUrl = (variantJson.image?.url ?: '')

@@ -6,8 +6,8 @@
         <description>
             Service to get all Transfer Orders.
             By default, the service will return orders with status ORDER_APPROVED.
-            This supports filtering on the basis of parameters orderId, orderStatusId, itemStatusId,
-            originFacilityId, destinationFacilityId and orderName.
+            This supports filtering on the basis of parameters orderId, orderName, orderStatusId, itemStatusId,
+            originFacilityId, destinationFacilityId and keyword(orderId or orderName).
         </description>
         <in-parameters>
             <parameter name="orderId">
@@ -45,6 +45,9 @@
             <parameter name="limit" type="Integer" default="20">
                 <description>Number of records per page (default 20).</description>
             </parameter>
+            <parameter name="keyword">
+                <description>The passed value is searched in orderId and orderName with LIKE operator.</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="orders" type="List"/>
@@ -65,8 +68,12 @@
                 <econdition field-name="itemStatusId" ignore-if-empty="true"/>
                 <econdition field-name="facilityId" from="excludeOriginFacilityIds" ignore-if-empty="true" operator="not-in"/>
                 <econdition field-name="facilityId" from="originFacilityId" ignore-if-empty="true"/>
+                <econditions combine="or">
+                    <econdition field-name="orderId" operator="like" value="${keyword}%" ignore="keyword == null || keyword == ''"/>
+                    <econdition field-name="orderName" operator="like" value="${keyword}%" ignore="keyword == null || keyword == ''"/>
+                </econditions>
                 <econdition field-name="orderFacilityId" from="destinationFacilityId" ignore-if-empty="true"/>
-                <econdition field-name="orderName" operator="like" value="%${orderName}%" ignore="!orderName"/>
+                <econdition field-name="orderName" operator="like" value="${orderName}%" ignore="!orderName"/>
                 <select-field field-name="orderId,orderName,orderExternalId,orderStatusId,orderStatusDesc"/>
             </entity-find>
         </actions>
@@ -158,11 +165,16 @@
                 <set field="orderItem" from="orderItem.getPlainValueMap(0)"/>
 
                 <!-- Get total Issued quantity for the item -->
-                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
-                    <econdition field-name="orderId"/>
+                <!-- NOTE: We are now getting total issued quantity from ShipmentItemView instead of ItemIssuanceSummary
+                        since no issuance done for the WH Fulfilled Transfer Orders -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
+                    <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
+                <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
+                <set field="totalShippedQty" from="shipmentItemList*.quantity.sum() ?: 0"/>
 
                  <!-- Get total Received Quantity for the item -->
                 <entity-find entity-name="co.hotwax.shipment.ShipmentReceiptSummary" list="shipmentReceiptList">
@@ -171,7 +183,7 @@
                     <select-field field-name="orderId,orderItemSeqId,quantityAccepted"/>
                 </entity-find>
 
-                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:itemIssuanceList?.first?.quantity, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
+                <script>order.items.add(orderItem + [status:statusItem?.description, totalIssuedQuantity:totalShippedQty, totalReceivedQuantity:shipmentReceiptList?.first?.quantityAccepted])</script>
             </iterate>
         </actions>
     </service>
@@ -428,6 +440,27 @@
             <if condition="orderHeader &amp;&amp; 'ORDER_APPROVED'.equals(orderHeader.statusId)">
                 <message error="true">Transfer Order [ID: ${orderId}] is already in Approved status.</message>
             </if>
+
+            <!-- Check the Product Store Setting for RECEIVE_BY_FULFILL - If true, then there should be at-least 1 Shipment in OMS for the Transfer Order -->
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="psSettingReceiveByFulfill">
+                <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                <field-map field-name="settingTypeEnumId" value="RECEIVE_BY_FULFILL"/>
+            </entity-find-one>
+            <set field="psSettingReceiveByFulfillValue" from="psSettingReceiveByFulfill?.settingValue?.toLowerCase() == 'true' ? 'true' : 'false'"/>
+
+            <!-- If RECEIVE_BY_FULFILL = true, validate at least one shipment exists -->
+            <if condition="psSettingReceiveByFulfillValue == 'true'">
+                <!-- Check if any outbound shipment associated with the TO -->
+                <entity-find-count entity-name="org.apache.ofbiz.shipment.shipment.Shipment" count-field="shipmentCount">
+                    <econdition field-name="primaryOrderId" from="orderId"/>
+                    <econdition field-name="shipmentTypeId" value="OUT_TRANSFER"/>
+                    <econdition field-name="statusId" value="SHIPMENT_SHIPPED"/>
+                </entity-find-count>
+
+                <if condition="shipmentCount == 0">
+                    <message error="true">Transfer Order [ID: ${orderId}] cannot be approved. At least one outbound shipment is required based on RECEIVE_BY_FULFILL setting.</message>
+                </if>
+            </if>
             <check-errors/>
 
             <!-- Update the order status to ORDER_APPROVED -->
@@ -608,10 +641,11 @@
             <iterate list="orderItems" entry="orderItem">
                 <set field="transferOrderItem" from="orderItem.getPlainValueMap(0)"/>
 
-                <!-- Get total Issued quantity for the item -->
-                <entity-find entity-name="co.hotwax.shipment.ItemIssuanceSummary" list="itemIssuanceList">
+                <!-- Get total Shipped quantity for the item -->
+                <entity-find entity-name="co.hotwax.shipment.ShipmentItemView" list="shipmentItemList">
                     <econdition field-name="orderId" from="orderItem.orderId"/>
                     <econdition field-name="orderItemSeqId" from="orderItem.orderItemSeqId"/>
+                    <econdition field-name="shipmentStatusId" value="SHIPMENT_SHIPPED"/>
                     <select-field field-name="orderId,orderItemSeqId,quantity"/>
                 </entity-find>
 
@@ -623,7 +657,7 @@
                 </entity-find>
 
                 <!-- Put the shippedQuantity and receivedQuantity in transferOrderItem -->
-                <set field="transferOrderItem.shippedQuantity" from="itemIssuanceList?.first?.quantity"/>
+                <set field="transferOrderItem.shippedQuantity" from="shipmentItemList*.quantity.sum() ?: 0"/>
                 <set field="transferOrderItem.receivedQuantity" from="shipmentReceiptList?.first?.quantityAccepted"/>
 
                 <!-- Add the transferOrderItem map to the TransferOrderItems list -->
