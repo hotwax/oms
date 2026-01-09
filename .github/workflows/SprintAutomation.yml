@@ -17,6 +17,6 @@ jobs:
         number: 13
         token: ${{ secrets.SPRINT_AUTOMATION }}
         iteration-field: Sprint
-        iteration: <current
+        iteration: last
         new-iteration: current
         statuses: 'Approved,In Progress'
