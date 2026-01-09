@@ -92,4 +92,10 @@
             <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
+
+    <seca id="transferOrderApprovalNotification" service="co.hotwax.orderledger.order.TransferOrderServices.approve#WhFulfillTransferOrder" when="post-service">
+        <actions>
+            <service-call name="co.hotwax.oms.order.TransferOrderNotificationServices.send#TransferOrdReceivedNotification" in-map="context"/>
+        </actions>
+    </seca>
 </secas>
