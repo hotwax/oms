@@ -22,7 +22,7 @@ under the License.
             <parameter name="orderId" required="true"/>
         </in-parameters>
         <actions>
-            <log message="sending notigication for transfer order ${orderId}"/>
+            <log message="sending notification for transfer order ${orderId}"/>
             <set field="topicEnumId" value="NEW_TRANSFER_ODR"/>
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroups" distinct="true">
                 <econdition field-name="orderId"/>
