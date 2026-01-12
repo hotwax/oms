@@ -638,7 +638,7 @@ under the License.
                 </entity-find-count>
                 <if condition="orderItemCount > 0">
                     <!-- Call create#NoteData service to add Capture tag as a note -->
-                    <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:productStoreSetting.settingValue, noteDateTime:ec.user.nowTimestamp]" out-map="noteDataResponse"/>
+                    <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:productStoreSetting.settingValue, noteDateTime:ec.user.nowTimestamp, noteParty:ec.user.getUserAccount()?.partyId]" out-map="noteDataResponse"/>
                     <!-- Call create#OrderHeaderNote service to associate the created note to the order -->
                     <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, internalNote:'N', noteId:noteDataResponse.noteId]"/>
                 </if>
