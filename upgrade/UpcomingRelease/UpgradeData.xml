@@ -8,4 +8,6 @@
     <moqui.service.job.ServiceJob serviceName="co.hotwax.orderledger.order.email.EmailServices.process#PendingEmailRequests"
         cronExpression="0 0 0 * * ?" paused="Y"/>
     <Enumeration enumId="CH_BOPIS_TO_STS" enumTypeId="ODR_ITM_CH_REASON" enumCode="BOPIS_TO_STS_CONV" description="Converted to Ship-to-Store from BOPIS" sequenceId="03" />
+    <moqui.basic.Enumeration enumId="HANDOVER_PROOF" enumName="Proof of handover" enumTypeId="PROD_STR_STNG" description="Enable proof of handover in BOPIS app"/>
+    <org.apache.ofbiz.product.store.ProductStoreSetting productStoreId="STORE" settingName="HANDOVER_PROOF" settingValue="false" />
 </entity-facade-xml>
