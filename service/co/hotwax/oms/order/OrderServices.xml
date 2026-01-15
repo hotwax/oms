@@ -607,4 +607,42 @@ under the License.
             <parameter name="topicEnumId" required="true"/>
         </in-parameters>
     </service>
+
+    <service verb="check" noun="OrderItemAndCapturePayment">
+        <description>If one item completed except the preorder item then send Capture payment tag to Shopify</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader"/>
+            <if condition="!orderHeader || orderHeader.statusId == 'ORDER_CANCELLED'">
+                <return/>
+            </if>
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="productStoreSetting">
+                <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                <field-map field-name="settingTypeEnumId" value="CAPTURE_PAYMENT_TAG"/>
+            </entity-find-one>
+            <if condition="!productStoreSetting ||  productStoreSetting.settingValue == null">
+                <log level="error" message="Capture payment tag data missing"/>
+                <return/>
+            </if>
+            <entity-find-count entity-name="co.hotwax.order.OrderHeaderNoteView" count-field="orderHeaderNoteCount">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="noteInfo" from="productStoreSetting.settingValue"/>
+            </entity-find-count>
+            <if condition="orderHeaderNoteCount == 0">
+                <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItemAndProduct" count-field="orderItemCount">
+                    <econdition field-name="statusId" value="ITEM_COMPLETED"/>
+                    <econdition field-name="isPhysical" value="Y"/>
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find-count>
+                <if condition="orderItemCount > 0">
+                    <!-- Call create#NoteData service to add Capture tag as a note -->
+                    <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:productStoreSetting.settingValue, noteDateTime:ec.user.nowTimestamp, noteParty:ec.user.getUserAccount()?.partyId]" out-map="noteDataResponse"/>
+                    <!-- Call create#OrderHeaderNote service to associate the created note to the order -->
+                    <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, internalNote:'N', noteId:noteDataResponse.noteId]"/>
+                </if>
+            </if>
+        </actions>
+    </service>
 </services>
