@@ -137,6 +137,11 @@ under the License.
                 <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
             </method>
         </resource>
+        <resource name="sendEmailNotification">
+            <method type="post">
+                <service name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"/>
+            </method>
+        </resource>
         <resource name="pickup">
             <method type="get"><service name="co.hotwax.orderledger.order.OrderServices.get#PickupOrders"/></method>
             <id name="orderId">

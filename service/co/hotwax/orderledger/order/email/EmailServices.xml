@@ -28,6 +28,7 @@ under the License.
                 <description>Used to send additional data for the master payload</description>
             </parameter>
             <parameter name="emailAddress"/>
+            <parameter name="sendEmailToStore" default-value="N"/>
         </in-parameters>
         <actions>
             <if condition="!orderId &amp;&amp; !shipmentId">
@@ -169,7 +170,17 @@ under the License.
             <set field="order.lastName" from="person.lastName"/>
 
             <if condition="!emailAddress">
-                <set field="emailAddress" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+                <if condition="sendEmailToStore == 'N'">
+                    <set field="emailAddress" from="order.contactMechs?.find { it.contactMechPurposeTypeId == 'ORDER_EMAIL' }?.contactMech?.infoString "/>
+                    <else>
+                        <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
+                            <econdition field-name="facilityId" from="order?.facilityAddress?.facilityId"/>
+                            <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
+                            <date-filter/>
+                        </entity-find>
+                        <set field="emailAddress" from="facilityContactDetail?.infoString[0].toString()"/>
+                    </else>
+                </if>
                 <if condition="!emailAddress">
                     <return error="true" message="Could not send ${emailType} email, No email address found for the order with ID ${orderId}."/>
                 </if>
