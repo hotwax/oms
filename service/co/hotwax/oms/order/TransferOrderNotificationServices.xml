@@ -45,4 +45,86 @@ under the License.
             </if>
         </actions>
     </service>
+
+    <service verb="send" noun="OpenTransferOrdNotification">
+        <in-parameters>
+            <parameter name="facilityId" required="true"/>
+            <parameter name="openTransferOrderCount" required="true"/>
+            <parameter name="totalOpenTransferOrderItemsCount" required="true"/>
+        </in-parameters>
+        <actions>
+            <log message="Sending notification for open transfer orders in facility ${facilityId}"/>
+            <set field="topicEnumId" value="OPEN_TRANSFER_ODR"/>
+
+            <entity-find-one entity-name="moqui.basic.Enumeration" value-field="enumeration" cache="true">
+                <field-map field-name="enumId" from="topicEnumId"/>
+            </entity-find-one>
+            <if condition="enumeration">
+                <service-call name="co.hotwax.oms.order.OrderNotificationServices.build#TopicName" in-map="[facilityId: facilityId, topicEnumId: topicEnumId]" out-map="context"/>
+                <script>
+                    ec.makeNotificationMessage()
+                     .topic(topicName)
+                     .type("info")
+                     .title(enumeration.enumName)
+                     .message([body: "You have ${openTransferOrderCount} transfer orders with ${totalOpenTransferOrderItemsCount} items pending receipt in " + facility.facilityName + "."])
+                     .send()
+                </script>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="find" noun="PendingTransferOrdersForToday" authenticate="anonymous-all">
+        <description>Find all transfer orders with pending items for all facilities and send notifications</description>
+        <actions>
+            <log message="Starting: Find pending transfer orders for all facilities"/>
+
+            <!-- Get all active facilities (non-virtual) -->
+            <entity-find entity-name="co.hotwax.facility.FacilityAndType" list="facilityList" cache="true">
+                <econdition field-name="parentTypeId" operator="not-equals" value="VIRTUAL_FACILITY"/>
+                <econdition field-name="parentTypeId" operator="is-not-null"/>
+                <select-field field-name="facilityId,facilityName"/>
+            </entity-find>
+
+            <log message="Found ${facilityList.size()} active facilities to process"/>
+
+            <!-- Process each facility -->
+            <iterate list="facilityList" entry="facility">
+                <log message="Processing facility: ${facility.facilityId} - ${facility.facilityName}"/>
+
+                <!-- Initialize counts for this facility -->
+                <set field="orderCount" from="0"/>
+                <set field="itemCount" from="0"/>
+                <set field="processedOrders" from="[:]"/>
+
+                <!-- Find all transfer order items pending receipt for this facility -->
+                <entity-find entity-name="co.hotwax.oms.order.TransferOrderAndItem" list="pendingItems">
+                    <econdition field-name="orderTypeId" value="TRANSFER_ORDER"/>
+                    <econdition field-name="orderFacilityId" from="facility.facilityId"/>
+                    <econdition field-name="orderStatusId" operator="equals" value="ORDER_APPROVED"/>
+                    <econdition field-name="itemStatusId" operator="equals" value="ITEM_PENDING_RECEIPT"/>
+                    <order-by field-name="orderId"/>
+                </entity-find>
+
+                <!-- Process each pending item -->
+                <iterate list="pendingItems" entry="pendingItem">
+                    <!-- Track unique orders -->
+                    <if condition="!processedOrders.containsKey(pendingItem.orderId)">
+                        <set field="orderCount" from="orderCount + 1"/>
+                        <set field="processedOrders[pendingItem.orderId]" from="true"/>
+                    </if>
+                    <!-- Count all items -->
+                    <set field="itemCount" from="itemCount + pendingItem.quantity"/>
+                </iterate>
+
+                <log message="Facility ${facility.facilityName} has ${orderCount} orders with ${itemCount} items pending receipt"/>
+
+                <!-- Send notification if there are pending orders -->
+                <if condition="orderCount &gt; 0">
+                    <service-call name="co.hotwax.oms.order.TransferOrderNotificationServices.send#OpenTransferOrdNotification"
+                        in-map="[facilityId: facility.facilityId, openTransferOrderCount: orderCount, totalOpenTransferOrderItemsCount: itemCount]" ignore-error="true"/>
+                </if>
+            </iterate>
+            <log message="Completed processing transfer order notifications for all facilities"/>
+        </actions>
+    </service>
 </services>
