@@ -624,4 +624,94 @@ under the License.
             </entity-find>
         </actions>
     </service>
+    <!-- This is a temporary service. Once the cancellation secas in SM is migrated to maarg we can remove this. -->
+    <service verb="send" noun="BulkBopisOrderCancelledEmailToStore" authenticate="anonymous-all">
+        <description>
+            Service to send bulk BOPIS order cancelled email to store for orders cancelled within a specified time frame.
+        </description>
+        <in-parameters>
+            <parameter name="orderIds"/>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="emailType" default-value="CANCEL_BOPIS_ORDER"/>
+            <parameter name="jobName">
+                <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
+            </parameter>
+            <parameter name="sinceDate"/>
+        </in-parameters>
+        <actions>
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <!-- Fetch last run time if jobName is provided and sinceDate is not -->
+            <if condition="jobName &amp;&amp; !sinceDate">
+                <entity-find-one entity-name="moqui.service.job.ServiceJobParameter" value-field="lastRunParam">
+                    <field-map field-name="jobName"/>
+                    <field-map field-name="parameterName" value="lastRunTime"/>
+                </entity-find-one>
+                <set field="sinceDate" from="lastRunParam?.parameterValue"/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
+            <!-- Find canceled BOPIS orders within the specified time frame -->
+            <entity-find entity-name="co.hotwax.order.OrderHeaderAndFacilityChange" list="ordersIterator" distinct="true">
+                <econdition field-name="statusId" value="ORDER_CANCELLED"/>
+                <econdition field-name="orderTypeId" value="SALES_ORDER"/>
+                <econdition field-name="facilityId" value="PICKUP_REJECTED"/>
+                <econdition field-name="productStoreId" from="productStoreId"/>
+                <econdition field-name="statusDatetime" operator="greater-equals" from="sinceDate"/>
+                <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <select-field field-name="orderId,orderItemSeqId,fromFacilityId"/>
+                <use-iterator/>
+            </entity-find>
+
+            <if condition="!ordersIterator.hasNext()">
+                <return message="No valid BOPIS cancelled orders found at ${nowDate}, not sending notification email to store."/>
+            </if>
+            <set field="orderItemsFacility" from="[:]"/>
+            <script>
+                ordersIterator.each { o ->
+                def oid = o.orderId
+                def fid = o.fromFacilityId
+                def seq = o.orderItemSeqId
+
+                if (oid &amp;&amp; fid &amp;&amp; seq) {
+                orderItemsFacility.computeIfAbsent(oid) { [:] }.computeIfAbsent(fid) { [] } &lt;&lt; seq
+                }
+                }
+            </script>
+
+            <log message="============ orderItemsFacility: ${orderItemsFacility} =============="/>
+
+            <!-- send email for each facility -->
+            <iterate list="orderItemsFacility.keySet()" entry="orderId">
+                <set field="facilitiesMap" from="orderItemsFacility[orderId]"/>
+                <iterate list="facilitiesMap.keySet()" entry="facilityId">
+                    <set field="itemSeqIds" from="facilitiesMap[facilityId]"/>
+                    <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
+                        <econdition field-name="facilityId" from="facilityId"/>
+                        <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
+                        <date-filter/>
+                    </entity-find>
+                    <set field="emailAddress" from="facilityContactDetail?.first()?.infoString ?: 'NO_EMAIL_FOUND'"/>
+
+                    <log message="==================== Sending email for order ${orderId}, facility ${facilityId}, items: ${itemSeqIds}, to: ${emailAddress}"/>
+                    <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
+                                  in-map="[orderId: orderId,orderItems: itemSeqIds,emailType: emailType,emailAddress: emailAddress]" async="true"/>
+                </iterate>
+            </iterate>
+
+            <!-- Update job parameter if jobName is provided -->
+            <if condition="jobName">
+                <service-call name="update#moqui.service.job.ServiceJobParameter"
+                              in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+            <return message="Bulk BOPIS Order Cancelled Email To Store Service Ran Successfully At ${nowDate}."/>
+        </actions>
+    </service>
 </services>
