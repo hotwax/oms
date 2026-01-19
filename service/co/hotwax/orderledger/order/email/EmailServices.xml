@@ -655,17 +655,11 @@ under the License.
             <set field="orderItemsFacility" from="[:]"/>
             <script>
                 ordersIterator.each { o ->
-                    def oid = o.orderId
-                    def fid = o.fromFacilityId
-                    def seq = o.orderItemSeqId
-
-                    if (oid &amp;&amp; fid &amp;&amp; seq) {
-                            orderItemsFacility.computeIfAbsent(oid) { [:] }.computeIfAbsent(fid) { [] } &lt;&lt; seq
+                    if (o.orderId &amp;&amp; o.fromFacilityId &amp;&amp; o.orderItemSeqId) {
+                        orderItemsFacility.computeIfAbsent(o.orderId) { [:] }.computeIfAbsent(o.fromFacilityId) { [] } &lt;&lt; [orderId: o.orderId, orderItemSeqId: o.orderItemSeqId]
                     }
                 }
             </script>
-
-            <log message="============ orderItemsFacility: ${orderItemsFacility} =============="/>
 
             <!-- send email for each facility -->
             <iterate list="orderItemsFacility.keySet()" entry="orderId">
@@ -679,7 +673,6 @@ under the License.
                     </entity-find>
                     <set field="emailAddress" from="facilityContactDetail?.first()?.infoString ?: 'NO_EMAIL_FOUND'"/>
 
-                    <log message="==================== Sending email for order ${orderId}, facility ${facilityId}, items: ${itemSeqIds}, to: ${emailAddress}"/>
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                   in-map="[orderId: orderId,orderItems: itemSeqIds,emailType: emailType,emailAddress: emailAddress]" async="true"/>
                 </iterate>
