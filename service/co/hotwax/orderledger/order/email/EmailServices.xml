@@ -603,4 +603,74 @@ under the License.
             <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
         </actions>
     </service>
+    <service verb="send" noun="BulkOrderCompletedEmails" authenticate="anonymous-all">
+        <description>
+            Send bulk emails for recently completed orders (similar to OFBiz bulkSendOrderCompletedMail).
+            Processes orders completed since last sync (or last 'frequency' minutes).
+        </description>
+        <in-parameters>
+            <parameter name="productStoreId" required="true"/>
+            <parameter name="emailType" default-value="PRDS_ORD_COMPLETED"/>
+            <parameter name="jobName">
+                <description>The name of the scheduled job to fetch the last run time for preparing the Feed.</description>
+            </parameter>
+            <parameter name="sinceDate">
+                <description>Parameter to fetch system messages updated after the specified date.</description>
+            </parameter>
+        </in-parameters>
+        <actions>
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <!-- Fetch last run time if jobName is provided and sinceDate is not -->
+            <if condition="jobName &amp;&amp; !sinceDate">
+                <entity-find-one entity-name="moqui.service.job.ServiceJobParameter" value-field="lastRunParam">
+                    <field-map field-name="jobName"/>
+                    <field-map field-name="parameterName" value="lastRunTime"/>
+                </entity-find-one>
+                <set field="sinceDate" from="lastRunParam?.parameterValue"/>
+            </if>
+
+            <entity-find-one entity-name="moqui.product.store.ProductStoreEmailSetting" value-field="productStoreEmail" cache="true">
+                <field-map field-name="productStoreId" from="productStoreId"/>
+                <field-map field-name="emailType" from="emailType"/>
+            </entity-find-one>
+
+            <if condition="!productStoreEmail">
+                <return message="No product store email setting found for email type ${emailType}"/>
+            </if>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderStatus" list="completedStatuses" distinct="true">
+                <econdition field-name="statusId" value="ORDER_COMPLETED"/>
+                 <econdition field-name="productStoreId" from="productStoreId"/>
+                <econdition field-name="statusDatetime" operator="greater-equals" from="sinceDate"/>
+                <order-by field-name="statusDatetime"/>
+                <use-iterator/>
+            </entity-find>
+
+            <iterate list="completedStatuses" entry="status">
+                <set field="orderId" from="status.orderId"/>
+                <entity-find-count entity-name="OrderItemShipGroup" count-field="shipToStoreCount">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="shipmentMethodTypeId" value="SHIP_TO_STORE"/>
+                </entity-find-count>
+
+                <if condition="shipToStoreCount > 0">
+                    <continue/>
+                </if>
+
+                <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
+                              in-map="[orderId: order.orderId, emailType: emailType]" async="true"/>
+
+                <if condition="">
+                    <log level="error" message="Failed to send completed order email for order ${orderId}: ${ec.service.getErrorMessage(emailResult)}"/>
+                </if>
+            </iterate>
+
+            <!-- Update job parameter if jobName is provided -->
+            <if condition="jobName">
+                <service-call name="update#moqui.service.job.ServiceJobParameter"
+                              in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+            <return type="success" message="Bulk order completed email processing finished. Processed since ${nowDate}."/>
+        </actions>
+    </service>
 </services>
