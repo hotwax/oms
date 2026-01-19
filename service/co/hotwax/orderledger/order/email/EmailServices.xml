@@ -648,7 +648,7 @@ under the License.
 
             <iterate list="completedStatuses" entry="status">
                 <set field="orderId" from="status.orderId"/>
-                <entity-find-count entity-name="OrderItemShipGroup" count-field="shipToStoreCount">
+                <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" count-field="shipToStoreCount">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="shipmentMethodTypeId" value="SHIP_TO_STORE"/>
                 </entity-find-count>
