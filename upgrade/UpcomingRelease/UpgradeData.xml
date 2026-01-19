@@ -1,13 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
-    <moqui.basic.Enumeration enumId="SEND_QUEUED_EMAILS" enumCode="SEND_QUEUED_EMAILS" description="Processes and sends all queued email communications" enumTypeId="ORDER_SYS_JOB"/>
-    <Product productId="SEND_QUEUED_EMAILS" productTypeId="SERVICE" internalName="SEND_QUEUED_EMAILS"
-        productName="Bulk Approve Warehouse Fulfill Transfer Orders" description="Processes and sends all queued email communications"
-        primaryProductCategoryId="MISC_SYS_JOB"/>
-    <ProductCategoryMember productId="SEND_QUEUED_EMAILS" productCategoryId="MISC_SYS_JOB" fromDate="2024-01-01 00:00:00.0"/>
-    <moqui.service.job.ServiceJob serviceName="co.hotwax.orderledger.order.email.EmailServices.process#PendingEmailRequests"
-        cronExpression="0 0 0 * * ?" paused="Y"/>
-    <Enumeration enumId="CH_BOPIS_TO_STS" enumTypeId="ODR_ITM_CH_REASON" enumCode="BOPIS_TO_STS_CONV" description="Converted to Ship-to-Store from BOPIS" sequenceId="03" />
-    <moqui.basic.Enumeration enumId="HANDOVER_PROOF" enumName="Proof of handover" enumTypeId="PROD_STR_STNG" description="Enable proof of handover in BOPIS app"/>
-    <org.apache.ofbiz.product.store.ProductStoreSetting productStoreId="STORE" settingTypeEnumId="HANDOVER_PROOF" settingValue="false" />
 </entity-facade-xml>
