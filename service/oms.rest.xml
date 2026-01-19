@@ -131,6 +131,11 @@ under the License.
                     <entity name="org.apache.ofbiz.order.order.OrderStatus" operation="list"/>
                 </method>
             </resource>
+            <resource name="attributes" description="OrderAttributes associated with an Order.">
+                <method type="get">
+                    <entity name="org.apache.ofbiz.order.order.OrderAttribute" operation="list"/>
+                </method>
+            </resource>
         </id>
         <resource name="pickupScheduledNotification">
             <method type="post">
@@ -643,6 +648,9 @@ under the License.
     <resource name="communicationEvents">
         <method type="post">
             <entity name="org.apache.ofbiz.party.communication.CommunicationEvent" operation="create"/>
+        </method>
+        <method type="get">
+            <service name="co.hotwax.orderledger.order.email.EmailServices.get#CommunicationEvents"/>
         </method>
     </resource>
 
