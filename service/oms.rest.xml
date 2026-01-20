@@ -659,4 +659,12 @@ under the License.
             <service name="co.hotwax.oms.product.InventoryServices.get#ProductOnlineAtp"/>
         </method>
     </resource>
+    <resource name="product" require-authentication="anonymous-all">
+        <method type="post">
+            <service name="co.hotwax.orderledger.product.ProductServices.create#ProductAndVariants"/>
+        </method>
+        <method type="put">
+            <service name="co.hotwax.orderledger.product.ProductServices.update#ProductAndVariants"/>
+        </method>
+    </resource>
 </resource>
