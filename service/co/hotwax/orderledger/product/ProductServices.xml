@@ -73,9 +73,6 @@ under the License.
                 </if>
             </if>
 
-            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:true]" ignore-error="true"/>
-            <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
-
             <if condition="variantErrors">
                 <script>
                     ec.message.addError(variantErrors.toString())
@@ -131,6 +128,10 @@ under the License.
             <!-- Create ShopifyShopProduct record -->
             <service-call name="store#co.hotwax.shopify.ShopifyShopProduct" in-map="[shopId:shopifyShopProduct.shopId,
                     productId:productId,shopifyProductId:shopifyShopProduct.shopifyProductId]" out-map="context"/>
+
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:productId]"
+                          transaction="force-new" ignore-error="true"/>
+            <log level="info" message="Created product index for oms productId : ${productId}"/>
         </actions>
     </service>
 
@@ -223,6 +224,9 @@ under the License.
                 <log message="Not creating Shopify Shop Product record as ShopifyShopProduct map is missing for [${createProductOut.productId}]"/>
             </else>
             </if>
+            <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:productId]"
+                    transaction="force-new" ignore-error="true"/>
+            <log level="info" message="Created product index for oms productId : ${productId}"/>
         </actions>
     </service>
 
@@ -318,19 +322,19 @@ under the License.
 
                 <!-- Set the parentProductId returned from create#VirtualProduct service -->
                 <set field="parentProductId" from="createVirtualProductOut.productId"/>
-                <set field="existingParentProduct" from="false"/>
+                <!--<set field="existingParentProduct" from="false"/>-->
                 <else>
                     <!-- Call update#VirtualProduct service -->
                     <service-call name="co.hotwax.orderledger.product.ProductServices.update#VirtualProduct"
                                   in-map="[productJson:payload]" out-map="updateVirtualProductOut" transaction="force-new"/>
 
-                    <set field="existingParentProduct" from="true"/>
+                    <!--<set field="existingParentProduct" from="true"/>
                     <set field="parentProductId" from="updateVirtualProductOut.productId"/>
                     <set field="parentProductUpdatedInfo" from="updateVirtualProductOut.updatedInfo"/>
                     <set field="parentProductKeywords" from="updateVirtualProductOut.keywords"/>
                     <set field="parentProductDeleteProductKeywords" from="updateVirtualProductOut.deleteProductKeywords"/>
                     <set field="parentProductFeatureAppls" from="updateVirtualProductOut.featureAppls"/>
-                    <set field="parentProductDeleteFeatureAppls" from="updateVirtualProductOut.deleteProductFeatureAppls"/>
+                    <set field="parentProductDeleteFeatureAppls" from="updateVirtualProductOut.deleteProductFeatureAppls"/>-->
                 </else>
             </if>
 
@@ -358,7 +362,7 @@ under the License.
                         ec.message.clearAll();
                     ]]>
                 </script>
-                <if condition="actionResult.productId">
+                <!--<if condition="actionResult.productId">
                     <set field="variantProductIds" from="variantProductIds + actionResult.productId"/>
                     <if condition="actionResult.featureAppls">
                         <set field="variantProductFeatureAppls[actionResult.productId]" from="actionResult.featureAppls"/>
@@ -378,7 +382,7 @@ under the License.
                     <if condition="actionResult.updatedInfo">
                         <set field="variantProductUpdatedInfo[actionResult.productId]" from="actionResult.updatedInfo"/>
                     </if>
-                </if>
+                </if>-->
             </iterate>
             <if condition="variantProductIds">
                 <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="productAssocs">
@@ -391,17 +395,17 @@ under the License.
                     </iterate>
                 </if>
             </if>
-            <set field="isVirtualUpdated" from="parentProductKeywords || parentProductFeatureAppls || parentProductDeleteProductKeywords || parentProductDeleteFeatureAppls || parentProductUpdatedInfo"/>
-            <set field="anyVariantUpdated" from="variantProductFeatureAppls || variantProductDeleteFeatureAppls || variantProductIdentifications || variantProductPrices || variantProductAssocs || variantProductUpdatedInfo"/>
-            <set field="indexVariants" from="anyVariantUpdated"/>
-            <if condition="!existingParentProduct">
+            <!--<set field="isVirtualUpdated" from="parentProductKeywords || parentProductFeatureAppls || parentProductDeleteProductKeywords || parentProductDeleteFeatureAppls || parentProductUpdatedInfo"/>-->
+            <!--<set field="anyVariantUpdated" from="variantProductFeatureAppls || variantProductDeleteFeatureAppls || variantProductIdentifications || variantProductPrices || variantProductAssocs || variantProductUpdatedInfo"/>-->
+            <!--<set field="indexVariants" from="anyVariantUpdated"/>-->
+         <!--   <if condition="!existingParentProduct">
                 <set field="isVirtualUpdated" from="true"/>
-            </if>
+            </if>-->
 
-            <if condition="isVirtualUpdated || anyVariantUpdated">
+            <!--<if condition="isVirtualUpdated || anyVariantUpdated">
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:parentProductId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
                 <log level="info" message="Created product index for oms productId : ${parentProductId}"/>
-            </if>
+            </if>-->
 
             <if condition="variantErrors">
                 <script>
@@ -656,6 +660,12 @@ under the License.
                     <service-call name="delete#org.apache.ofbiz.product.product.ProductKeyword" in-map="productKeyword"/>
                 </iterate>
             </if>
+
+            <set field="isVirtualUpdated" from="keywords || featureAppls || deleteProductKeywords || deleteFeatureAppls || updatedInfo"/>
+            <if condition="isVirtualUpdated">
+                <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:productId]" ignore-error="true" transaction="force-new"/>
+                <log level="info" message="Created product index for oms productId : ${productId}"/>
+            </if>
         </actions>
     </service>
 
@@ -760,6 +770,11 @@ under the License.
                     </if>
                 </else>
             </if>
+            <set field="isVariantUpdated" from="featureAppls || deleteProductFeatureAppls || identifications || prices || assocs || updatedInfo"/>
+            <if condition="isVariantUpdated">
+               <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:productId]" ignore-error="true" transaction="force-new"/>
+               <log level="info" message="Created product index for oms productId : ${productId}"/>
+           </if>
         </actions>
     </service>
     <service verb="update" noun="ExternalProductVariant">
