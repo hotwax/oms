@@ -664,7 +664,7 @@ under the License.
                 <econdition field-name="orderTypeId" value="SALES_ORDER"/>
                 <econdition field-name="facilityId" value="PICKUP_REJECTED"/>
                 <econdition field-name="productStoreId" from="productStoreId"/>
-                <econdition field-name="statusDatetime" operator="greater-equals" from="sinceDate"/>
+                <econdition field-name="statusDatetime" operator="greater" from="sinceDate"/>
                 <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
                 <select-field field-name="orderId,orderItemSeqId,fromFacilityId"/>
                 <use-iterator/>
@@ -692,7 +692,11 @@ under the License.
                         <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
                         <date-filter/>
                     </entity-find>
-                    <set field="emailAddress" from="facilityContactDetail?.first()?.infoString ?: 'NO_EMAIL_FOUND'"/>
+                    <set field="emailAddress" from="facilityContactDetail?.first()?.infoString"/>
+                    <if condition="!emailAddress">
+                        <log message="No email address found for facility ${facilityId}, skipping email for order ${orderId}."/>
+                        <continue/>
+                    </if>
 
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                   in-map="[orderId: orderId,orderItems: itemSeqIds,emailType: emailType,emailAddress: emailAddress]" async="true"/>
