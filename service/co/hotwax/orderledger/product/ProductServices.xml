@@ -158,11 +158,12 @@ under the License.
             <!-- Check if the product already exists -->
             <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
                 <econdition field-name="internalName" from="productVariantJson.internalName"/>
+                <econdition field-name="productTypeId" operator="not-equals" value="DRAFT_PRODUCT"/>
             </entity-find>
-
             <!-- Set productId in the productVariantMap if the productId exists -->
-            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
-
+            <if condition="productsList">
+                <set field="productVariantJson.productId" from="productsList.first?.productId"/>
+            </if>
             <!-- Set the shopifyShopProductMap from productVariantJsonMap -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
@@ -689,11 +690,12 @@ under the License.
             <!-- Check if the product already exists -->
             <entity-find entity-name="org.apache.ofbiz.product.product.Product" list="productsList">
                 <econdition field-name="internalName" from="productVariantJson.internalName"/>
+                <econdition field-name="productTypeId" operator="not-equals" value="DRAFT_PRODUCT"/>
             </entity-find>
-
             <!-- Set productId in the productVariantMap if the productId exists -->
-            <set field="productVariantJson.productId" from="productsList?.first?.productId"/>
-
+            <if condition="productsList">
+                <set field="productVariantJson.productId" from="productsList.first?.productId"/>
+            </if>
             <!-- Set the shopifyShopProduct record from the productJson -->
             <set field="shopifyShopProduct" from="productVariantJson.remove('shopifyShopProduct')"/>
 
