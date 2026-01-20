@@ -191,7 +191,39 @@
     <service verb="create" noun="TransferOrder">
         <description>Create a Transfer Order</description>
         <in-parameters>
-            <parameter name="payload" type="Map" required="true"/>
+            <parameter name="payload" type="Map" required="true">
+                <parameter name="externalId"/>
+                <parameter name="orderName"/>
+                <parameter name="productStoreId"/>
+                <parameter name="statusId"/>
+                <parameter name="orderTypeId"/>
+                <parameter name="orderDate"/>
+                <parameter name="statusFlowId"/>
+                <parameter name="grandTotal"/>
+                <parameter name="entryDate"/>
+                <parameter name="originFacilityId"/>
+
+                <parameter name="shipGroups" type="List">
+                    <parameter name="shipGroup" type="Map">
+                        <parameter name="shipmentMethodTypeId"/>
+                        <parameter name="carrierPartyId"/>
+                        <parameter name="facilityId"/>
+                        <parameter name="orderFacilityId"/>
+
+                        <parameter name="items" type="List">
+                            <parameter name="item" type="Map">
+                                <parameter name="externalId"/>
+                                <parameter name="orderItemTypeId"/>
+                                <parameter name="quantity"/>
+                                <parameter name="statusId"/>
+                                <parameter name="unitListPrice"/>
+                                <parameter name="unitPrice"/>
+                                <parameter name="productId"/>
+                            </parameter>
+                        </parameter>
+                    </parameter>
+                </parameter>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="orderId">
