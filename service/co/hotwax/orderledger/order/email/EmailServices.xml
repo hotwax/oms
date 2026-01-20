@@ -681,7 +681,7 @@ under the License.
                     }
                 }
             </script>
-
+            <log message="============== Order Items Facility Map: ${orderItemsFacility} =============="/>
             <!-- send email for each facility -->
             <iterate list="orderItemsFacility.keySet()" entry="orderId">
                 <set field="facilitiesMap" from="orderItemsFacility[orderId]"/>
@@ -697,7 +697,7 @@ under the License.
                         <log message="No email address found for facility ${facilityId}, skipping email for order ${orderId}."/>
                         <continue/>
                     </if>
-
+                    <log message="===================== Sending Cancelled BOPIS Order Email to Store for Order ID: ${orderId}, Facility ID: ${facilityId}, Email Address: ${emailAddress}, productStoreId: ${productStoreId} ====================="/>
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                   in-map="[orderId: orderId,orderItems: itemSeqIds,emailType: emailType,emailAddress: emailAddress]" async="true"/>
                 </iterate>
