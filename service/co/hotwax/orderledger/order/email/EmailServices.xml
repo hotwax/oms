@@ -692,7 +692,7 @@ under the License.
                         <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
                         <date-filter/>
                     </entity-find>
-                    <set field="emailAddress" from="facilityContactDetail?.first()?.infoString"/>
+                    <set field="emailAddress" from="facilityContactDetail?.infoString[0].toString()"/>
                     <if condition="!emailAddress">
                         <log message="No email address found for facility ${facilityId}, skipping email for order ${orderId}."/>
                         <continue/>
