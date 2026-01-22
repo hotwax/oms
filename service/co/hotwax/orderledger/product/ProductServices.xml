@@ -239,6 +239,30 @@ under the License.
             </parameter>
         </out-parameters>
         <actions>
+
+            <!-- Check for inventoryItemTypeId, if not exists then set as 'NON_SERIAL_INV_ITEM' -->
+            <if condition="!productJson.inventoryItemTypeId">
+                <set field="productJson.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+            </if>
+
+            <!-- Check for isVirtual and isVariant, if not exists set isVirtual to 'N' and isVariant to 'Y' -->
+            <if condition="!productJson.isVirtual">
+                <set field="productJson.isVirtual" value="N"/>
+            </if>
+            <if condition="!productJson.isVariant">
+                <set field="productJson.isVariant" value="Y"/>
+            </if>
+
+            <!-- Check for productPriceTypeId in productPrices Map -->
+            <if condition="!productJson.productPrices.productPriceTypeId">
+                <set field="productJson.productPrices.productPriceTypeId" value="LIST_PRICE"/>
+            </if>
+
+            <!-- Check for productPricePurposeId in the productPrices Map -->
+            <if condition="!productJson.productPrices.productPricePurposeId">
+                <set field="productJson.productPrices.productPricePurposeId" value="PURCHASE"/>
+            </if>
+
             <!--<log message="productJson BEFORE prepare create: ${productJson}"/>-->
             <!-- Set the features list and remove it from productJson -->
             <set field="features" from="productJson.remove('features')"/>
@@ -250,6 +274,12 @@ under the License.
 
                 <!-- Iterate through the features list -->
                 <iterate list="features" entry="feature">
+
+                    <!-- Check if productFeatureApplTypeId exists, if not then set the value -->
+                    <if condition="!feature.productFeatureApplTypeId">
+                        <set field="feature.productFeatureApplTypeId" value="STANDARD_FEATURE"/>
+                    </if>
+
                     <!-- Fetch productFeatureType record for productFeatureTypeId -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
                         <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
@@ -423,6 +453,29 @@ under the License.
         </out-parameters>
         <actions>
             <!--<log message="productJson BEFORE prepare update: ${productJson}"/>-->
+            <!-- Check for inventoryItemTypeId, if not exists then set as 'NON_SERIAL_INV_ITEM' -->
+            <if condition="!productJson.inventoryItemTypeId">
+                <set field="productJson.inventoryItemTypeId" value="NON_SERIAL_INV_ITEM"/>
+            </if>
+
+            <!-- Check for isVirtual and isVariant, if not exists set isVirtual to 'N' and isVariant to 'Y' -->
+            <if condition="!productJson.isVirtual">
+                <set field="productJson.isVirtual" value="N"/>
+            </if>
+            <if condition="!productJson.isVariant">
+                <set field="productJson.isVariant" value="Y"/>
+            </if>
+
+            <!-- Check for productPriceTypeId in productPrices Map -->
+            <if condition="!productJson.productPrices.productPriceTypeId">
+                <set field="productJson.productPrices.productPriceTypeId" value="LIST_PRICE"/>
+            </if>
+
+            <!-- Check for productPricePurposeId in the productPrices Map -->
+            <if condition="!productJson.productPrices.productPricePurposeId">
+                <set field="productJson.productPrices.productPricePurposeId" value="PURCHASE"/>
+            </if>
+
             <!-- Prepare the map of updated Product level details -->
             <set field="selectedFields" from="['productName', 'productTypeId', 'detailImageUrl', 'productWeight', 'shippingWeight', 'isVirtual', 'isVariant']"/>
             <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product">
@@ -439,6 +492,11 @@ under the License.
 
                 <!-- Iterate through the features list -->
                 <iterate list="features" entry="feature">
+                    <!-- Check if productFeatureApplTypeId exists, if not then set the value -->
+                    <if condition="!feature.productFeatureApplTypeId">
+                        <set field="feature.productFeatureApplTypeId" value="STANDARD_FEATURE"/>
+                    </if>
+
                     <!-- Fetch productFeatureType record for productFeatureTypeId -->
                     <entity-find entity-name="org.apache.ofbiz.product.feature.ProductFeatureType" list="productFeatureTypes">
                         <econdition field-name="description" from="feature.productFeatureTypeDesc.trim()"/>
