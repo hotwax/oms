@@ -409,7 +409,7 @@
 
             <set field="fromShipGroupSeqId" from="fromShipGroup.shipGroupSeqId"/>
             <if condition="hasParentType &amp;&amp; facilityId == fromShipGroup?.facilityId">
-                <log level="warn" message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
+                <log level="warn" message="OrderItem [Order ID: ${orderId}, Order Item Seq ID: ${orderItemSeqId}] - Already located at facility ${facilityId}."/>
                 <if condition="autoCancelDate || clearAutoCancelDate">
                     <set field="serviceInCtx" from="[orderId: orderId, orderItemSeqId: orderItemSeqId]"/>
                     <if condition="clearAutoCancelDate">
