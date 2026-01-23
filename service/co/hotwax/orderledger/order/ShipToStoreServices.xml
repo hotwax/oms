@@ -33,6 +33,26 @@
             <log level="info" message="Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
+            // TODO: Ideally, STOREPICKUP orders should have contactMechIds set from the Facility during order import.
+            // However, changing the order import service would impact all clients.
+            // As a safe workaround, we handle it here for now.
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs"
+                          in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'POSTAL_ADDRESS',
+                       contactMechPurposeTypeId: ['PRIMARY_LOCATION']]"
+                          out-map="facilityAddressResult"/>
+            <if condition="facilityAddressResult?.facilityContactMechs">
+                <set field="shipGroup.contactMechId" from="facilityAddressResult.facilityContactMechs[0].contactMechId"/>
+                <log level="info" message="Updated contactMechId to ${shipGroup.contactMechId} for facility ${pickupFacilityId}"/>
+            </if>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs" in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'TELECOM_NUMBER',
+                       contactMechPurposeTypeId: ['PRIMARY_PHONE']]"
+                          out-map="facilityPhoneResult"/>
+            <if condition="facilityPhoneResult?.facilityContactMechs">
+                <set field="shipGroup.telecomContactMechId" from="facilityPhoneResult.facilityContactMechs[0].contactMechId"/>
+                <log level="info" message="Updated telecomContactMechId to ${shipGroup.telecomContactMechId} for facility ${pickupFacilityId}"/>
+            </if>
             <entity-update value-field="shipGroup"/>
 
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
