@@ -31,7 +31,7 @@
         </out-parameters>
         <actions>
             <set field="partyStatusId" from="status == 'T' ? 'PARTY_DISABLED' : 'PARTY_ENABLED'"/>
-            <log level="info" message="store#Picker start partyId=${partyId}, externalPartyId=${externalPartyId}, status=${status}, externalFacilityId=${externalFacilityId}"/>
+            <log message="Party [Party ID: ${partyId}, External Party ID: ${externalPartyId}] - store#Picker start, status=${status}, externalFacilityId=${externalFacilityId}"/>
 
             <if condition="!externalPartyId &amp;&amp; !partyId">
                 <script>ec.message.addError("Either partyId or externalPartyId is required")</script>
@@ -71,7 +71,7 @@
                 <if condition="partyList">
                     <set field="party" from="partyList[0]"/>
                     <set field="partyId" from="party.partyId"/>
-                    <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
+                    <log message="Party [Party ID: ${partyId}] - store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
                 </if>
             </if>
             
@@ -81,7 +81,7 @@
 
             <if condition="partyId">
                 <set field="context.partyId" from="partyId"/>
-                <log level="info" message="store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
+                <log message="Party [Party ID: ${partyId}] - store#Picker existing party ${partyId}, desiredStatus=${partyStatusId}, currentStatus=${party.statusId}"/>
                 <set field="partyUpdateMap" from="[partyId:partyId]"/>
                 <if condition="party.statusId != partyStatusId">
                     <set field="partyUpdateMap.statusId" from="partyStatusId"/>
@@ -100,7 +100,7 @@
                         <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
                     </if>
                     <if condition="facilityId">
-                        <log level="info" message="store#Picker (existing) linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                        <log message="Party [Party ID: ${partyId}] - store#Picker (existing) linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
                         <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityParty" list="existingFp" limit="1">
                             <econdition field-name="facilityId" from="facilityId"/>
                             <econdition field-name="partyId" from="partyId"/>
@@ -111,7 +111,7 @@
                             <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
                                           in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
                             <if condition="facilityPartyResp.error">
-                                <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                                <log level="error" message="Party [Party ID: ${partyId}] - store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
                                 <return error="true" message="${facilityPartyResp.errorMessage}"/>
                             </if>
                         </if>
@@ -120,11 +120,11 @@
             </if>
 
             <if condition="!partyId &amp;&amp; partyStatusId == 'PARTY_ENABLED'">
-                <log level="info" message="store#Picker creating new party for externalPartyId=${externalPartyId}"/>
+                <log message="Party [External ID: ${externalPartyId}] - store#Picker creating new party"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Party" out-map="createPartyOut"
                               in-map="[partyTypeId:'PERSON', externalId:externalPartyId, statusId:partyStatusId]"/>
                 <set field="partyId" from="createPartyOut.partyId"/>
-                <log level="info" message="store#Picker created new partyId=${partyId} for externalPartyId=${externalPartyId}"/>
+                <log message="Party [Party ID: ${partyId}] - store#Picker created new partyId=${partyId} for externalPartyId=${externalPartyId}"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="[partyId:partyId, firstName:firstName, lastName:lastName]"/>
 
                 <if condition="emailAddress">
@@ -143,11 +143,11 @@
                 <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
 
                 <if condition="facilityId">
-                    <log level="info" message="store#Picker linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
+                    <log message="Party [Party ID: ${partyId}] - store#Picker linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>
                     <service-call name="create#org.apache.ofbiz.product.facility.FacilityParty" out-map="facilityPartyResp"
                                   in-map="[facilityId:facilityId, partyId:partyId, roleTypeId:roleTypeId]"/>
                     <if condition="facilityPartyResp.error">
-                        <log level="error" message="store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
+                        <log level="error" message="Party [Party ID: ${partyId}] - store#Picker failed to create FacilityParty for facility ${facilityId}, party ${partyId}: ${facilityPartyResp.errorMessage}"/>
                         <return error="true" message="${facilityPartyResp.errorMessage}"/>
                     </if>
                 </if>

@@ -24,7 +24,7 @@
                     }
                 }
             </script>
-            <log message="Removed ${recordsRemoved} RuleGroupRun records."/>
+            <log message="RuleGroupRun [Records Removed: ${recordsRemoved}] - Removed records."/>
         </actions>
     </service>
     <service verb="scheduleNow" noun="RuleGroup">

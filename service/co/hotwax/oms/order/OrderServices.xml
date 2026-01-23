@@ -623,7 +623,7 @@ under the License.
                 <field-map field-name="settingTypeEnumId" value="CAPTURE_PAYMENT_TAG"/>
             </entity-find-one>
             <if condition="!productStoreSetting ||  productStoreSetting.settingValue == null">
-                <log level="error" message="Capture payment tag data missing"/>
+                <log level="error" message="OrderHeader [Order ID: ${orderId}] - Capture payment tag data missing"/>
                 <return/>
             </if>
             <entity-find-count entity-name="co.hotwax.order.OrderHeaderNoteView" count-field="orderHeaderNoteCount">

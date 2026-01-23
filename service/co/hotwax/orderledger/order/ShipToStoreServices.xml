@@ -25,12 +25,11 @@
                 <field-map field-name="shipGroupSeqId"/>
             </entity-find-one>
             <if condition="!shipGroup">
-                <log level="error"
-                     message="Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
+                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - Not found."/>
                 <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
             </if>
             <set field="pickupFacilityId" from="shipGroup?.facilityId"/>
-            <log level="info" message="Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
+            <log message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - Updating to SHIP_TO_STORE."/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
             <entity-update value-field="shipGroup"/>
@@ -42,7 +41,7 @@
             </entity-find>
 
             <if condition="!orderItems">
-                <log level="error" message="No order items found in ship group ${shipGroupSeqId}"/>
+                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - No order items found."/>
                 <return error="true" message="No order items found"/>
             </if>
 
@@ -57,9 +56,9 @@
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
-                    <log level="info" message="Successfully rejected item ${orderItem.orderItemSeqId}"/>
+                    <log message="OrderItem [Order ID: ${orderItem.orderId}, Order Item Sequence ID: ${orderItem.orderItemSeqId}] - Successfully rejected item."/>
                     <else>
-                        <log level="warn" message="Failed to reject item ${orderItem.orderItemSeqId}"/>
+                        <log level="warn" message="OrderItem [Order ID: ${orderItem.orderId}, Order Item Sequence ID: ${orderItem.orderItemSeqId}] - Failed to reject item."/>
                     </else>
                 </if>
             </iterate>

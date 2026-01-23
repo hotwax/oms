@@ -91,7 +91,7 @@
             <set field="shipGroupSeqId" from="itemShipGroup.shipGroupSeqId"/>
 
             <if condition="itemShipGroup?.facilityId == facilityId">
-                <log message="Order item [${orderId}:${orderItemSeqId}] already located at facility ${facilityId}."/>
+                <log message="OrderItem [Order ID: ${orderId}, Order Item Seq ID: ${orderItemSeqId}] - Already located at facility ${facilityId}."/>
                 <return/>
             </if>
 

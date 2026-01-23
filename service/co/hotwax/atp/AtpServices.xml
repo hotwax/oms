@@ -53,7 +53,7 @@
             </if>
             <set field="productGroups" from="productResult.productDetail.productGroups"/>
             <set field="totalGroups" from="productResult.productDetail.totalCount"/>
-            <log message="Rule group ${ruleGroupId}: Total ${totalGroups} product groups to process."/>
+            <log message="RuleGroup [Rule Group ID: ${ruleGroupId}] - Total ${totalGroups} product groups to process."/>
 
             <iterate list="productGroups" entry="productGroup">
                 <set field="products" from="productGroup.doclist.docs"/>
@@ -238,7 +238,7 @@
                     </else>
                 </if>
             </if>
-            <log message="${viewSize} products are fetched successfully from index ${viewIndex}."/>
+            <log message="Products [View Index: ${viewIndex}, View Size: ${viewSize}] - ${viewSize} Products fetched successfully from index ${viewIndex}."/>
         </actions>
     </service>
 
@@ -284,7 +284,7 @@
             <service-call name="update#moqui.service.message.SystemMessage" transaction="force-new"
                           in-map="[systemMessageId : systemMessageId, statusId: 'SmsgSent']"
                           out-map="result"/>
-            <log message="CSV file uploaded successfully."/>
+            <log message="SystemMessage [System Message ID: ${systemMessageId}] - CSV file uploaded successfully."/>
         </actions>
     </service>
 </services>

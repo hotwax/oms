@@ -403,7 +403,7 @@ under the License.
                 <set field="indexVariants" from="(!hasUpdate &amp;&amp; isVirtual.equals('Y')) ? true : false"/>
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex"
                               in-map="[productId:productId, indexVariants:indexVariants]" ignore-error="true" transaction="force-new"/>
-                <log level="info" message="Created/Updated, and Indexed product: ${productId} for shopId: ${shopId} successfully."/>
+                <log message="Product [Product ID: ${productId}] - Created/Updated and Indexed for shopId ${shopId}."/>
             </iterate>
         </actions>
     </service>
@@ -426,7 +426,7 @@ under the License.
                 diff = productUpdateHistory.differenceMap ? org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(productUpdateHistory.differenceMap, Map.class) : null
             </script>
             <if condition="!diff">
-                <log level="warn" message="No differenceMap found for the productId: ${productUpdateHistory.productId}, skipping this entry."/>
+                <log level="warn" message="ProductUpdateHistory [Product ID: ${productUpdateHistory.productId}] - No differenceMap found, skipping entry."/>
                 <return/>
             </if>
             <entity-find-one entity-name="co.hotwax.shopify.ShopifyShop" value-field="shopifyShop" cache="true"/>
