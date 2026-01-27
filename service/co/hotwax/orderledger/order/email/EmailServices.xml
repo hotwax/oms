@@ -674,32 +674,42 @@ under the License.
                 <return message="No valid BOPIS cancelled orders found at ${nowDate}, not sending notification email to store."/>
             </if>
             <set field="orderItemsFacility" from="[:]"/>
-            <script>
-                ordersIterator.each { o ->
-                    if (o.orderId &amp;&amp; o.fromFacilityId &amp;&amp; o.orderItemSeqId) {
-                        orderItemsFacility.computeIfAbsent(o.orderId) { [:] }.computeIfAbsent(o.fromFacilityId) { [] } &lt;&lt; [orderId: o.orderId, orderItemSeqId: o.orderItemSeqId]
-                    }
-                }
-            </script>
+            <set field="facilityIds" from="new HashSet()"/>
+            <iterate list="ordersIterator" entry="orderItem">
+                <if condition="orderItem.orderId &amp;&amp; orderItem.fromFacilityId &amp;&amp; orderItem.orderItemSeqId">
+                    <script>
+                        orderItemsFacility.computeIfAbsent(orderItem.orderId) { [:] }.computeIfAbsent(orderItem.fromFacilityId) { [] } &lt;&lt; [orderId: orderItem.orderId, orderItemSeqId: orderItem.orderItemSeqId]
+                        facilityIds.add(orderItem.fromFacilityId)
+                    </script>
+                </if>
+            </iterate>
 
-            <!-- send email for each facility -->
-            <iterate list="orderItemsFacility.keySet()" entry="orderId">
-                <set field="facilitiesMap" from="orderItemsFacility[orderId]"/>
-                <iterate list="facilitiesMap.keySet()" entry="facilityId">
-                    <set field="itemSeqIds" from="facilitiesMap[facilityId]"/>
-                    <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
-                        <econdition field-name="facilityId" from="facilityId"/>
-                        <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
-                        <date-filter/>
-                    </entity-find>
-                    <set field="emailAddress" from="facilityContactDetail[0]?.infoString"/>
+            <!-- Pre-fetch facility email addresses in bulk -->
+            <set field="facilityEmailMap" from="[:]"/>
+            <if condition="facilityIds">
+                <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetailList">
+                    <econdition field-name="facilityId" operator="in" from="facilityIds"/>
+                    <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
+                    <date-filter/>
+                </entity-find>
+                <iterate list="facilityContactDetailList" entry="facilityContactDetail">
+                    <if condition="!facilityEmailMap[facilityContactDetail?.facilityId]">
+                        <set field="facilityEmailMap[facilityContactDetail?.facilityId]" from="facilityContactDetail?.infoString"/>
+                    </if>
+                </iterate>
+            </if>
+
+            <!-- Send email for each order and facility grouping -->
+            <iterate list="orderItemsFacility" entry="facilitiesMap" key="orderId">
+                <iterate list="facilitiesMap" entry="itemSeqIds" key="facilityId">
+                    <set field="emailAddress" from="facilityEmailMap[facilityId]"/>
                     <if condition="!emailAddress">
                         <log message="No email address found for facility ${facilityId}, skipping email for order ${orderId}."/>
                         <continue/>
                     </if>
 
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                                  in-map="[orderId: orderId,orderItems: itemSeqIds,emailType: emailType,emailAddress: emailAddress]" async="true"/>
+                                  in-map="[orderId: orderId, orderItems: itemSeqIds, emailType: emailType, emailAddress: emailAddress]" async="true"/>
                 </iterate>
             </iterate>
 
