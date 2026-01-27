@@ -527,7 +527,7 @@ under the License.
                 </entity-find>
 
                 <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
-                              in-map="[orderId: order.orderId, orderItems:orderItems, emailType: emailType, emailAddress: facilityContactDetail?.infoString[0].toString()]" async="true"/>
+                              in-map="[orderId: order.orderId, orderItems:orderItems, emailType: emailType, emailAddress: facilityContactDetail[0]?.infoString]" async="true"/>
             </iterate>
 
             <!-- Update job parameter if jobName is provided -->
@@ -671,7 +671,7 @@ under the License.
                         <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
                         <date-filter/>
                     </entity-find>
-                    <set field="emailAddress" from="facilityContactDetail?.infoString[0].toString()"/>
+                    <set field="emailAddress" from="facilityContactDetail[0]?.infoString"/>
                     <if condition="!emailAddress">
                         <log message="No email address found for facility ${facilityId}, skipping email for order ${orderId}."/>
                         <continue/>
