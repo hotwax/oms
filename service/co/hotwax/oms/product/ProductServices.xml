@@ -154,6 +154,7 @@ under the License.
     </service>
     <service verb="calculate" noun="ProductSalesVelocity">
         <in-parameters>
+            <parameter name="configId" default-value="IMP_UPD_PRD_FACI"/>
             <parameter name="productStoreId"/>
             <parameter name="productId"/>
             <parameter name="excludeSalesChannels" type="List"/>
@@ -165,11 +166,11 @@ under the License.
             <script>
                 <![CDATA[
                     import java.time.temporal.ChronoUnit
-                    import org.apache.commons.csv.CSVFormat
-                    import org.apache.commons.csv.CSVPrinter
+                    import com.fasterxml.jackson.databind.ObjectMapper
+                    import com.fasterxml.jackson.core.JsonFactory
+                    import com.fasterxml.jackson.core.JsonGenerator
+                    import java.io.PrintWriter
                     import java.nio.charset.StandardCharsets
-                    import java.nio.file.Files
-                    import java.nio.file.Paths
                     import org.apache.commons.fileupload.FileItem
                     import org.apache.commons.fileupload.disk.DiskFileItem
                     import org.apache.commons.io.FileUtils
@@ -194,48 +195,49 @@ under the License.
                 <select-field field-name="productId,facilityId,totalQuantity"/>
                 <use-iterator/>
             </entity-find>
-            <set field="csvFilePathRef" value="runtime://tmp/ProductVelocity-${ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd_HHmmss_SSS')}.csv"/>
-            <set field="csvFilePath" from="ec.resource.getLocationReference(csvFilePathRef).getUri().getPath()"/>
-            <set field="headers" from="['productId', 'facilityId', 'salesVelocity']"/>
-            <script>
-                <![CDATA[
-                   File productVelocityFile = new File(csvFilePath)
-                   if (!productVelocityFile.parentFile.exists()) productVelocityFile.parentFile.mkdirs()
-                    try(csvWriter = Files.newBufferedWriter(Paths.get(csvFilePath), StandardCharsets.UTF_8);
-                       csvPrinter = new CSVPrinter(csvWriter, CSVFormat.DEFAULT
-                           .withHeader(headers.toArray(new String[0]))
-                           .withRecordSeparator("\n")
-                           .withIgnoreEmptyLines(true))) {
-                   ]]>
-            </script>
+
+            <set field="jsonFilePathRef" value="runtime://tmp/ProductVelocity-${ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd_HHmmss_SSS')}.json"/>
+            <set field="jsonFilePath" from="ec.resource.getLocationReference(jsonFilePathRef).getUri().getPath()"/>
+            <script><![CDATA[
+                count = 0
+                File productVelocityFile = new File(jsonFilePath)
+                if (!productVelocityFile.parentFile.exists()) productVelocityFile.parentFile.mkdirs()
+                JsonFactory jfactory = new JsonFactory()
+                try (PrintWriter pw = new PrintWriter(StandardCharsets.UTF_8, productVelocityFile)
+                    JsonGenerator jGenerator = jfactory.createGenerator(pw)) {
+                    jGenerator.writeStartArray()
+            ]]></script>
             <iterate entry="productSalesVelocity" list="productSalesVelocityList">
-                <set field="salesValocity" value="0"/>
+                <set field="salesVelocity" value="0" type="BigDecimal"/>
                 <if condition="productSalesVelocity.totalQuantity">
                     <set field="totalQuantity" from="productSalesVelocity.totalQuantity"/>
-                    <set field="salesValocity" from="totalQuantity.divide(daysInterval, 3, java.math.RoundingMode.HALF_UP)"/>
+                    <set field="salesVelocity" from="totalQuantity.divide(daysInterval, 3, java.math.RoundingMode.HALF_UP)"/>
                 </if>
-                <set field="record" from="[productSalesVelocity.productId,productSalesVelocity.facilityId,salesValocity]"/>
-                <script>csvPrinter.printRecord(record)</script>
+                <set field="prodMap" from="[productId:productSalesVelocity.productId,facilityId:productSalesVelocity.facilityId, salesVelocity:salesVelocity]"/>
+                <script>
+                    count++
+                    new ObjectMapper().setDateFormat(new java.text.SimpleDateFormat(System.getProperty('default_date_time_format')))
+                    .writerWithDefaultPrettyPrinter().writeValue(jGenerator, prodMap)
+                </script>
             </iterate>
-            <script>
-                csvPrinter.flush()
-                csvPrinter.close()
-                csvWriter.close()
-                } catch(Exception e) {
-                    ec.logger.warn("Error exporting cycle counts CSV: ${e.getMessage()}");
-                    return;
-                }
-            </script>
-            <!-- Create ResourceReference for generated CSV -->
-            <set field="csvRr" from="ec.resource.getLocationReference(csvFilePathRef)"/>
             <script><![CDATA[
-                contentFile = new DiskFileItem("contentFile", csvRr.getContentType(), false, productVelocityFile.getName(), (int) productVelocityFile.length(), productVelocityFile.getParentFile())
+                   jGenerator.writeEndArray()
+               }
+            ]]></script>
+            <if condition="count == 0">
+                 <script>productVelocityFile.delete()</script>
+                 <return/>
+            </if>
+            <!-- Create ResourceReference for generated JSON -->
+            <set field="jsonRr" from="ec.resource.getLocationReference(jsonFilePathRef)"/>
+            <script><![CDATA[
+                contentFile = new DiskFileItem("contentFile", jsonRr.getContentType(), false, productVelocityFile.getName(), (int) productVelocityFile.length(), productVelocityFile.getParentFile())
                 FileUtils.copyFile(productVelocityFile, contentFile.getOutputStream())
             ]]></script>
             <!-- Call DataManagerFile upload service -->
-            <service-call name="co.hotwax.util.UtilityServices.upload#DataManagerFile" in-map="[contentFile : contentFile, configId : 'IMP_UPD_PRD_FACILITY',]" out-map="context" />
+            <service-call name="co.hotwax.util.UtilityServices.upload#DataManagerFile" in-map="[contentFile : contentFile, configId : configId]" out-map="context" />
             <script>
-                productVelocityFile.delete();
+                productVelocityFile.delete()
             </script>
         </actions>
     </service>
