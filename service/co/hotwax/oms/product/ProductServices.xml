@@ -159,6 +159,7 @@ under the License.
             <parameter name="excludeSalesChannels" type="List"/>
             <parameter name="startDate" type="Timestamp"/>
             <parameter name="endDate" type="Timestamp"/>
+            <parameter name="intervalDays" type="Integer" default-value="7"/>
         </in-parameters>
         <actions>
             <script>
@@ -177,9 +178,8 @@ under the License.
             <if condition="!endDate">
                 <set field="endDate" from="ec.user.nowTimestamp"/>
             </if>
-            <!-- If startDate is empty, set it to 7 days before endDate -->
             <if condition="!startDate">
-                <set field="startDate" from="Timestamp.valueOf(endDate.toLocalDateTime().minusDays(7))"/>
+                <set field="startDate" from="Timestamp.valueOf(endDate.toLocalDateTime().minusDays(intervalDays))"/>
             </if>
             <set field="startDateStr" from="ec.l10n.format(startDate, 'yyyy-MM-dd 00:00:00')"/>
             <set field="endDateStr" from="ec.l10n.format(endDate, 'yyyy-MM-dd 00:00:00')"/>
@@ -192,54 +192,51 @@ under the License.
                 <econdition field-name="statusDatetime" from="endDateStr" operator="less-equals"/>
                 <econdition field-name="salesChannelEnumId" from="excludeSalesChannels" operator="not-in" ignore-if-empty="true"/>
                 <select-field field-name="productId,facilityId,totalQuantity"/>
+                <use-iterator/>
             </entity-find>
-
-            <if condition="productSalesVelocityList.size() &gt; 0">
-                <set field="csvFilePathRef" value="runtime://tmp/ProductVelocity-${ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd_HHmmss_SSS')}.csv"/>
-                <set field="csvFilePath" from="ec.resource.getLocationReference(csvFilePathRef).getUri().getPath()"/>
-                <set field="headers" from="['productId', 'facilityId', 'salesVelocity']"/>
-                <script>
-                    <![CDATA[
-                    File productVelocityFile = new File(csvFilePath)
-                    if (!productVelocityFile.parentFile.exists()) productVelocityFile.parentFile.mkdirs()
-
+            <set field="csvFilePathRef" value="runtime://tmp/ProductVelocity-${ec.l10n.format(ec.user.nowTimestamp, 'yyyy-MM-dd_HHmmss_SSS')}.csv"/>
+            <set field="csvFilePath" from="ec.resource.getLocationReference(csvFilePathRef).getUri().getPath()"/>
+            <set field="headers" from="['productId', 'facilityId', 'salesVelocity']"/>
+            <script>
+                <![CDATA[
+                   File productVelocityFile = new File(csvFilePath)
+                   if (!productVelocityFile.parentFile.exists()) productVelocityFile.parentFile.mkdirs()
                     try(csvWriter = Files.newBufferedWriter(Paths.get(csvFilePath), StandardCharsets.UTF_8);
-                        csvPrinter = new CSVPrinter(csvWriter, CSVFormat.DEFAULT
-                            .withHeader(headers.toArray(new String[0]))
-                            .withRecordSeparator("\n")
-                            .withIgnoreEmptyLines(true))) {
-                    ]]>
-                </script>
-                <iterate entry="productSalesVelocity" list="productSalesVelocityList">
-                    <set field="salesValocity" value="0"/>
-                    <if condition="productSalesVelocity.totalQuantity">
-                        <set field="totalQuantity" from="productSalesVelocity.totalQuantity"/>
-                        <set field="salesValocity" from="totalQuantity.divide(daysInterval, 3, java.math.RoundingMode.HALF_UP)"/>
-                    </if>
-                    <set field="record" from="[productSalesVelocity.productId,productSalesVelocity.facilityId,salesValocity]"/>
-                    <script>csvPrinter.printRecord(record)</script>
-                </iterate>
-                <script>
-                        csvPrinter.flush()
-                        csvPrinter.close()
-                        csvWriter.close()
-                    } catch(Exception e) {
-                        ec.logger.warn("Error exporting cycle counts CSV: ${e.getMessage()}");
-                        return;
-                    }
-                </script>
-                <!-- Create ResourceReference for generated CSV -->
-                <set field="csvRr" from="ec.resource.getLocationReference(csvFilePathRef)"/>
-                <script><![CDATA[
-                    contentFile = new DiskFileItem("contentFile", csvRr.getContentType(), false, productVelocityFile.getName(), (int) productVelocityFile.length(), productVelocityFile.getParentFile())
-                    FileUtils.copyFile(productVelocityFile, contentFile.getOutputStream())
-                ]]></script>
-                <!-- Call DataManagerFile upload service -->
-                <service-call name="co.hotwax.util.UtilityServices.upload#DataManagerFile" in-map="[contentFile : contentFile, configId : 'IMP_UPD_PRD_FACILITY',]" out-map="context" />
-                <script>
-                    productVelocityFile.delete();
-                </script>
-            </if>
+                       csvPrinter = new CSVPrinter(csvWriter, CSVFormat.DEFAULT
+                           .withHeader(headers.toArray(new String[0]))
+                           .withRecordSeparator("\n")
+                           .withIgnoreEmptyLines(true))) {
+                   ]]>
+            </script>
+            <iterate entry="productSalesVelocity" list="productSalesVelocityList">
+                <set field="salesValocity" value="0"/>
+                <if condition="productSalesVelocity.totalQuantity">
+                    <set field="totalQuantity" from="productSalesVelocity.totalQuantity"/>
+                    <set field="salesValocity" from="totalQuantity.divide(daysInterval, 3, java.math.RoundingMode.HALF_UP)"/>
+                </if>
+                <set field="record" from="[productSalesVelocity.productId,productSalesVelocity.facilityId,salesValocity]"/>
+                <script>csvPrinter.printRecord(record)</script>
+            </iterate>
+            <script>
+                csvPrinter.flush()
+                csvPrinter.close()
+                csvWriter.close()
+                } catch(Exception e) {
+                    ec.logger.warn("Error exporting cycle counts CSV: ${e.getMessage()}");
+                    return;
+                }
+            </script>
+            <!-- Create ResourceReference for generated CSV -->
+            <set field="csvRr" from="ec.resource.getLocationReference(csvFilePathRef)"/>
+            <script><![CDATA[
+                contentFile = new DiskFileItem("contentFile", csvRr.getContentType(), false, productVelocityFile.getName(), (int) productVelocityFile.length(), productVelocityFile.getParentFile())
+                FileUtils.copyFile(productVelocityFile, contentFile.getOutputStream())
+            ]]></script>
+            <!-- Call DataManagerFile upload service -->
+            <service-call name="co.hotwax.util.UtilityServices.upload#DataManagerFile" in-map="[contentFile : contentFile, configId : 'IMP_UPD_PRD_FACILITY',]" out-map="context" />
+            <script>
+                productVelocityFile.delete();
+            </script>
         </actions>
     </service>
 </services>
