@@ -215,9 +215,9 @@ under the License.
                 </if>
                 <set field="prodMap" from="[productId:productSalesVelocity.productId,facilityId:productSalesVelocity.facilityId, salesVelocity:salesVelocity]"/>
                 <script>
-                    count++
                     new ObjectMapper().setDateFormat(new java.text.SimpleDateFormat(System.getProperty('default_date_time_format')))
                     .writerWithDefaultPrettyPrinter().writeValue(jGenerator, prodMap)
+                    count++
                 </script>
             </iterate>
             <script><![CDATA[
