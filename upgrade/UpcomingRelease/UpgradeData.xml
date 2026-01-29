@@ -5,8 +5,4 @@
     <org.apache.ofbiz.common.user.UserPrefGroupType userPrefGroupTypeId="RECEIVING" description="Transfer order receiving topic subscriptions"/>
     <moqui.basic.Enumeration enumId="NEW_TRANSFER_ODR" enumTypeId="NOTIF_RECEIVING" description="New Transfer order ready to receive" enumName="New Transfer Order"/>
     <moqui.basic.Enumeration enumId="OPEN_TRANSFER_ODR" enumTypeId="NOTIF_RECEIVING" description="Open transfer orders pending to receive" enumName="Open Transfer Order"/>
-    <moqui.service.job.ServiceJob jobName="pending_transfer_order_notification" description="Sends daily notifications for pending transfer orders"
-          serviceName="co.hotwax.oms.order.TransferOrderNotificationServices.find#PendingTransferOrdersForToday"
-          cronExpression="0 0 18 * * ?" paused="N">
-    </moqui.service.job.ServiceJob>
 </entity-facade-xml>

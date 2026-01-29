@@ -28,9 +28,4 @@
             cronExpression="0 0 0 * * ?" paused="Y">
         <parameters parameterName="orderIds"/>
     </moqui.service.job.ServiceJob>
-
-    <moqui.service.job.ServiceJob jobName="pending_transfer_order_notification" description="Sends daily notifications for pending transfer orders"
-      serviceName="co.hotwax.oms.order.TransferOrderNotificationServices.find#PendingTransferOrdersForToday"
-      cronExpression="0 0 18 * * ?" paused="N">
-    </moqui.service.job.ServiceJob>
 </entity-facade-xml>

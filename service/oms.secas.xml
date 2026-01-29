@@ -98,13 +98,4 @@
             <service-call name="co.hotwax.oms.order.TransferOrderNotificationServices.send#TransferOrdReceivedNotification" in-map="context"/>
         </actions>
     </seca>
-    <seca id="StoreTransferOrderNotification" service="co.hotwax.poorti.TransferOrderFulfillmentServices.ship#TransferOrderShipment" when="post-service">
-        <actions>
-            <entity-find-one value-field="Shipment" entity-name="org.apache.ofbiz.shipment.shipment.Shipment">
-                <field-map field-name="shipmentId"/>
-            </entity-find-one>
-            <set field="orderId" from="Shipment.primaryOrderId"/>
-            <service-call name="co.hotwax.oms.order.TransferOrderNotificationServices.send#TransferOrdReceivedNotification" in-map="context"/>
-        </actions>
-    </seca>
 </secas>
