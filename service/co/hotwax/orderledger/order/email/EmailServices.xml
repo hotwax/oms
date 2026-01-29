@@ -624,7 +624,7 @@ under the License.
             </entity-find>
         </actions>
     </service>
-    <!-- This is a temporary service. Once the cancellation secas in SM is migrated to maarg we can remove this. -->
+    <!-- FIXME: This is a temporary service. Once the cancellation secas in SM is migrated to maarg we can remove this. -->
     <service verb="send" noun="BulkBopisOrderCancelledEmailToStore" authenticate="anonymous-all">
         <description>
             Service to send bulk BOPIS order cancelled email to store for orders cancelled within a specified time frame.
