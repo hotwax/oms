@@ -603,7 +603,27 @@ under the License.
             <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
         </actions>
     </service>
-    <!-- This is a temporary service. Once the cancellation secas in SM is migrated to maarg we can remove this. -->
+    <service verb="get" noun="CommunicationEvents" authenticate="anonymous-all">
+        <in-parameters>
+            <parameter name="communicationEventId"/>
+            <parameter name="orderIds" type="List"/>
+            <parameter name="communicationEventTypeId"/>
+            <parameter name="reasonEnumId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="communicationEventList" type="List"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="co.hotwax.integration.CommunicationEventAndOrder" list="communicationEventList">
+                <econdition field-name="communicationEventId" from="communicationEventId" ignore-if-empty="true"/>
+                <econdition field-name="orderId" operator="in" from="orderIds" ignore-if-empty="true"/>
+                <econdition field-name="communicationEventTypeId" from="communicationEventTypeId" ignore-if-empty="true"/>
+                <econdition field-name="reasonEnumId" from="reasonEnumId" ignore-if-empty="true"/>
+                <select-field field-name="communicationEventId,orderId,communicationEventTypeId,content,statusId"/>
+            </entity-find>
+        </actions>
+    </service>
+    <!-- FIXME: This is a temporary service. Once the cancellation secas in SM is migrated to maarg we can remove this. -->
     <service verb="send" noun="BulkBopisOrderCancelledEmailToStore" authenticate="anonymous-all">
         <description>
             Service to send bulk BOPIS order cancelled email to store for orders cancelled within a specified time frame.
