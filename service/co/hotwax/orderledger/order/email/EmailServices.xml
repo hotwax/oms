@@ -447,7 +447,7 @@ under the License.
                             <select-field field-name="orderId,orderItemSeqId,shipGroupSeqId"/>
                         </entity-find>
 
-                        <set field="storeHour" from="[openingHoursMtoS:storeOpenTime,colsingHoursMtoS:storeCloseTime,openingHoursSunday:sundayOpenTime,colsingHoursSunday:sundayCloseTime]"/>
+                        <set field="storeHour" from="[openingHoursMtoS:storeOpenTime.toString(),colsingHoursMtoS:storeCloseTime.toString(),openingHoursSunday:sundayOpenTime.toString(),colsingHoursSunday:sundayCloseTime.toString()]"/>
                         <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                       in-map="[orderId: order.orderId, orderItems:orderItems, emailType: emailType, additionalFields:storeHour]" async="true"/>
                     </if>
