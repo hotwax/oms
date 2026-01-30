@@ -77,7 +77,7 @@
             <service-call name="co.hotwax.oms.order.OrderServices.send#OrderWebhook" in-map="[orderId:orderId,topicEnumId:'WEBHOOK_ODR_COMPLETE']" async="true" disable-authz="true"/>
         </actions>
     </seca>
-    <seca id="SendCancellationEmail" service="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItems" when="post-service">
+    <seca id="SendCancellationEmail" service="co.hotwax.orderledger.order.OrderServices.cancel#SalesOrderItems" when="post-commit">
         <condition>
             <expression>orderId &amp;&amp; cancelledItems</expression>
         </condition>
@@ -91,7 +91,7 @@
             </if>
             <set field="emailType" value="CANCEL_BOPIS_ORDER"/>
             <set field="orderItems" from="cancelledItems"/>
-            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" transaction="force-new" ignore-error="true"/>
+            <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents" in-map="context" ignore-error="true" async="true"/>
         </actions>
     </seca>
 
