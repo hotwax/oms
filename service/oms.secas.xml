@@ -58,6 +58,15 @@
                           ignore-error="true" disable-authz="true"/>
         </actions>
     </seca>
+    <seca id="OrderItemComplete" service="update#org.apache.ofbiz.order.order.OrderItem" when="post-commit">
+        <condition>
+            <expression>statusChanged &amp;&amp; statusId == 'ITEM_COMPLETED'</expression>
+        </condition>
+        <actions>
+            <service-call name="co.hotwax.oms.order.OrderServices.check#OrderItemAndCapturePayment" in-map="[orderId:orderId]"
+                          ignore-error="true" disable-authz="true"/>
+        </actions>
+    </seca>
 
     <!-- Seca rule on order Complete to generate generic order feed for other ERP system -->
     <seca id="OrderStatusChange" service="update#org.apache.ofbiz.order.order.OrderHeader" when="tx-commit">
