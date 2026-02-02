@@ -32,6 +32,22 @@
             <log message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - Updating to SHIP_TO_STORE."/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
+            // FIXME: Ideally, STOREPICKUP orders should have contactMechIds set from the Facility during order import.
+            // However, changing the order import service would impact all clients.
+            // As a safe workaround, we handle it here for now.
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs"
+                          in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'POSTAL_ADDRESS',
+                       contactMechPurposeTypeId: ['PRIMARY_LOCATION']]"
+                          out-map="facilityAddressResult"/>
+            <set field="shipGroup.contactMechId" from="facilityAddressResult?.facilityContactMechs ? facilityAddressResult.facilityContactMechs[0]?.contactMechId : null"/>
+            <log message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated contactMechId to ${shipGroup.contactMechId} for Facility ${pickupFacilityId}"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs" in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'TELECOM_NUMBER',
+                       contactMechPurposeTypeId: ['PRIMARY_PHONE']]"
+                          out-map="facilityPhoneResult"/>
+            <set field="shipGroup.telecomContactMechId" from="facilityPhoneResult?.facilityContactMechs ? facilityPhoneResult.facilityContactMechs[0].contactMechId : null"/>
+            <log message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated telecomContactMechId to ${shipGroup.telecomContactMechId} for Facility ${pickupFacilityId}"/>
             <entity-update value-field="shipGroup"/>
 
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
@@ -41,7 +57,7 @@
             </entity-find>
 
             <if condition="!orderItems">
-                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - No order items found."/>
+                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - No active items found in the ship group for conversion."/>
                 <return error="true" message="No order items found"/>
             </if>
 
