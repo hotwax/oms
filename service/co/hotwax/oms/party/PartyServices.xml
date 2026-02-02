@@ -182,12 +182,7 @@
                 <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
 
                 <iterate list="identifications" entry="identification">
-                    <if condition="identification.getKey() == 'fileLimit' &amp;&amp; identification.getValue()">
-                        <set field="fileLimit" from="identification.getValue()"/>
-                    </if>
-                    <if condition="identification.getKey() == 'fileAction' &amp;&amp; identification.getValue()">
-                        <set field="fileAction" from="identification.getValue()"/>
-                    </if>
+                    <service-call name="create#org.apache.ofbiz.party.party.PartyIdentification" in-map="[partyId:partyId, partyIdentificationTypeId:identification.getKey(), idValue:identification.getValue()]"/>
                 </iterate>
 
                 <if condition="facilityId">
