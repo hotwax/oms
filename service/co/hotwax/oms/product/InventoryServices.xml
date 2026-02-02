@@ -63,7 +63,7 @@ under the License.
             </entity-find-one>
 
             <!--
-            <log message="========== start update#InventoryItemFromDetail ${inventoryItemId}: ${availableToPromiseDiff}/${quantityOnHandDiff} :: ${inventoryItem.availableToPromiseTotal}/${inventoryItem.quantityOnHandTotal}"/>
+            <log message="InventoryItem [Inventory Item ID: ${inventoryItemId}] - Start update from detail: ${availableToPromiseDiff}/${quantityOnHandDiff} :: ${inventoryItem.availableToPromiseTotal}/${inventoryItem.quantityOnHandTotal}"/>
             -->
             <!-- View queries won't work with transaction cache (for data updated within the tx), so if active use different approach -->
             <if condition="ec.transaction.isTransactionCacheActive()"><then>

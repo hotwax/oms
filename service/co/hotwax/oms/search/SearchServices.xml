@@ -20,7 +20,7 @@ under the License.
         <implements service="org.moqui.EntityServices.receive#DataFeed"/>
         <actions>
             <iterate list="documentList" entry="dataDocument">
-                <log level="info" message="Creating product index for oms productId : ${dataDocument._id}"/>
+                <log message="Product [Product ID: ${dataDocument._id}] - Creating product index."/>
                 <service-call name="co.hotwax.oms.search.SearchServices.call#CreateProductIndex" in-map="[productId:dataDocument._id]"
                         transaction="force-new" ignore-error="true"/>
             </iterate>

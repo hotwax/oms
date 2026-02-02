@@ -25,12 +25,11 @@
                 <field-map field-name="shipGroupSeqId"/>
             </entity-find-one>
             <if condition="!shipGroup">
-                <log level="error"
-                message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated shipmentMethodTypeId to SHIP_TO_STORE"/>
+                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - Not found."/>
                 <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
             </if>
             <set field="pickupFacilityId" from="shipGroup?.facilityId"/>
-            <log level="info" message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated shipmentMethodTypeId to SHIP_TO_STORE"/>
+            <log message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - Updating to SHIP_TO_STORE."/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
             // FIXME: Ideally, STOREPICKUP orders should have contactMechIds set from the Facility during order import.
@@ -58,7 +57,7 @@
             </entity-find>
 
             <if condition="!orderItems">
-                <log level="error" message="OrderItem Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - No active items found in the ship group for conversion"/>
+                <log level="error" message="OrderItemShipGroup [Order ID: ${orderId}, Ship Group Sequence ID: ${shipGroupSeqId}] - No active items found in the ship group for conversion."/>
                 <return error="true" message="No order items found"/>
             </if>
 
@@ -73,9 +72,9 @@
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
-                    <log level="info" message="OrderItem Order ID ${orderId}, OrderItemSeqId: ${orderItem.orderItemSeqId} - Successfully rejected for ShipToStore conversion"/>
+                    <log message="OrderItem [Order ID: ${orderItem.orderId}, Order Item Sequence ID: ${orderItem.orderItemSeqId}] - Successfully rejected item."/>
                     <else>
-                        <log level="warn" message="OrderItem Order ID ${orderId}, OrderItemSeqId: ${orderItem.orderItemSeqId} - Failed to reject for ShipToStore conversion"/>
+                        <log level="warn" message="OrderItem [Order ID: ${orderItem.orderId}, Order Item Sequence ID: ${orderItem.orderItemSeqId}] - Failed to reject item."/>
                     </else>
                 </if>
             </iterate>
