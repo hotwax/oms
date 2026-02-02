@@ -25,6 +25,10 @@
             <parameter name="status" required="true">
                 <description>Expected values: A (active) or T (terminated).</description>
             </parameter>
+            <parameter name="thruDate"/>
+            <parameter name="identifications" type="Map">
+                <description>Map of party identifications with partyIdentificationTypeId as key and idValue as value</description>
+            </parameter>
         </in-parameters>
         <out-parameters>
             <parameter name="partyId"/>
@@ -74,7 +78,7 @@
                     <log level="info" message="store#Picker resolved partyId=${partyId} from externalPartyId=${externalPartyId}"/>
                 </if>
             </if>
-            
+
             <if condition="ec.message.hasError()">
                 <return/>
             </if>
@@ -117,6 +121,41 @@
                         </if>
                     </if>
                 </if>
+
+                <!-- Termination Logic -->
+                <if condition="partyStatusId == 'PARTY_DISABLED'">
+                    <log level="info" message="store#Picker terminating party ${partyId}"/>
+                    <!-- Set thruDate to current timestamp if not provided -->
+                    <if condition="!thruDate">
+                        <set field="thruDate" from="ec.user.nowTimestamp"/>
+                    </if>
+                    
+                    <!-- Update FacilityParty with thruDate -->
+                    <if condition="facilityId">
+                        <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityParty" list="fpList">
+                            <econdition field-name="facilityId" from="facilityId"/>
+                            <econdition field-name="partyId" from="partyId"/>
+                            <econdition field-name="roleTypeId" from="roleTypeId"/>
+                            <date-filter/>
+                        </entity-find>
+                        <if condition="fpList">
+                            <iterate list="fpList" entry="fp">
+                                <service-call name="update#org.apache.ofbiz.product.facility.FacilityParty" in-map="[facilityId:fp.facilityId, partyId:fp.partyId, roleTypeId:fp.roleTypeId, fromDate:fp.fromDate, thruDate:thruDate]"/>
+                            </iterate>
+                        </if>
+                    </if>
+                    
+                    <!-- Remove PartyRole for terminated status -->
+                    <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="partyRoleList">
+                        <econdition field-name="partyId" from="partyId"/>
+                        <econdition field-name="roleTypeId" from="roleTypeId"/>
+                    </entity-find>
+                    <if condition="partyRoleList">
+                        <iterate list="partyRoleList" entry="partyRole">
+                            <service-call name="delete#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyRole.partyId, roleTypeId:partyRole.roleTypeId]"/>
+                        </iterate>
+                    </if>
+                </if>
             </if>
 
             <if condition="!partyId &amp;&amp; partyStatusId == 'PARTY_ENABLED'">
@@ -141,6 +180,15 @@
                 </if>
 
                 <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
+
+                <iterate list="identifications" entry="identification">
+                    <if condition="identification.getKey() == 'fileLimit' &amp;&amp; identification.getValue()">
+                        <set field="fileLimit" from="identification.getValue()"/>
+                    </if>
+                    <if condition="identification.getKey() == 'fileAction' &amp;&amp; identification.getValue()">
+                        <set field="fileAction" from="identification.getValue()"/>
+                    </if>
+                </iterate>
 
                 <if condition="facilityId">
                     <log level="info" message="store#Picker linking party ${partyId} to facility ${facilityId} as ${roleTypeId}"/>

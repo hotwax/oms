@@ -98,6 +98,7 @@
     <seca id="pickerUpdate" service="co.hotwax.oms.party.PartyServices.store#Picker"
           when="post-service">
         <actions>
+            <log message="===============partyId ${partyId}========="/>
             <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
