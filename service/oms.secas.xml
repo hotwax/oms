@@ -101,4 +101,31 @@
             <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
+
+    <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="tx-commit">
+        <condition><expression>orderId</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.order.OrderServices.split#OrderASNItems" in-map="[orderId:orderId]"/>
+        </actions>
+    </seca>
+
+    <seca id="ShopifyOrderSetPreorderPromisedDate" service="co.hotwax.oms.order.OrderServices.split#OrderASNItems" when="post-commit">
+        <condition><expression>orderId</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" in-map="[orderId:orderId]"/>
+        </actions>
+    </seca>
+
+    <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" when="post-commit">
+        <condition><expression>orderId</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.order.approve#Order" in-map="[orderId: orderId]"/>
+        </actions>
+    </seca>
+    <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-commit">
+        <condition><expression>orderId</expression></condition>
+        <actions>
+            <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context"/>
+        </actions>
+    </seca>
 </secas>

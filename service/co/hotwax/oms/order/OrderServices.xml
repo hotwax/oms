@@ -1687,6 +1687,75 @@ under the License.
             </iterate>
         </actions>
     </service>
+    <service verb="approve" noun="Order">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <set field="approveOrder" from="true"/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader">
+                <set field="approveOrder" from="false"/>
+            </if>
+            <if condition="approveOrder">
+                <if condition="!(orderHeader.statusId in ['ORDER_CREATED', 'ORDER_HOLD'])">
+                    <set field="approveOrder" from="false"/>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                    <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                </entity-find-one>
+                <if condition="productStore &amp;&amp; !'Y'.equalsIgnoreCase(productStore.autoApproveOrder)">
+                    <set field="approveOrder" from="false"/>
+                </if>
+                <if condition="'N'.equalsIgnoreCase(orderHeader.autoApprove)">
+                    <set field="approveOrder" from="false"/>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="productStoreSetting" cache="true">
+                    <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                    <field-map field-name="settingTypeEnumId" value="APPR_WO_PMNT_CHK"/>
+                </entity-find-one>
+                <if condition="!(productStoreSetting?.settingValue?.equalsIgnoreCase('Y'))">
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderPaymentPreference" list="paymentPreferences">
+                        <econdition field-name="orderId" from="orderId"/>
+                        <econdition field-name="statusId" value="PAYMENT_NOT_RECEIVED"/>
+                    </entity-find>
+                    <set field="isNonCashOnDeliveryMethod" from="false"/>
+                    <iterate list="paymentPreferences" entry="paymentPreference">
+                        <if condition="paymentPreference.paymentMethodTypeId != 'EXT_SHOP_CASH_ON_DEL'">
+                            <set field="isNonCashOnDeliveryMethod" from="true"/>
+                        </if>
+                    </iterate>
+                    <if condition="isNonCashOnDeliveryMethod">
+                        <set field="approveOrder" from="false"/>
+                    </if>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus"
+                              in-map="[orderId:orderId, statusId:'ORDER_APPROVED', setItemStatus:true]"/>
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <iterate list="orderItems" entry="orderItem">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
+                        <field-map field-name="orderId" from="orderId"/>
+                        <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                    </entity-find-one>
+                    <set field="facilityId" from="shipGroup?.facilityId"/>
+                    <if condition="facilityId">
+                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                      in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, facilityId:facilityId, quantity:orderItem.quantity]"/>
+                    </if>
+                </iterate>
+            </if>
+        </actions>
+    </service>
     <service verb="create" noun="POSOrderReservationAndIssuance">
         <in-parameters>
             <parameter name="orderId" required="true"/>
