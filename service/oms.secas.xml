@@ -102,7 +102,7 @@
         </actions>
     </seca>
 
-    <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="tx-commit">
+    <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-commit">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.split#OrderASNItems" in-map="[orderId:orderId]"/>
@@ -126,6 +126,17 @@
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context"/>
+        </actions>
+    </seca>
+    <seca id="IndexOrder" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="tx-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <if condition="orderId">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]" ignore-error="true"/>
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId]" ignore-error="true" />
+            </if>
         </actions>
     </seca>
 </secas>
