@@ -1773,6 +1773,18 @@ under the License.
                 <econdition field-name="shipmentMethodTypeId" value="POS_COMPLETED"/>
                 <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
             </entity-find>
+            <if condition="posOrderItems">
+                <entity-find-one entity-name="co.hotwax.facility.FacilityAndType" value-field="facilityAndType" cache="true">
+                    <field-map field-name="facilityId" from="posOrderItems[0].facilityId"/>
+                </entity-find-one>
+
+                <if condition="facilityAndType">
+                    <if condition="facilityAndType.parentTypeId != 'PHYSICAL_STORE'">
+                        <return type="warning" message="POS Order: ${orderId} with facility: ${posOrderItems[0].facilityId} is not eligible for issuance."/>
+                    </if>
+                </if>
+            </if>
+
 
             <iterate list="posOrderItems" entry="orderItem">
                 <set field="itemQuantity" from="orderItem.quantity" type="BigDecimal" default-value="0"/>
