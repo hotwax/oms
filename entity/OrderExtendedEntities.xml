@@ -45,6 +45,12 @@ under the License.
         <relationship type="many" related="co.hotwax.order.OrderIdentification" short-alias="identifications">
             <key-map field-name="orderId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" short-alias="itemShipGroupAssocs">
+            <key-map field-name="orderId"/>
+        </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderContent" short-alias="contents">
+            <key-map field-name="orderId"/>
+        </relationship>
         <!-- Adding at order level for exchange orders where orderItemSeqId="_NA_" -->
         <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAssoc" short-alias="itemAssocs">
             <key-map field-name="orderId"/>
@@ -60,6 +66,8 @@ under the License.
             <detail relationship="shipGroups" use-master="default"/>
             <detail relationship="statuses"/>
             <detail relationship="identifications"/>
+            <detail relationship="itemShipGroupAssocs"/>
+            <detail relationship="contents"/>
             <detail relationship="itemAssocs"/>
         </master>
     </extend-entity>
@@ -86,11 +94,16 @@ under the License.
             <key-map field-name="orderId"/>
             <key-map field-name="orderItemSeqId"/>
         </relationship>
+        <relationship type="many" related="org.apache.ofbiz.order.order.OrderItemAssoc" short-alias="assocs">
+            <key-map field-name="orderId"/>
+            <key-map field-name="orderItemSeqId"/>
+        </relationship>
 
         <master>
             <detail relationship="adjustments" use-master="default"/>
             <detail relationship="attributes"/>
             <detail relationship="statuses"/>
+            <detail relationship="assocs"/>
         </master>
     </extend-entity>
     <extend-entity entity-name="OrderAdjustment" package="org.apache.ofbiz.order.order">
