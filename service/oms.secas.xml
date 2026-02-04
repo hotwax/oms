@@ -119,7 +119,7 @@
     <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" when="post-commit">
         <condition><expression>orderId</expression></condition>
         <actions>
-            <service-call name="co.hotwax.oms.order.approve#Order" in-map="[orderId: orderId]"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.approve#Order" in-map="[orderId: orderId]"/>
         </actions>
     </seca>
     <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-commit">
