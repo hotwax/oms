@@ -1768,7 +1768,7 @@ under the License.
                 <return message="Order: ${orderId} not eligible for issuance"/>
             </if>
 
-            <entity-find entity-name="co.hotwax.warehouse.OrderItemShipGroupAndAssoc" list="posOrderItems">
+            <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="posOrderItems">
                 <econdition field-name="orderId" from="orderId"/>
                 <econdition field-name="shipmentMethodTypeId" value="POS_COMPLETED"/>
                 <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
