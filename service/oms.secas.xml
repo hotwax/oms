@@ -102,27 +102,27 @@
         </actions>
     </seca>
 
-    <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-commit">
+    <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.split#OrderASNItems" in-map="[orderId:orderId]"/>
         </actions>
     </seca>
 
-    <seca id="ShopifyOrderSetPreorderPromisedDate" service="co.hotwax.oms.order.OrderServices.split#OrderASNItems" when="post-commit">
+    <seca id="ShopifyOrderSetPreorderPromisedDate" service="co.hotwax.oms.order.OrderServices.split#OrderASNItems" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" in-map="[orderId:orderId]"/>
         </actions>
     </seca>
 
-    <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" when="post-commit">
+    <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.approve#Order" in-map="[orderId: orderId]"/>
         </actions>
     </seca>
-    <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-commit">
+    <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context"/>
@@ -135,7 +135,6 @@
         <actions>
             <if condition="orderId">
                 <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]" ignore-error="true"/>
-                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderItem" in-map="[orderId:orderId]" ignore-error="true" />
             </if>
         </actions>
     </seca>
