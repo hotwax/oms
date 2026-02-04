@@ -823,7 +823,7 @@ under the License.
             <set field="pendingItemShipGroupAssocs" from="itemShipGroupAssocs"/>
             <set field="itemShipGroupAssocs" from="[]"/>
 
-            <set field="presentmentCurrencyCode" value="null"/>
+            <set field="presentmentCurrencyCode" from="null"/>
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="context" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
 
