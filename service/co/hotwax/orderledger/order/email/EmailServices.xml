@@ -399,15 +399,14 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
-            </if>
             <script>
                 import java.time.LocalDateTime
                 import java.time.LocalTime
                 import java.sql.Time
             </script>
+            <set field="hasOrders" from="false"/>
             <iterate list="ordersIterator" entry="order">
+                <set field="hasOrders" from="true"/>
                 <script>
                     LocalDateTime orderDateTime = order.orderDate.toLocalDateTime()
                     String dayOfWeek = orderDateTime.getDayOfWeek().toString().toLowerCase()
@@ -458,6 +457,10 @@ under the License.
             <if condition="jobName">
                 <service-call name="update#moqui.service.job.ServiceJobParameter"
                               in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+
+            <if condition="!hasOrders">
+                <log message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
             </if>
             <return message="BOPIS store close notification service ran successfully at ${nowDate}."/>
         </actions>
@@ -511,10 +514,9 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS orders found at ${nowDate}, not sending notification email."/>
-            </if>
+            <set field="hasOrders" from="false"/>
             <iterate list="ordersIterator" entry="order">
+                <set field="hasOrders" from="true"/>
                 <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
                     <econdition field-name="facilityId" from="order?.facilityId"/>
                     <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
@@ -535,6 +537,10 @@ under the License.
             <if condition="jobName">
                 <service-call name="update#moqui.service.job.ServiceJobParameter"
                               in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+
+            <if condition="!hasOrders">
+                <log message="No valid BOPIS orders found at ${nowDate}, not sending notification email."/>
             </if>
             <return message="New BOPIS Order Notification Service Ran Successfully At ${nowDate}."/>
         </actions>
@@ -574,6 +580,7 @@ under the License.
                 def intervalList = (1..maxOccurrences).collect { it }
             </script>
 
+            <set field="anyShipmentsFound" from="false"/>
             <iterate list="intervalList" entry="interval">
                 <script>
                     def targetDate = nowTimestamp.toLocalDateTime().minusDays(interval * intervalDays)
@@ -591,16 +598,17 @@ under the License.
                     <use-iterator/>
                 </entity-find>
 
-                <if condition="!shipments.hasNext()">
-                    <return message="No valid BOPIS orders found at ${nowDate}, not sending reminder email."/>
-                </if>
-
                 <!-- Iterate over shipments -->
                 <iterate list="shipments" entry="shipment">
+                    <set field="anyShipmentsFound" from="true"/>
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                   in-map="[shipmentId: shipment.shipmentId, emailType: emailType]" async="true" />
                 </iterate>
             </iterate>
+
+            <if condition="!anyShipmentsFound">
+                <log message="No valid BOPIS orders found at ${nowTimestamp}, not sending reminder email."/>
+            </if>
             <return type="success" message="Pickup reminder service ran successfully at ${nowTimestamp}."/>
         </actions>
     </service>
@@ -670,12 +678,11 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS cancelled orders found at ${nowDate}, not sending notification email to store."/>
-            </if>
+            <set field="hasOrders" from="false"/>
             <set field="orderItemsFacility" from="[:]"/>
             <set field="facilityIds" from="new HashSet()"/>
             <iterate list="ordersIterator" entry="orderItem">
+                <set field="hasOrders" from="true"/>
                 <if condition="orderItem.orderId &amp;&amp; orderItem.fromFacilityId &amp;&amp; orderItem.orderItemSeqId">
                     <script>
                         orderItemsFacility.computeIfAbsent(orderItem.orderId) { [:] }.computeIfAbsent(orderItem.fromFacilityId) { [] } &lt;&lt; [orderId: orderItem.orderId, orderItemSeqId: orderItem.orderItemSeqId]
@@ -717,6 +724,9 @@ under the License.
             <if condition="jobName">
                 <service-call name="update#moqui.service.job.ServiceJobParameter"
                               in-map="[jobName:lastRunParam.jobName, parameterName:lastRunParam.parameterName, parameterValue:nowDate]"/>
+            </if>
+            <if condition="!hasOrders">
+                <log message="No valid BOPIS orders found at ${nowDate}, not sending bulk BOPIS order cancelled email to store."/>
             </if>
             <return message="Bulk BOPIS Order Cancelled Email To Store Service Ran Successfully At ${nowDate}."/>
         </actions>
