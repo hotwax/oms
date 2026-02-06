@@ -406,7 +406,9 @@ under the License.
             </script>
             <set field="hasOrders" from="false"/>
             <iterate list="ordersIterator" entry="order">
-                <set field="hasOrders" from="true"/>
+                <if condition="!hasOrders">
+                    <set field="hasOrders" from="true"/>
+                </if>
                 <script>
                     LocalDateTime orderDateTime = order.orderDate.toLocalDateTime()
                     String dayOfWeek = orderDateTime.getDayOfWeek().toString().toLowerCase()
@@ -516,7 +518,9 @@ under the License.
 
             <set field="hasOrders" from="false"/>
             <iterate list="ordersIterator" entry="order">
-                <set field="hasOrders" from="true"/>
+                <if condition="!hasOrders">
+                    <set field="hasOrders" from="true"/>
+                </if>
                 <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
                     <econdition field-name="facilityId" from="order?.facilityId"/>
                     <econdition field-name="contactMechTypeId" value="EMAIL_ADDRESS"/>
@@ -600,7 +604,9 @@ under the License.
 
                 <!-- Iterate over shipments -->
                 <iterate list="shipments" entry="shipment">
-                    <set field="anyShipmentsFound" from="true"/>
+                    <if condition="!anyShipmentsFound">
+                        <set field="anyShipmentsFound" from="true"/>
+                    </if>
                     <service-call name="co.hotwax.orderledger.order.email.EmailServices.send#EmailOnOrderEvents"
                                   in-map="[shipmentId: shipment.shipmentId, emailType: emailType]" async="true" />
                 </iterate>
@@ -682,7 +688,9 @@ under the License.
             <set field="orderItemsFacility" from="[:]"/>
             <set field="facilityIds" from="new HashSet()"/>
             <iterate list="ordersIterator" entry="orderItem">
-                <set field="hasOrders" from="true"/>
+                <if condition="!hasOrders">
+                    <set field="hasOrders" from="true"/>
+                </if>
                 <if condition="orderItem.orderId &amp;&amp; orderItem.fromFacilityId &amp;&amp; orderItem.orderItemSeqId">
                     <script>
                         orderItemsFacility.computeIfAbsent(orderItem.orderId) { [:] }.computeIfAbsent(orderItem.fromFacilityId) { [] } &lt;&lt; [orderId: orderItem.orderId, orderItemSeqId: orderItem.orderItemSeqId]
