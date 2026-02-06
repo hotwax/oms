@@ -216,7 +216,7 @@ under the License.
 
                 <!-- Fetch items for this order -->
                 <entity-find entity-name="co.hotwax.oms.order.OrderHeaderShipGroupShipment" list="eligibleShipGroups">
-                    <search-form-inputs/>
+                    <search-form-inputs input-fields-map="context + [pageNoLimit: true]"/>
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" ignore-if-empty="true"/>
                     <select-field field-name="shipGroupSeqId"/>
@@ -226,7 +226,7 @@ under the License.
                 <set field="eligibleShipGroupSeqIds" from="eligibleShipGroups.collect{ it.shipGroupSeqId }"/>
 
                 <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="orderItems">
-                    <search-form-inputs input-fields-map="[statusId: statusId]" />
+                    <search-form-inputs input-fields-map="[statusId: statusId, pageNoLimit: true]"/>
                     <econdition field-name="orderId" from="orderHeader.orderId"/>
                     <econdition field-name="facilityId" ignore-if-empty="true"/>
                     <econdition field-name="shipGroupSeqId" operator="in" from="eligibleShipGroupSeqIds"/>
