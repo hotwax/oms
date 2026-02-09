@@ -26,13 +26,29 @@
             </entity-find-one>
             <if condition="!shipGroup">
                 <log level="error"
-                     message="Ship group ${shipGroupSeqId} not found for order ${orderId}"/>
+                message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated shipmentMethodTypeId to SHIP_TO_STORE"/>
                 <return error="true" message="Ship group ${shipGroupSeqId} not found"/>
             </if>
             <set field="pickupFacilityId" from="shipGroup?.facilityId"/>
-            <log level="info" message="Updating ship group ${shipGroupSeqId} to SHIP_TO_STORE"/>
+            <log level="info" message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated shipmentMethodTypeId to SHIP_TO_STORE"/>
             <set field="shipGroup.shipmentMethodTypeId" value="SHIP_TO_STORE"/>
             <set field="shipGroup.orderFacilityId" from="pickupFacilityId"/>
+            // FIXME: Ideally, STOREPICKUP orders should have contactMechIds set from the Facility during order import.
+            // However, changing the order import service would impact all clients.
+            // As a safe workaround, we handle it here for now.
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs"
+                          in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'POSTAL_ADDRESS',
+                       contactMechPurposeTypeId: ['PRIMARY_LOCATION']]"
+                          out-map="facilityAddressResult"/>
+            <set field="shipGroup.contactMechId" from="facilityAddressResult?.facilityContactMechs ? facilityAddressResult.facilityContactMechs[0]?.contactMechId : null"/>
+            <log message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated contactMechId to ${shipGroup.contactMechId} for Facility ${pickupFacilityId}"/>
+            <service-call name="co.hotwax.oms.contact.ContactMechServices.get#FacilityContactMechs" in-map="[facilityId: pickupFacilityId,
+                       contactMechTypeId: 'TELECOM_NUMBER',
+                       contactMechPurposeTypeId: ['PRIMARY_PHONE']]"
+                          out-map="facilityPhoneResult"/>
+            <set field="shipGroup.telecomContactMechId" from="facilityPhoneResult?.facilityContactMechs ? facilityPhoneResult.facilityContactMechs[0].contactMechId : null"/>
+            <log message="OrderItemShipGroup Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - Updated telecomContactMechId to ${shipGroup.telecomContactMechId} for Facility ${pickupFacilityId}"/>
             <entity-update value-field="shipGroup"/>
 
             <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
@@ -42,7 +58,7 @@
             </entity-find>
 
             <if condition="!orderItems">
-                <log level="error" message="No order items found in ship group ${shipGroupSeqId}"/>
+                <log level="error" message="OrderItem Order ID: ${orderId}, ShipGroupSeqId: ${shipGroupSeqId} - No active items found in the ship group for conversion"/>
                 <return error="true" message="No order items found"/>
             </if>
 
@@ -57,9 +73,9 @@
 
                 <if condition="rejectResult &amp;&amp; !rejectResult.hasError">
                     <set field="rejectedCount" from="rejectedCount + 1"/>
-                    <log level="info" message="Successfully rejected item ${orderItem.orderItemSeqId}"/>
+                    <log level="info" message="OrderItem Order ID ${orderId}, OrderItemSeqId: ${orderItem.orderItemSeqId} - Successfully rejected for ShipToStore conversion"/>
                     <else>
-                        <log level="warn" message="Failed to reject item ${orderItem.orderItemSeqId}"/>
+                        <log level="warn" message="OrderItem Order ID ${orderId}, OrderItemSeqId: ${orderItem.orderItemSeqId} - Failed to reject for ShipToStore conversion"/>
                     </else>
                 </if>
             </iterate>

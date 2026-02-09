@@ -197,4 +197,132 @@
             </if>
         </actions>
     </service>
+
+    <service verb="create" noun="Party">
+        <description>Create a Party (Person or PartyGroup) with roles, identifications, and contact mechs.</description>
+        <in-parameters>
+            <parameter name="partyId"/>
+            <parameter name="externalId"/>
+            <parameter name="partyTypeId"/>
+            <parameter name="statusId" default-value="PARTY_ENABLED"/>
+            <parameter name="roleTypeId" default-value="CUSTOMER"/>
+            <parameter name="firstName"/>
+            <parameter name="lastName"/>
+            <parameter name="groupName"/>
+            <parameter name="nickName"/>
+            <parameter name="partyIdentifications" type="Map"/>
+            <parameter name="identifications" type="List">
+                <parameter name="identification" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.party.party.PartyIdentification" include="nonpk"/>
+                </parameter>
+            </parameter>
+            <parameter name="roles" type="List">
+                <parameter name="role" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.party.party.PartyRole"/>
+                </parameter>
+            </parameter>
+            <parameter name="contactMechs" type="List">
+                <parameter name="contactMech" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.party.contact.PartyContactMech" include="nonpk"/>
+                    <parameter name="purposes" type="List">
+                        <parameter name="purpose" type="Map">
+                            <auto-parameters entity-name="org.apache.ofbiz.party.contact.PartyContactMechPurpose" include="nonpk"/>
+                        </parameter>
+                    </parameter>
+                </parameter>
+            </parameter>
+            <parameter name="primaryEmail"/>
+            <parameter name="primaryPhoneNumber"/>
+            <parameter name="primaryPurpose" default-value="PRIMARY_LOCATION"/>
+            <parameter name="address1"/>
+            <parameter name="address2"/>
+            <parameter name="city"/>
+            <parameter name="stateProvinceGeoId"/>
+            <parameter name="countryGeoId"/>
+            <parameter name="postalCode"/>
+            <parameter name="toName"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="partyId"/>
+        </out-parameters>
+        <actions>
+            <if condition="!partyTypeId">
+                <set field="partyTypeId" from="groupName ? 'PARTY_GROUP' : 'PERSON'"/>
+            </if>
+
+            <if condition="!partyId &amp;&amp; externalId">
+                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="partyList" limit="1">
+                    <econdition field-name="externalId"/>
+                </entity-find>
+                <if condition="partyList">
+                    <set field="partyId" from="partyList[0].partyId"/>
+                </if>
+            </if>
+
+            <if condition="!partyId">
+                <service-call name="create#org.apache.ofbiz.party.party.Party"
+                              in-map="[partyTypeId:partyTypeId, externalId:externalId, statusId:statusId]"
+                              out-map="partyOut"/>
+                <set field="partyId" from="partyOut.partyId"/>
+            </if>
+
+            <if condition="!roles"><set field="roles" from="[]"/></if>
+            <if condition="roleTypeId">
+                <set field="roles" from="roles + [partyId: partyId, roleTypeId:roleTypeId]"/>
+            </if>
+
+            <if condition="!identifications"><set field="identifications" from="[]"/></if>
+            <if condition="partyIdentifications">
+                <script>
+                    if (partyIdentifications) {
+                        partyIdentifications.each { k, v ->
+                            if (k &amp;&amp; v) identifications.add([partyIdentificationTypeId:k, idValue:v])
+                        }
+                    }
+                </script>
+            </if>
+
+            <if condition="!contactMechs"><set field="contactMechs" from="[]"/></if>
+            <if condition="primaryEmail">
+                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
+                              in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:primaryEmail]"
+                              out-map="emailOut"/>
+                <set field="contactMechs" from="contactMechs + [[contactMechId:emailOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_EMAIL']]] ]"/>
+            </if>
+            <if condition="primaryPhoneNumber">
+                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                              in-map="[contactNumber:primaryPhoneNumber]"
+                              out-map="phoneOut"/>
+                <set field="contactMechs" from="contactMechs + [[contactMechId:phoneOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_PHONE']]] ]"/>
+            </if>
+            <if condition="address1">
+                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                              in-map="[toName:toName, address1:address1, address2:address2, city:city, stateProvinceGeoId:stateProvinceGeoId, postalCode:postalCode, countryGeoId:countryGeoId]"
+                              out-map="postalOut"/>
+                <set field="contactMechs" from="contactMechs + [[contactMechId:postalOut.contactMechId, purposes:[[contactMechPurposeTypeId:primaryPurpose]]]]"/>
+            </if>
+
+            <if condition="partyTypeId == 'PERSON'">
+                <entity-find-one entity-name="org.apache.ofbiz.party.party.Person" value-field="person">
+                    <field-map field-name="partyId" from="partyId"/>
+                </entity-find-one>
+                <if condition="!person">
+                    <set field="personMap" from="[partyId:partyId, firstName:firstName, lastName:lastName, nickname:nickName, roles:roles, identifications:identifications, contactMechs:contactMechs]"/>
+                    <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="personMap"/>
+                    <entity-find entity-name="org.apache.ofbiz.party.party.PartyRole" list="role">
+                        <econdition field-name="partyId"/>
+                    </entity-find>
+                </if>
+            </if>
+            <if condition="partyTypeId == 'PARTY_GROUP'">
+                <entity-find-one entity-name="org.apache.ofbiz.party.party.PartyGroup" value-field="partyGroup">
+                    <field-map field-name="partyId" from="partyId"/>
+                </entity-find-one>
+                <if condition="!partyGroup">
+                    <set field="groupMap" from="[partyId:partyId, groupName:groupName, roles:roles, identifications:identifications, contactMechs:contactMechs]"/>
+                    <service-call name="create#org.apache.ofbiz.party.party.PartyGroup" in-map="groupMap"/>
+                </if>
+            </if>
+        </actions>
+    </service>
 </services>
