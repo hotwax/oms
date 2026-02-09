@@ -1837,12 +1837,13 @@ under the License.
                                   in-map="[partyId:'system', physicalInventoryDate: ec.user.nowTimestamp]" out-map="physicalInventoryResult"/>
                     <set field="availableToPromiseDiff" from="issueItem.quantity" type="BigDecimal"/>
                     <set field="quantityOnHandDiff" from="issueItem.quantity" type="BigDecimal"/>
+                    <!-- Not passing reasonEnumId as 'POS_SALE' as the OOTB OFBiz ProductInventoryView screen shows Sale(Event)
+                    only when only orderId is populated and not the reasonEnumId -->
                     <set field="inventoryItemVariance" from="[
                             physicalInventoryId: physicalInventoryResult.physicalInventoryId,
                             inventoryItemId: inventoryItemId,
                             availableToPromiseVar: availableToPromiseDiff.negate(),
-                            quantityOnHandVar: quantityOnHandDiff.negate(),
-                            reasonEnumId: 'POS_SALE'
+                            quantityOnHandVar: quantityOnHandDiff.negate()
                         ]"/>
                     <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemVariance" in-map="inventoryItemVariance"/>
 
@@ -1852,8 +1853,7 @@ under the License.
                             shipGroupSeqId:orderItem.shipGroupSeqId, itemIssuanceId:itemIssuanceOut?.itemIssuanceId,
                             physicalInventoryId:physicalInventoryResult.physicalInventoryId,
                             availableToPromiseDiff:availableToPromiseDiff.negate(),
-                            quantityOnHandDiff:quantityOnHandDiff.negate(),
-                            reasonEnumId: 'POS_SALE']"/>
+                            quantityOnHandDiff:quantityOnHandDiff.negate()]"/>
                 </iterate>
             </iterate>
         </actions>

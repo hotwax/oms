@@ -125,7 +125,7 @@
     <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
-            <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context" ignore-error="true"/>
         </actions>
     </seca>
     <seca id="IndexOrder" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="tx-commit">
