@@ -166,17 +166,24 @@
                 <log level="info" message="store#Picker created new partyId=${partyId} for externalPartyId=${externalPartyId}"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="[partyId:partyId, firstName:firstName, lastName:lastName]"/>
 
+              <log message="==emailAddress==========${partyId}========${emailAddress}===="/>
+
                 <if condition="emailAddress">
+                  <log message="==calling emailAddress==========${partyId}========${emailAddress}===="/>
                     <service-call name="create#org.apache.ofbiz.party.contact.ContactMech" out-map="emailOut"
                                   in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:emailAddress]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
                                   in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, allowSolicitation:'N']"/>
+                  <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose"
+                                in-map="[partyId:partyId, contactMechId:emailOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_EMAIL', fromDate:ec.user.nowTimestamp]"/>
                 </if>
                 <if condition="contactNumber">
                     <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber" out-map="phoneOut"
                                   in-map="[contactNumber:contactNumber]"/>
                     <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMech"
                                   in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId]"/>
+                  <service-call name="create#org.apache.ofbiz.party.contact.PartyContactMechPurpose"
+                                in-map="[partyId:partyId, contactMechId:phoneOut.contactMechId, contactMechPurposeTypeId:'PRIMARY_PHONE', fromDate:ec.user.nowTimestamp]"/>
                 </if>
 
                 <service-call name="create#org.apache.ofbiz.party.party.PartyRole" in-map="[partyId:partyId, roleTypeId:roleTypeId]"/>
