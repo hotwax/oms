@@ -57,18 +57,6 @@ under the License.
             </iterate>
         </actions>
     </service>
-    <service verb="test" noun="CreateSalesOrder">
-        <in-parameters>
-            <parameter name="order" type="Map"/>
-        </in-parameters>
-        <out-parameters>
-            <parameter name="orderId"/>
-        </out-parameters>
-        <actions>
-<!--            <service-call name="co.hotwax.oms.order.OrderServices.create#SalesOrder" in-map="order" out-map="context"/>-->
-            <set field="orderId" value="Samba"/>
-        </actions>
-    </service>
 
     <service verb="prepare" noun="SalesOrderShipGroups">
         <description>Normalize ship groups and items for sales order creation.</description>
@@ -90,15 +78,13 @@ under the License.
             <if condition="!itemShipGroupAssocs">
                 <set field="itemShipGroupAssocs" from="[]"/>
             </if>
-            <set field="shipGroupEd" from="ec.entity.getEntityDefinition('org.apache.ofbiz.order.order.OrderItemShipGroup')"/>
-            <set field="orderItemEd" from="ec.entity.getEntityDefinition('org.apache.ofbiz.order.order.OrderItem')"/>
+            <if condition="shipGroups">
+                <return error="true" message="Missing ship groups, skipping order import"/>
+            </if>
             <if condition="shipGroups">
                 <set field="normalizedShipGroups" from="[]"/>
                 <iterate list="shipGroups" entry="shipGroup">
                     <set field="shipGroupMap" from="shipGroup"/>
-                    <if condition="!shipGroupMap.shipGroupSeqId">
-                        <set field="shipGroupMap.shipGroupSeqId" from="ec.entityFacade.sequencedIdPrimaryEd(shipGroupEd)"/>
-                    </if>
                     <if condition="!shipGroupMap.carrierRoleTypeId">
                         <set field="shipGroupMap.carrierRoleTypeId" value="CARRIER"/>
                     </if>
@@ -217,12 +203,6 @@ under the License.
                         <if condition="!itemMap.isModifiedPrice">
                             <set field="itemMap.isModifiedPrice" value="Y"/>
                         </if>
-                        <if condition="!itemMap.orderItemSeqId">
-                            <set field="itemMap.orderItemSeqId" from="ec.entityFacade.sequencedIdPrimaryEd(orderItemEd)"/>
-                        </if>
-                        <if condition="!itemMap.shipGroupSeqId">
-                            <set field="itemMap.shipGroupSeqId" from="shipGroupMap.shipGroupSeqId"/>
-                        </if>
                         <if condition="!itemMap.requestedShipMethTypeId &amp;&amp; shipGroupMap.shipmentMethodTypeId">
                             <set field="itemMap.requestedShipMethTypeId" from="shipGroupMap.shipmentMethodTypeId"/>
                         </if>
@@ -262,9 +242,6 @@ under the License.
                                 <set field="itemMap.prodCatalogId" from="storeCatalogList[0].prodCatalogId"/>
                             </if>
                         </if>
-                        <if condition="item.orderItemAttributes">
-                            <set field="itemMap.attributes" from="item.orderItemAttributes"/>
-                        </if>
                         <if condition="!item.adjustments &amp;&amp; item.itemAdjustments">
                             <set field="item.adjustments" from="item.itemAdjustments"/>
                         </if>
@@ -277,9 +254,6 @@ under the License.
                                 </if>
                                 <if condition="itemAdjMap.setShipGroup == 'N'">
                                     <set field="itemAdjMap.shipGroupSeqId" value="_NA_"/>
-                                </if>
-                                <if condition="!itemAdjMap.shipGroupSeqId">
-                                    <set field="itemAdjMap.shipGroupSeqId" from="shipGroupMap.shipGroupSeqId"/>
                                 </if>
                                 <if condition="itemAdj.adjustmentAttributes">
                                     <set field="itemAdjMap.attributes" from="itemAdj.adjustmentAttributes"/>
@@ -304,14 +278,8 @@ under the License.
                         <if condition="!itemMap.statuses &amp;&amp; itemMap.statusId">
                             <set field="itemMap.statuses" from="[[statusId:itemMap.statusId, statusDatetime:(orderStatusDatetime ?: ec.user.nowTimestamp), statusUserLogin:ec.user.getUsername()]]"/>
                         </if>
-                        <if condition="item.orderItemAssociations">
-                            <set field="itemMap.assocs" from="item.orderItemAssociations"/>
-                        </if>
                         <if condition="itemMap.assocs">
                             <iterate list="itemMap.assocs" entry="assoc">
-                                <if condition="!assoc.shipGroupSeqId">
-                                    <set field="assoc.shipGroupSeqId" from="shipGroupMap.shipGroupSeqId"/>
-                                </if>
                                 <if condition="assoc.toOrderExternalId &amp;&amp; !assoc.toOrderId">
                                     <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="assocOrder">
                                         <field-map field-name="externalId" from="assoc.toOrderExternalId"/>
@@ -322,7 +290,7 @@ under the License.
                                 </if>
                             </iterate>
                         </if>
-                        <set field="itemShipGroupAssocs" from="itemShipGroupAssocs + [[orderItemSeqId:itemMap.orderItemSeqId, shipGroupSeqId:shipGroupMap.shipGroupSeqId, quantity:itemMap.quantity]]"/>
+                        <set field="itemShipGroupAssocs" from="itemShipGroupAssocs + [[orderItemSeqId:itemMap.orderItemSeqId, quantity:itemMap.quantity]]"/>
                         <set field="normalizedItems" from="normalizedItems + itemMap"/>
                     </iterate>
                     <set field="shipGroupMap.items" from="normalizedItems"/>
@@ -485,7 +453,7 @@ under the License.
                                     </parameter>
                                 </parameter>
                             </parameter>
-                            <parameter name="itemAttributes" type="List">
+                            <parameter name="attributes" type="List">
                                 <parameter name="attribute" type="Map">
                                     <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemAttribute" include="nonpk"/>
                                 </parameter>
@@ -495,7 +463,7 @@ under the License.
                                     <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderStatus" include="nonpk"/>
                                 </parameter>
                             </parameter>
-                            <parameter name="orderItemAssociations" type="List">
+                            <parameter name="assocs" type="List">
                                 <parameter name="assoc" type="Map">
                                     <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemAssoc" include="nonpk"/>
                                     <parameter name="toOrderExternalId"/>
@@ -853,8 +821,8 @@ under the License.
             <!-- Persist simple note strings as NoteData + OrderHeaderNote -->
             <if condition="note">
                 <iterate list="note" entry="noteText">
-                    <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:noteText, noteDateTime:ec.user.nowTimestamp]" out-map="noteDataOut"/>
-                    <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:noteDataOut.noteId]"/>
+                    <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[content:noteText, subject:'NA', communicationEventTypeId:'ORDER_NOTE']" out-map="communicationEvent"/>
+                    <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:orderId, communicationEventId:communicationEvent.communicationEventId]"/>
                 </iterate>
             </if>
         </actions>
@@ -1000,13 +968,16 @@ under the License.
         </out-parameters>
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
-            <!-- Since a new ShipGroup is created for each routing attempt,
-                 reuse the existing ShipGroup only if the facility type is "virtual".
-                Additionally, filtering based on the shipment method type may be required in future.
+            <!-- Since a new ShipGroup can be created during routing/allocation attempts,
+                 reuse an existing ShipGroup when:
+                 1) destination facility is virtual, or
+                 2) shipment method is store pickup (pickup items for the same facility should stay grouped).
             -->
             <set field="hasParentType"
                  from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
-            <if condition="hasParentType">
+            <set field="isStorePickupShipMethod"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+            <if condition="hasParentType || isStorePickupShipMethod">
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
@@ -1837,12 +1808,13 @@ under the License.
                                   in-map="[partyId:'system', physicalInventoryDate: ec.user.nowTimestamp]" out-map="physicalInventoryResult"/>
                     <set field="availableToPromiseDiff" from="issueItem.quantity" type="BigDecimal"/>
                     <set field="quantityOnHandDiff" from="issueItem.quantity" type="BigDecimal"/>
+                    <!-- Not passing reasonEnumId as 'POS_SALE' as the OOTB OFBiz ProductInventoryView screen shows Sale(Event)
+                    only when only orderId is populated and not the reasonEnumId -->
                     <set field="inventoryItemVariance" from="[
                             physicalInventoryId: physicalInventoryResult.physicalInventoryId,
                             inventoryItemId: inventoryItemId,
                             availableToPromiseVar: availableToPromiseDiff.negate(),
-                            quantityOnHandVar: quantityOnHandDiff.negate(),
-                            reasonEnumId: 'POS_SALE'
+                            quantityOnHandVar: quantityOnHandDiff.negate()
                         ]"/>
                     <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemVariance" in-map="inventoryItemVariance"/>
 
@@ -1852,8 +1824,7 @@ under the License.
                             shipGroupSeqId:orderItem.shipGroupSeqId, itemIssuanceId:itemIssuanceOut?.itemIssuanceId,
                             physicalInventoryId:physicalInventoryResult.physicalInventoryId,
                             availableToPromiseDiff:availableToPromiseDiff.negate(),
-                            quantityOnHandDiff:quantityOnHandDiff.negate(),
-                            reasonEnumId: 'POS_SALE']"/>
+                            quantityOnHandDiff:quantityOnHandDiff.negate()]"/>
                 </iterate>
             </iterate>
         </actions>
