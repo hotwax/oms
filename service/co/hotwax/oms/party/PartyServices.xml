@@ -156,6 +156,19 @@
                         </iterate>
                     </if>
                 </if>
+                <log level="info" message="store#Picker adding identifications for existing partyId=${partyId}"/>
+                <iterate list="identifications" entry="identification">
+                  <!-- Check if identification already exists -->
+                  <entity-find-one entity-name="org.apache.ofbiz.party.party.PartyIdentification" value-field="existingIdentification">
+                    <field-map field-name="partyId" from="partyId"/>
+                    <field-map field-name="partyIdentificationTypeId" from="identification.getKey()"/>
+                  </entity-find-one>
+                  <if condition="!existingIdentification">
+                    <service-call name="create#org.apache.ofbiz.party.party.PartyIdentification"
+                        in-map="[partyId:partyId, partyIdentificationTypeId:identification.getKey(), idValue:identification.getValue()]"/>
+                    <log level="info" message="Added identification ${identification.getKey()}: ${identification.getValue()} for party ${partyId}"/>
+                  </if>
+                </iterate>
             </if>
 
             <if condition="!partyId &amp;&amp; partyStatusId == 'PARTY_ENABLED'">
