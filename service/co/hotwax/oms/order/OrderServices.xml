@@ -792,6 +792,7 @@ under the License.
             <set field="itemShipGroupAssocs" from="[]"/>
 
             <set field="presentmentCurrencyCode" from="null"/>
+            <log message="\n\n========Context: ==== ${context} =========================\n\n"/>
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="context" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
 
@@ -977,7 +978,7 @@ under the License.
                  from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
             <set field="isStorePickupShipMethod"
                  from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
-            <if condition="hasParentType || isStorePickupShipMethod">
+            <if condition="hasParentType || isStorePickupShipMethod || 'POS_COMPLETED' == shipmentMethodTypeId">
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
