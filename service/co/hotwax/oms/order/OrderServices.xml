@@ -1784,9 +1784,7 @@ under the License.
                         <set field="componentQty" from="(component.quantity ?: 1) * quantityToIssue" type="BigDecimal"/>
                         <script>issueItems.add([productId: component.productIdTo, quantity: componentQty])</script>
                     </iterate>
-                    <if condition="!issueItems || issueItems.size() == 0">
-                        <script>issueItems.add([productId: orderItem.productId, quantity: quantityToIssue])</script>
-                    </if>
+                    <script>issueItems.add([productId: orderItem.productId, quantity: quantityToIssue])</script>
                     <else>
                         <script>issueItems.add([productId: orderItem.productId, quantity: quantityToIssue])</script>
                     </else>
