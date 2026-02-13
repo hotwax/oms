@@ -399,8 +399,8 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS orders found at ${nowDate}, not sending store close notification email."/>
+            <if condition="ordersIterator_xafind.count() == 0">
+                <log message="No valid BOPIS orders found at ${nowDate} for the specified criteria, not sending store close notification email."/>
             </if>
             <script>
                 import java.time.LocalDateTime
@@ -511,8 +511,8 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS orders found at ${nowDate}, not sending notification email."/>
+            <if condition="ordersIterator_xafind.count() == 0">
+                <log message="No valid BOPIS orders found at ${nowDate} for the specified criteria, not sending notification email."/>
             </if>
             <iterate list="ordersIterator" entry="order">
                 <entity-find entity-name="org.apache.ofbiz.product.facility.FacilityContactDetailByPurpose" list="facilityContactDetail" limit="1">
@@ -591,8 +591,8 @@ under the License.
                     <use-iterator/>
                 </entity-find>
 
-                <if condition="!shipments.hasNext()">
-                    <return message="No valid BOPIS orders found at ${nowDate}, not sending reminder email."/>
+                <if condition="shipments_xafind.count() == 0">
+                    <log message="No valid BOPIS orders found at ${nowDate} for the specified criteria, not sending reminder email."/>
                 </if>
 
                 <!-- Iterate over shipments -->
@@ -670,8 +670,8 @@ under the License.
                 <use-iterator/>
             </entity-find>
 
-            <if condition="!ordersIterator.hasNext()">
-                <return message="No valid BOPIS cancelled orders found at ${nowDate}, not sending notification email to store."/>
+            <if condition="ordersIterator_xafind.count() == 0">
+                <log message="No cancelled BOPIS orders found at ${nowDate} for the specified criteria, not sending bulk email to store."/>
             </if>
             <set field="orderItemsFacility" from="[:]"/>
             <set field="facilityIds" from="new HashSet()"/>
