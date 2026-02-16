@@ -116,13 +116,16 @@
         </actions>
     </seca>
 
-    <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.set#PreOrderPromisedDate" when="post-service">
+    <seca id="ShopifyOrderApproveAndAllocate" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service" priority="6">
         <condition><expression>orderId</expression></condition>
         <actions>
-            <service-call name="co.hotwax.oms.order.OrderServices.approve#Order" in-map="[orderId: orderId]"/>
+            <service-call name="co.hotwax.oms.order.OrderServices.approve#Order" in-map="[orderId: orderId]" out-map="context"/>
+            <if condition="approveOrder">
+                <service-call name="co.hotwax.oms.order.OrderServices.reserve#OrderItems" in-map="[orderId: orderId]"/>
+            </if>
         </actions>
     </seca>
-    <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service">
+    <seca id="ReserveAndIssueInventoryForPOSOrders" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service" priority="7">
         <condition><expression>orderId</expression></condition>
         <actions>
             <service-call name="co.hotwax.oms.order.OrderServices.create#POSOrderReservationAndIssuance" in-map="context" ignore-error="true"/>

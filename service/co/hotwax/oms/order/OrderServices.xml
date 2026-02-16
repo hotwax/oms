@@ -1689,6 +1689,9 @@ under the License.
         <in-parameters>
             <parameter name="orderId" required="true"/>
         </in-parameters>
+        <out-parameters>
+            <parameter name="approveOrder"/>
+        </out-parameters>
         <actions>
             <set field="approveOrder" from="true"/>
             <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
@@ -1737,21 +1740,36 @@ under the License.
             <if condition="approveOrder">
                 <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus"
                               in-map="[orderId:orderId, statusId:'ORDER_APPROVED', setItemStatus:true]"/>
-                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
-                    <econdition field-name="orderId" from="orderId"/>
-                </entity-find>
-                <iterate list="orderItems" entry="orderItem">
-                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
-                        <field-map field-name="orderId" from="orderId"/>
-                        <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
-                    </entity-find-one>
-                    <set field="facilityId" from="shipGroup?.facilityId"/>
-                    <if condition="facilityId">
-                        <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
-                                      in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, facilityId:facilityId, quantity:orderItem.quantity]"/>
-                    </if>
-                </iterate>
             </if>
+        </actions>
+    </service>
+    <service verb="reserve" noun="OrderItems">
+        <in-parameters>
+            <parameter name="orderId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="allocatedShipGroupSeqIds"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId" from="orderId"/>
+            </entity-find>
+            <set field="allocatedShipGroupSeqIds" from="[]"/>
+            <iterate list="orderItems" entry="orderItem">
+                <if condition="orderItem.statusId == 'ITEM_COMPLETED'">
+                    <continue/>
+                </if>
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
+                    <field-map field-name="orderId" from="orderId"/>
+                    <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                </entity-find-one>
+                <set field="facilityId" from="shipGroup?.facilityId"/>
+                <if condition="facilityId">
+                    <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                  in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, facilityId:facilityId, quantity:orderItem.quantity]" out-map="context"/>
+                    <set field="allocatedShipGroupSeqIds" from="allocatedShipGroupSeqIds + allocatedShipGroupSeqId"/>
+                </if>
+            </iterate>
         </actions>
     </service>
     <service verb="create" noun="POSOrderReservationAndIssuance">
