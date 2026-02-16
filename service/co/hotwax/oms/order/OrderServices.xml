@@ -638,20 +638,43 @@ under the License.
             <if condition="!customerPartyId">
                 <set field="primaryEmail" from="customerEmail ?: orderContacts?.email?.infoString ?: billTo?.email?.infoString"/>
                 <set field="primaryPhone" from="customerPhone ?: billTo?.phoneNumber?.contactNumber"/>
-                <set field="customerPartyIdentifications" from="[:]"/>
+                <set field="customerPartyIdentifications" from="[]"/>
                 <if condition="customerIdentificationType &amp;&amp; customerIdentificationValue">
-                    <set field="customerPartyIdentifications" from="[(customerIdentificationType):customerIdentificationValue]"/>
+                    <set field="customerPartyIdentifications" from="customerPartyIdentifications + [[partyIdentificationTypeId:customerIdentificationType, idValue:customerIdentificationValue]]"/>
+                </if>
+                <set field="customerContactMechs" from="[]"/>
+                <if condition="primaryEmail">
+                    <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
+                                  in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:primaryEmail]"
+                                  out-map="customerEmailOut"/>
+                    <set field="customerContactMechs" from="customerContactMechs + [[contactMechId:customerEmailOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_EMAIL']]] ]"/>
+                </if>
+                <if condition="primaryPhone">
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                                  in-map="[contactNumber:primaryPhone]"
+                                  out-map="customerPhoneOut"/>
+                    <set field="customerContactMechs" from="customerContactMechs + [[contactMechId:customerPhoneOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_PHONE']]] ]"/>
+                </if>
+                <set field="customerPostalAddress" from="billTo?.postalAddress"/>
+                <if condition="customerPostalAddress?.address1">
+                    <set field="customerPostalAddressIn" from="[toName:customerPostalAddress.toName ?: customerPostalAddress.name,
+                        address1:customerPostalAddress.address1, address2:customerPostalAddress.address2, city:customerPostalAddress.city,
+                        stateProvinceGeoId:customerPostalAddress.stateProvinceGeoId, postalCode:customerPostalAddress.postalCode,
+                        countryGeoId:customerPostalAddress.countryGeoId]"/>
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                                  in-map="customerPostalAddressIn"
+                                  out-map="customerPostalOut"/>
+                    <set field="customerContactMechs" from="customerContactMechs + [[contactMechId:customerPostalOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_LOCATION']]] ]"/>
                 </if>
 
-                <set field="partyRoles" from="[[roleTypeId:'PLACING_CUSTOMER'], [roleTypeId:'END_USER_CUSTOMER'], [roleTypeId:'SHIP_TO_CUSTOMER'], [roleTypeId:'BILL_TO_CUSTOMER']]"/>
-                <set field="customerCreateIn" from="[externalId:customerExternalId, firstName:firstName, lastName:lastName,
-                    roleTypeId:'CUSTOMER', partyIdentifications:customerPartyIdentifications, primaryEmail:primaryEmail,
-                    primaryPhoneNumber:primaryPhone, toName:billTo?.postalAddress?.toName ?: billTo?.postalAddress?.name,
-                    address1:billTo?.postalAddress?.address1, address2:billTo?.postalAddress?.address2, city:billTo?.postalAddress?.city,
-                    stateProvinceGeoId:billTo?.postalAddress?.stateProvinceGeoId, postalCode:billTo?.postalAddress?.postalCode,
-                    countryGeoId:billTo?.postalAddress?.countryGeoId, roles:partyRoles]"/>
-                <service-call name="co.hotwax.oms.party.PartyServices.create#Party" in-map="customerCreateIn" out-map="customerCreateOut"/>
-                <set field="customerPartyId" from="customerCreateOut.partyId"/>
+                <set field="partyRoles" from="[[roleTypeId:'CUSTOMER'], [roleTypeId:'PLACING_CUSTOMER'], [roleTypeId:'END_USER_CUSTOMER'], [roleTypeId:'SHIP_TO_CUSTOMER'], [roleTypeId:'BILL_TO_CUSTOMER']]"/>
+                <service-call name="create#org.apache.ofbiz.party.party.Party"
+                              in-map="[partyTypeId:'PERSON', externalId:customerExternalId, statusId:'PARTY_ENABLED']"
+                              out-map="customerPartyOut"/>
+                <set field="customerPartyId" from="customerPartyOut.partyId"/>
+                <set field="customerCreateIn" from="[partyId:customerPartyId, firstName:firstName, lastName:lastName,
+                    roles:partyRoles, identifications:customerPartyIdentifications, contactMechs:customerContactMechs]"/>
+                <service-call name="create#org.apache.ofbiz.party.party.Person" in-map="customerCreateIn"/>
                 <else>
                     <set field="partyRoles" from="[[partyId: customerPartyId, roleTypeId:'PLACING_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'END_USER_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'SHIP_TO_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'BILL_TO_CUSTOMER']]"/>
                     <service-call name="store#org.apache.ofbiz.party.party.Person" in-map="[partyId: customerPartyId, roles: partyRoles]"/>
