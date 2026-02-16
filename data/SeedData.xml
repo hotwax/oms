@@ -77,4 +77,23 @@
     <!-- Product Store Setting for Receive items against fulfillment, mainly will be used for Wh Fulfilled TOs -->
     <moqui.basic.Enumeration enumId="RECEIVE_BY_FULFILL" enumTypeId="PROD_STR_STNG" description="Receive items against fulfillment" enumName="Receive by fulfillment"/>
     <org.apache.ofbiz.product.store.ProductStoreSetting productStoreId="STORE" settingTypeEnumId="RECEIVE_BY_FULFILL" settingValue="false"/>
+
+    <moqui.basic.EnumerationType description="Webhook Event Topics" enumTypeId="WebhookTopic"/>
+
+    <moqui.basic.Enumeration enumId="ORDER_CREATED" enumTypeId="WebhookTopic" description="Order Created"/>
+    <moqui.basic.Enumeration enumId="ORDER_APPROVED" enumTypeId="WebhookTopic" description="Order Approved"/>
+    <moqui.basic.Enumeration enumId="ORDER_COMPLETED" enumTypeId="WebhookTopic" description="Order Completed"/>
+
+    <moqui.basic.Enumeration enumId="ITEM_BROKERED" enumTypeId="WebhookTopic" description="Item Brokered"/>
+    <moqui.basic.Enumeration enumId="ITEM_REJECTED" enumTypeId="WebhookTopic" description="Item Rejected"/>
+
+    <moqui.basic.Enumeration enumId="SHIPMENT_APPROVED" enumTypeId="WebhookTopic" description="Shipment Approved"/>
+    <moqui.basic.Enumeration enumId="SHIPMENT_PACKED" enumTypeId="WebhookTopic" description="Shipment Packed"/>
+    <moqui.basic.Enumeration enumId="SHIPMENT_SHIPPED" enumTypeId="WebhookTopic" description="Shipment Shipped"/>
+
+    <!-- System Message Type for Notifications -->
+    <moqui.service.message.SystemMessageType systemMessageTypeId="WebhookNotification"
+                                             description="Webhook Event Notification"
+                                             sendServiceName="co.hotwax.webhook.WebhookServices.send#WebhookNotification"/>
+
 </entity-facade-xml>

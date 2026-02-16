@@ -38,6 +38,10 @@ under the License.
         <field name="trackingUrl" type="text-medium"></field>
     </extend-entity>
 
+    <extend-entity entity-name="WebhookConfig" package="co.hotwax.common">
+        <field name="sharedSecret" type="text-medium"></field>
+    </extend-entity>
+
     <extend-entity entity-name="Picklist" package="org.apache.ofbiz.shipment.picklist">
         <relationship type="many" related="org.apache.ofbiz.shipment.picklist.PicklistRole" short-alias="roles">
             <key-map field-name="picklistId"/>

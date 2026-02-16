@@ -101,4 +101,26 @@
             <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
+
+    <seca id="DispatchOrderCreatedWebhook"
+          service="co.hotwax.oms.order.OrderServices.create#SalesOrder"
+          when="tx-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <service-call name="co.hotwax.webhook.WebhookServices.poll#WebhookOrderStatus" in-map="[orderId: orderId,statusIds: ['ORDER_CREATED']]" ignore-error="true"/>
+        </actions>
+    </seca>
+
+    <seca id="DispatchOrderApprovedWebhook"
+          service="co.hotwax.oms.order.OrderServices.approve#Order"
+          when="tx-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <service-call name="co.hotwax.webhook.WebhookServices.poll#WebhookOrderStatus" in-map="[orderId: orderId,statusIds: ['ORDER_APPROVED']]" ignore-error="true"/>
+        </actions>
+    </seca>
 </secas>

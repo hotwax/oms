@@ -1,0 +1,942 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/service-definition-3.xsd">
+
+    <service verb="dispatch" noun="WebhookEvent" authenticate="false">
+        <description>
+            Dispatcher for business events. Finds all subscribers and sends events.
+        </description>
+        <in-parameters>
+            <parameter name="topicEnumId" required="true"/>
+            <parameter name="orderId"/>
+            <parameter name="orderItemSeqId"/>
+            <parameter name="shipmentId"/>
+            <parameter name="facilityId"/>
+            <parameter name="eventContext" type="Map"/>
+        </in-parameters>
+        <actions>
+
+            <set field="nowDate" from="ec.user.nowTimestamp"/>
+            <log level="warn" message=">>> [WebhookServices] dispatch#WebhookEvent called with topic=${topicEnumId}, orderId=${orderId}, shipmentId=${shipmentId}, eventContext=${eventContext}"/>
+
+            <entity-find entity-name="co.hotwax.common.WebhookConfig" list="subscribers">
+                <econdition field-name="topicEnumId" from="topicEnumId"/>
+            </entity-find>
+
+            <if condition="!subscribers">
+                <log level="warn" message=">>> [WebhookServices] No subscribers found for topic ${topicEnumId}. Exiting."/>
+                <return/>
+            </if>
+
+            <if condition="!orderId &amp;&amp; shipmentId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments" limit="1">
+                    <econdition field-name="shipmentId" from="shipmentId"/>
+                </entity-find>
+                <set field="orderId" from="orderShipments?.first?.orderId"/>
+            </if>
+
+            <set field="payload" from="eventContext?.payload"/>
+
+            <if condition="!payload">
+                <log level="warn" message=">>> [WebhookServices] Missing payload in eventContext for topic ${topicEnumId}, orderId=${orderId}, shipmentId=${shipmentId}. Exiting."/>
+                <return/>
+            </if>
+            <!-- fallback/global secret for test/back-compat -->
+            <set field="globalHmacHeaderName" from="'X-Hmac-SHA256'"/>
+
+            <iterate list="subscribers" entry="subscriber">
+                <if condition="subscriber.remoteUrl">
+                    <entity-find-one entity-name="moqui.service.message.SystemMessageType" value-field="messageType">
+                        <field-map field-name="systemMessageTypeId" value="WebhookNotification"/>
+                    </entity-find-one>
+                    <if condition="!messageType">
+                        <log level="error" message=">>> [WebhookServices] Missing SystemMessageType WebhookNotification. Skipping subscriber ${subscriber.webhookConfigId}."/>
+                    <else>
+                    <!-- 1. Prefer subscriber-level shared secret-->
+                    <set field="hmacSecret" from="subscriber.sharedSecret"/>
+                    <set field="hmacHeaderName" from="globalHmacHeaderName"/>
+
+                    <!-- 2. Build compact event id (18 chars) -->
+                    <set field="eventSourceId" from="payload?.event_source_id ?: payload?.order_item_seq_id"/>
+                    <if condition="eventSourceId">
+                        <set field="eventIdSeed" from="topicEnumId + '|' + eventSourceId + '|' + subscriber.webhookConfigId"/>
+                    <else>
+                        <set field="eventIdSeed" from="topicEnumId + '|' + (orderId ?: shipmentId ?: 'NA') + '|' + subscriber.webhookConfigId + '|' + nowDate.time + '|' + java.lang.System.nanoTime()"/>
+                    </else>
+                    </if>
+                    <script>
+                        def digest = java.security.MessageDigest.getInstance("SHA-1")
+                        def hashHex = digest.digest((eventIdSeed ?: "").getBytes("UTF-8")).encodeHex().toString()
+                        // "EV" + 16 hex chars => 18 chars total
+                        eventId = "EV" + hashHex.substring(0, 16)
+                    </script>
+                    <set field="payload.event_id" from="eventId"/>
+                    <set field="payload.occurred_at" from="nowDate.toString()"/>
+
+
+                    <!-- 3. De-dup by (SystemMessageType, eventId) -->
+                    <entity-find-one entity-name="moqui.service.message.SystemMessage" value-field="existingSmsg">
+                        <field-map field-name="systemMessageTypeId" value="WebhookNotification"/>
+                        <field-map field-name="remoteMessageId" from="eventId"/>
+                    </entity-find-one>
+                    <if condition="existingSmsg">
+                        <log level="info" message=">>> [WebhookServices] duplicate webhook skipped topic=${topicEnumId}, orderId=${orderId}, shipmentId=${shipmentId}, eventId=${eventId}, existingSystemMessageId=${existingSmsg.systemMessageId}"/>
+                        <continue/>
+                    </if>
+
+                    <set field="messageText" from="org.moqui.impl.context.ContextJavaUtil.jacksonMapper.writeValueAsString(payload)"/>
+
+                    <!-- 4. Create SystemMessage for audit and status tracking -->
+                    <service-call name="create#moqui.service.message.SystemMessage" out-map="createSmsgOut"
+                                  in-map="[systemMessageTypeId: 'WebhookNotification',
+                                           messageText: messageText, remoteMessageId: eventId, statusId: 'SmsgProduced',
+                                           docControl: (orderId ?: shipmentId)]"/>
+
+                    <!-- 5. Send synchronously to avoid async race where SystemMessage is still uncommitted -->
+                    <service-call name="co.hotwax.webhook.WebhookServices.send#WebhookNotification" ignore-error="true"
+                                  in-map="[systemMessageId: createSmsgOut.systemMessageId, remoteUrl: subscriber.remoteUrl,
+                                           hmacSecret: hmacSecret, hmacHeaderName: hmacHeaderName]"/>
+                    <log level="info" message=">>> [WebhookServices] queued webhook topic=${topicEnumId}, orderId=${orderId}, shipmentId=${shipmentId}, systemMessageId=${createSmsgOut.systemMessageId}, eventId=${eventId}, remoteUrl=${subscriber.remoteUrl}"/>
+                    </else>
+                    </if>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="send" noun="WebhookNotification" authenticate="false">
+        <description>Sends event notification via HTTP POST with SystemMessage status tracking</description>
+        <in-parameters>
+            <parameter name="systemMessageId" required="true"/>
+            <parameter name="remoteUrl" required="true"/>
+            <parameter name="hmacSecret"/>
+            <parameter name="hmacHeaderName" default-value="X-Hmac-SHA256"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="moqui.service.message.SystemMessage" value-field="systemMessage"/>
+            <if condition="!systemMessage">
+                <log level="warn" message=">>> [WebhookServices] send#WebhookNotification skipped, SystemMessage not found for systemMessageId=${systemMessageId}"/>
+                <return/>
+            </if>
+
+            <if condition="systemMessage.statusId == 'SmsgSent'">
+                <log level="info" message=">>> [WebhookServices] send#WebhookNotification skipped, already sent systemMessageId=${systemMessageId}"/>
+                <return/>
+            </if>
+            <if condition="systemMessage.statusId != 'SmsgProduced' &amp;&amp; systemMessage.statusId != 'SmsgError'">
+                <log level="warn" message=">>> [WebhookServices] send#WebhookNotification skipped, invalid current status ${systemMessage.statusId} for systemMessageId=${systemMessageId}"/>
+                <return/>
+            </if>
+
+            <if condition="!hmacSecret">
+                <log level="error" message=">>> [WebhookServices] send#WebhookNotification missing hmacSecret for systemMessageId=${systemMessageId}, remoteUrl=${remoteUrl}"/>
+                <!-- Set to error from current status (should be SmsgProduced) -->
+                <service-call name="update#moqui.service.message.SystemMessage"
+                              in-map="[systemMessageId: systemMessageId, statusId: 'SmsgError']"/>
+                <return/>
+            </if>
+
+            <!-- Mark as sending -->
+            <service-call name="update#moqui.service.message.SystemMessage"
+                          in-map="[systemMessageId: systemMessageId, statusId: 'SmsgSending']"/>
+
+            <!-- Build HTTP request -->
+            <set field="restClient" from="ec.service.rest().method('post').uri(remoteUrl)"/>
+            <script>restClient.addHeader("Content-Type", "application/json")</script>
+            <set field="messageBody" from="systemMessage.messageText ?: ''"/>
+            <set field="webhookTopic" from="null"/>
+            <set field="webhookOccurredAt" from="null"/>
+            <script><![CDATA[
+                try {
+                    Map payloadMap = org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(messageBody, Map.class)
+                    webhookTopic = payloadMap?.event_type
+                    webhookOccurredAt = payloadMap?.occurred_at
+                } catch (Exception ignored) {
+                    // Keep optional metadata headers empty if payload can't be parsed.
+                }
+            ]]></script>
+            <script><![CDATA[
+                import javax.crypto.Mac
+                import javax.crypto.spec.SecretKeySpec
+                Mac hmacSha256 = Mac.getInstance("HmacSHA256")
+                hmacSha256.init(new SecretKeySpec(hmacSecret.getBytes("UTF-8"), "HmacSHA256"))
+                byte[] bytes = hmacSha256.doFinal(messageBody.getBytes("UTF-8"))
+                webhookHmac = Base64.encoder.encodeToString(bytes)
+            ]]></script>
+            <script>restClient.addHeader(hmacHeaderName, webhookHmac)</script>
+            <script>restClient.addHeader("X-Webhook-Id", systemMessage.remoteMessageId ?: systemMessageId)</script>
+            <if condition="webhookTopic">
+                <script>restClient.addHeader("X-Webhook-Topic", webhookTopic.toString())</script>
+            </if>
+            <if condition="webhookOccurredAt">
+                <script>restClient.addHeader("X-Webhook-Occurred-At", webhookOccurredAt.toString())</script>
+            </if>
+            <script>restClient.addHeader("X-Webhook-Signature-Version", "v1")</script>
+            <log level="info" message=">>> [WebhookServices] HMAC header added for systemMessageId=${systemMessageId}, header=${hmacHeaderName}"/>
+            <script>restClient.text(messageBody)</script>
+
+            <script>
+                try {
+                    def response = restClient.call()
+                    // If we got a response, the message was successfully sent regardless of status code
+                    if (response.statusCode &gt;= 200 &amp;&amp; response.statusCode &lt; 300) {
+                        ec.logger.info("Webhook delivered successfully to ${remoteUrl}. Status: ${response.statusCode}")
+                    } else {
+                        ec.logger.warn("Webhook delivered but server returned non-success status ${response.statusCode} from ${remoteUrl}")
+                    }
+                    ec.service.sync().name("update#moqui.service.message.SystemMessage")
+                        .parameter("systemMessageId", systemMessageId)
+                        .parameter("statusId", "SmsgSent")
+                        .parameter("processedDate", ec.user.nowTimestamp)
+                        .call()
+                } catch (Exception e) {
+                    // Check if this is an HTTP protocol violation (server responded but with invalid format)
+                    if (e.message?.contains("HTTP protocol violation") || e.cause?.message?.contains("HTTP protocol violation")) {
+                        ec.logger.warn("Webhook delivered but server returned protocol violation at ${remoteUrl}: ${e.message}")
+                        // Server responded, so treat as successful delivery
+                        ec.service.sync().name("update#moqui.service.message.SystemMessage")
+                            .parameter("systemMessageId", systemMessageId)
+                            .parameter("statusId", "SmsgSent")
+                            .parameter("processedDate", ec.user.nowTimestamp)
+                            .call()
+                    } else {
+                        // Actual delivery failure (network error, timeout, etc.)
+                        ec.logger.error("Webhook delivery error to ${remoteUrl}: ${e.message}", e)
+                        def currentSmsg = ec.entity.find("moqui.service.message.SystemMessage")
+                            .condition("systemMessageId", systemMessageId)
+                            .useCache(false)
+                            .one()
+
+                        if (currentSmsg &amp;&amp; currentSmsg.statusId != "SmsgError") {
+                            try {
+                                ec.service.sync().name("update#moqui.service.message.SystemMessage")
+                                    .parameter("systemMessageId", systemMessageId)
+                                    .parameter("statusId", "SmsgError")
+                                    .call()
+                            } catch (Exception ignored) {
+                                ec.logger.warn("Ignoring illegal status transition for systemMessageId=${systemMessageId}")
+                            }
+                        }
+                    }
+                }
+            </script>
+        </actions>
+    </service>
+
+
+    <service verb="receive" noun="WebhookEvents" authenticate="false">
+        <description>Receive DataFeed documents and dispatch webhook events.</description>
+        <implements service="org.moqui.EntityServices.receive#DataFeed"/>
+        <actions>
+            <iterate list="documentList" entry="doc">
+                <set field="logStatus" from="doc.eventStatusId ?: doc.orderHeaderStatusId ?: doc.shipmentCurrentStatusId ?: doc.itemStatusId"/>
+                <if condition="doc._type == 'WebhookOrderItem'">
+                    <set field="logStatus" from="doc.itemStatusId"/>
+                </if>
+                <set field="logOrderItemSeqId" from="doc.eventOrderItemSeqId ?: doc.orderItemSeqId"/>
+                <log level="info" message=">>> [WebhookDataFeed] docType=${doc._type}, id=${doc._id}, status=${logStatus}, orderItemSeqId=${logOrderItemSeqId}"/>
+
+                <if condition="doc._type == 'WebhookOrderStatus'">
+                    <service-call name="co.hotwax.webhook.WebhookServices.process#WebhookOrderStatusDoc"
+                                  in-map="[doc: doc, feedStamp: feedStamp]" ignore-error="true"/>
+                </if>
+                <if condition="doc._type == 'WebhookShipmentStatus'">
+                    <service-call name="co.hotwax.webhook.WebhookServices.process#WebhookShipmentStatusDoc"
+                                  in-map="[doc: doc, feedStamp: feedStamp]" ignore-error="true"/>
+                </if>
+                <if condition="doc._type == 'WebhookOrderItem'">
+                    <service-call name="co.hotwax.webhook.WebhookServices.process#WebhookOrderItemDoc"
+                                  in-map="[doc: doc, feedStamp: feedStamp]" ignore-error="true"/>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+
+    <service verb="process" noun="WebhookOrderStatusDoc" authenticate="false">
+        <in-parameters>
+            <parameter name="doc" type="Map" required="true"/>
+            <parameter name="feedStamp" type="Timestamp"/>
+            <parameter name="allowOrderCompleted" type="Boolean" default-value="false"/>
+        </in-parameters>
+        <actions>
+            <set field="eventStatusId" from="doc.eventStatusId ?: doc.orderHeaderStatusId"/>
+            <set field="eventOrderItemSeqId" from="doc.eventOrderItemSeqId ?: doc.orderItemSeqId"/>
+            <set field="eventOrderStatusId" from="doc.eventOrderStatusId ?: doc.orderStatusId"/>
+            <set field="eventStatusDatetime" from="doc.eventStatusDatetime"/>
+            <set field="eventStatusUserLogin" from="doc.eventStatusUserLogin"/>
+            <set field="eventOrderStatusLastUpdatedStamp" from="doc.eventStatusLastUpdatedStamp"/>
+            <set field="orderHeaderStatusId" from="doc.orderHeaderStatusId"/>
+            <if condition="eventOrderItemSeqId == '_NA_' || eventOrderItemSeqId == ''">
+                <set field="eventOrderItemSeqId" from="null"/>
+            </if>
+            <set field="orderId" from="doc.orderId"/>
+            <if condition="orderId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderStatus" list="statusHistory">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" operator="is-null"/>
+                    <order-by field-name="-statusDatetime"/>
+                </entity-find>
+                <set field="previousStatus" from="statusHistory?.size() > 1 ? statusHistory[1].statusId : null"/>
+                <if condition="!eventStatusId &amp;&amp; statusHistory">
+                    <set field="eventStatusId" from="statusHistory[0].statusId"/>
+                </if>
+                <if condition="!eventStatusDatetime &amp;&amp; statusHistory">
+                    <set field="eventStatusDatetime" from="statusHistory[0].statusDatetime"/>
+                </if>
+                <if condition="!eventStatusUserLogin &amp;&amp; statusHistory">
+                    <set field="eventStatusUserLogin" from="statusHistory[0].statusUserLogin"/>
+                </if>
+                <if condition="eventOrderStatusId">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderStatus" value-field="eventOrderStatusEntity">
+                        <field-map field-name="orderStatusId" from="eventOrderStatusId"/>
+                    </entity-find-one>
+                    <if condition="!eventStatusId &amp;&amp; eventOrderStatusEntity">
+                        <set field="eventStatusId" from="eventOrderStatusEntity.statusId"/>
+                    </if>
+                    <if condition="!eventStatusDatetime &amp;&amp; eventOrderStatusEntity">
+                        <set field="eventStatusDatetime" from="eventOrderStatusEntity.statusDatetime"/>
+                    </if>
+                    <if condition="!eventOrderStatusLastUpdatedStamp &amp;&amp; eventOrderStatusEntity">
+                        <set field="eventOrderStatusLastUpdatedStamp" from="eventOrderStatusEntity.lastUpdatedStamp"/>
+                    </if>
+                </if>
+            </if>
+
+            <set field="isLatestOrderStatusEvent" from="false"/>
+            <set field="isFreshOrderStatusEvent" from="false"/>
+            <set field="isNotFutureOrderStatusEvent" from="false"/>
+            <if condition="orderId &amp;&amp; !eventOrderItemSeqId">
+                <set field="referenceTs" from="feedStamp ?: eventOrderStatusLastUpdatedStamp ?: ec.user.nowTimestamp"/>
+                <set field="futureCutoff" from="new java.sql.Timestamp(referenceTs.time + (15L * 60L * 1000L))"/>
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderStatus" list="latestStatusList" limit="1">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" operator="is-null"/>
+                    <econdition field-name="lastUpdatedStamp" operator="less-equals" from="futureCutoff"/>
+                    <order-by field-name="-lastUpdatedStamp"/>
+                    <order-by field-name="-statusDatetime"/>
+                    <order-by field-name="-orderStatusId"/>
+                </entity-find>
+                <set field="latestStatus" from="latestStatusList ? latestStatusList[0] : null"/>
+                <if condition="latestStatus &amp;&amp; eventOrderStatusId == latestStatus.orderStatusId">
+                    <set field="isLatestOrderStatusEvent" from="true"/>
+                </if>
+                <set field="freshTs" from="eventOrderStatusLastUpdatedStamp ?: feedStamp ?: eventStatusDatetime"/>
+                <set field="freshCutoff" from="new java.sql.Timestamp(ec.user.nowTimestamp.time - (30L * 60L * 1000L))"/>
+                <if condition="freshTs &amp;&amp; freshTs &gt;= freshCutoff">
+                    <set field="isFreshOrderStatusEvent" from="true"/>
+                </if>
+                <if condition="freshTs &amp;&amp; freshTs &lt;= futureCutoff">
+                    <set field="isNotFutureOrderStatusEvent" from="true"/>
+                </if>
+            </if>
+
+            <set field="isOrderStatusWebhookTopic" from="eventStatusId in ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_COMPLETED', 'ORDER_CANCELLED']"/>
+            <set field="eventStatusMatchesHeader" from="true"/>
+            <script><![CDATA[
+                def orderStatusRank = ['ORDER_CREATED':10, 'ORDER_APPROVED':20, 'ORDER_COMPLETED':30, 'ORDER_CANCELLED':40]
+                Integer eventRank = orderStatusRank[eventStatusId]
+                Integer headerRank = orderStatusRank[orderHeaderStatusId]
+                if (eventRank != null && headerRank != null && headerRank > eventRank) {
+                    eventStatusMatchesHeader = false
+                }
+            ]]></script>
+
+            <!-- Ensure ORDER_COMPLETED fires only after all shipments are shipped -->
+            <set field="shipmentCompletedCheck" from="true"/>
+            <set field="orderHasShipment" from="false"/>
+            <if condition="eventStatusId == 'ORDER_COMPLETED' &amp;&amp; orderId">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderShipment" list="orderShipments">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <if condition="orderShipments">
+                    <set field="orderHasShipment" from="true"/>
+                    <iterate list="orderShipments" entry="os">
+                        <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentStatus"
+                                     list="latestShipmentStatus" limit="1">
+                            <econdition field-name="shipmentId" from="os.shipmentId"/>
+                            <order-by field-name="-lastUpdatedStamp"/>
+                            <order-by field-name="-statusDate"/>
+                            <order-by field-name="-shipmentStatusId"/>
+                        </entity-find>
+                        <set field="shipmentStatus" from="latestShipmentStatus ? latestShipmentStatus[0]?.statusId : null"/>
+                        <if condition="shipmentStatus != 'SHIPMENT_SHIPPED'">
+                            <set field="shipmentCompletedCheck" from="false"/>
+                        </if>
+                    </iterate>
+                </if>
+            </if>
+            <!-- If order has shipments, block ORDER_COMPLETED here unless explicitly allowed -->
+            <if condition="eventStatusId == 'ORDER_COMPLETED' &amp;&amp; orderHasShipment &amp;&amp; !allowOrderCompleted">
+                <set field="shipmentCompletedCheck" from="false"/>
+                <log level="info" message=">>> [WebhookDataFeed][defer] OrderCompleted deferred to SHIPMENT_SHIPPED handler orderId=${orderId}"/>
+            </if>
+            <if condition="eventStatusId == 'ORDER_COMPLETED' &amp;&amp; !shipmentCompletedCheck">
+                <set field="shouldDispatchOrderStatus" from="false"/>
+            </if>
+
+            <!-- Ensure ORDER_COMPLETED webhook only after SHIPMENT_SHIPPED webhook is sent -->
+            <set field="shipmentWebhookSent" from="true"/>
+            <if condition="eventStatusId == 'ORDER_COMPLETED' &amp;&amp; orderId">
+                <set field="shipmentWebhookSent" from="false"/>
+                <script><![CDATA[
+                    def sentList = ec.entity.find("moqui.service.message.SystemMessage")
+                            .condition("systemMessageTypeId", "WebhookNotification")
+                            .condition("docControl", orderId)
+                            .condition("statusId", "SmsgSent")
+                            .orderBy("-createdStamp")
+                            .limit(20)
+                            .list()
+                    for (def sm : sentList) {
+                        if (!sm.messageText) continue
+                        try {
+                            def payload = org.moqui.impl.context.ContextJavaUtil.jacksonMapper.readValue(sm.messageText, Map.class)
+                            if (payload?.event_type?.toString() == 'SHIPMENT_SHIPPED') {
+                                shipmentWebhookSent = true
+                                break
+                            }
+                        } catch (Exception ignored) { }
+                    }
+                ]]></script>
+                <if condition="!shipmentWebhookSent">
+                    <log level="info" message=">>> [WebhookDataFeed][defer] OrderCompleted deferred until SHIPMENT_SHIPPED webhook is sent orderId=${orderId}"/>
+                </if>
+            </if>
+
+            <set field="shouldDispatchOrderStatus"
+                 from="orderId &amp;&amp; isOrderStatusWebhookTopic &amp;&amp; !eventOrderItemSeqId &amp;&amp; eventStatusMatchesHeader &amp;&amp; isLatestOrderStatusEvent &amp;&amp; isFreshOrderStatusEvent &amp;&amp; isNotFutureOrderStatusEvent &amp;&amp; shipmentCompletedCheck &amp;&amp; shipmentWebhookSent"/>
+            <if condition="shouldDispatchOrderStatus">
+                <set field="shipGroup" from="doc.shipGroups ? doc.shipGroups[0] : null"/>
+                <set field="paymentPrefList" from="doc.paymentPrefs ?: doc.paymentPreferences"/>
+                <set field="billContactList" from="doc.billContacts ?: doc.contactMechs"/>
+                <set field="paymentPref" from="paymentPrefList ? paymentPrefList[0] : null"/>
+                <set field="billContact" from="billContactList ? billContactList[0] : null"/>
+                <if condition="billContactList">
+                    <iterate list="billContactList" entry="bc">
+                        <if condition="bc.contactMechPurposeTypeId == 'BILLING_LOCATION'">
+                            <set field="billContact" from="bc"/>
+                        </if>
+                    </iterate>
+
+                    <if condition="!billContact?.billToName">
+                        <iterate list="billContactList" entry="bc">
+                            <if condition="bc.billToName">
+                                <set field="billContact" from="bc"/>
+                            </if>
+                        </iterate>
+                    </if>
+                </if>
+                <set field="billToNameFallback" from="null"/>
+                <if condition="!billContact?.billToName &amp;&amp; orderId">
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderContactMech" list="billingContactMechList" limit="1">
+                        <econdition field-name="orderId" from="orderId"/>
+                        <econdition field-name="contactMechPurposeTypeId" value="BILLING_LOCATION"/>
+                        <econdition field-name="thruDate" operator="is-null"/>
+                        <order-by field-name="-fromDate"/>
+                    </entity-find>
+                    <set field="billingContactMech" from="billingContactMechList ? billingContactMechList[0] : null"/>
+                    <if condition="billingContactMech?.contactMechId">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.PostalAddress" value-field="billingPostalAddress">
+                            <field-map field-name="contactMechId" from="billingContactMech.contactMechId"/>
+                        </entity-find-one>
+                        <set field="billToNameFallback" from="billingPostalAddress?.toName"/>
+                    </if>
+                </if>
+
+                <set field="shippingCost" from="0"/>
+                <if condition="doc.adjustments">
+                    <iterate list="doc.adjustments" entry="adj">
+                        <if condition="adj.adjustmentTypeId == 'SHIPPING_CHARGES'">
+                            <set field="shippingCost" from="shippingCost + (adj.adjustmentAmount ?: 0)"/>
+                        </if>
+                    </iterate>
+                </if>
+                <set field="orderPrice" from="(doc.grandTotal ?: 0) - shippingCost"/>
+
+                <set field="payloadItems" from="[]"/>
+                <if condition="doc.shipGroups">
+                    <iterate list="doc.shipGroups" entry="sg">
+                        <if condition="sg.items">
+                            <iterate list="sg.items" entry="item">
+                                <set field="upcValue" from="null"/>
+                                <if condition="item.identifications">
+                                    <iterate list="item.identifications" entry="ident">
+                                        <if condition="!upcValue &amp;&amp; (ident.upc_type == 'UPCA' || ident.goodIdentificationTypeId == 'UPCA')">
+                                            <set field="upcValue" from="ident.upc ?: ident.idValue"/>
+                                        </if>
+                                    </iterate>
+                                    <if condition="!upcValue">
+                                        <set field="upcValue" from="item.identifications[0]?.upc ?: item.identifications[0]?.idValue"/>
+                                    </if>
+                                </if>
+                                <if condition="!upcValue">
+                                    <set field="upcValue" from="item.upc ?: item.idValue"/>
+                                </if>
+                                <set field="payloadItems" from="payloadItems + [[sku: item.sku ?: item.productId, upc: upcValue, product_name: item.product_name, quantity: item.quantity]]"/>
+                            </iterate>
+                        </if>
+                    </iterate>
+                </if>
+
+                <set field="countryCode" from="doc.defaultLocaleString ? doc.defaultLocaleString.substring(doc.defaultLocaleString.length()-2) : null"/>
+                <set field="payload" from="[
+                    event_type: eventStatusId,
+                    event_source_id: eventOrderStatusId,
+                    shopify_order_name: doc.orderName ?: orderId,
+                    previous_status: previousStatus,
+                    facility_id: shipGroup?.facilityId,
+                    facility_name: shipGroup?.facilityName,
+                    status: eventStatusId,
+                    user_id: (doc.eventStatusUserLogin ?: eventStatusUserLogin) ?: ec.user.userId,
+                    shipping_method: shipGroup?.shipmentMethodDesc ?: shipGroup?.shipmentMethodTypeId,
+                    brand: doc.storeName,
+                    country: countryCode,
+                    channel: doc.salesChannelDesc,
+                    payment_type: paymentPref?.paymentMethodDesc,
+                    bill_to: billContact?.billToName ?: billToNameFallback,
+                    currency: doc.currencyUom,
+                    order_price: orderPrice,
+                    shipping_cost: shippingCost,
+                    total_price: doc.grandTotal,
+                    items: payloadItems,
+                    event_date: (doc.eventStatusDatetime ?: eventStatusDatetime) ?: doc.orderEntryDate ?: ec.user.nowTimestamp
+                ]"/>
+
+                <service-call name="co.hotwax.webhook.WebhookServices.dispatch#WebhookEvent"
+                              in-map="[topicEnumId: eventStatusId, orderId: orderId,
+                                      eventContext: [payload: payload, previousStatus: previousStatus]]" ignore-error="true"/>
+            </if>
+            <if condition="orderId &amp;&amp; isOrderStatusWebhookTopic &amp;&amp; !eventOrderItemSeqId &amp;&amp; !shouldDispatchOrderStatus">
+                <log level="info" message=">>> [WebhookDataFeed][skip] OrderStatus doc skipped orderId=${orderId} eventStatusId=${eventStatusId} orderHeaderStatusId=${orderHeaderStatusId} eventOrderStatusId=${eventOrderStatusId} statusMatchesHeader=${eventStatusMatchesHeader} isLatest=${isLatestOrderStatusEvent} isFresh=${isFreshOrderStatusEvent} isNotFuture=${isNotFutureOrderStatusEvent} freshTs=${freshTs} eventStatusDatetime=${eventStatusDatetime} shipmentCompleted=${shipmentCompletedCheck}"/>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="process" noun="WebhookShipmentStatusDoc" authenticate="false">
+        <in-parameters>
+            <parameter name="doc" type="Map" required="true"/>
+            <parameter name="feedStamp" type="Timestamp"/>
+        </in-parameters>
+        <actions>
+            <if condition="doc.eventStatusId in ['SHIPMENT_APPROVED', 'SHIPMENT_PACKED', 'SHIPMENT_SHIPPED']">
+                <set field="shipmentId" from="doc.shipmentId"/>
+                <set field="eventShipmentStatusId" from="doc.eventShipmentStatusId ?: doc.shipmentStatusId"/>
+                <set field="eventShipmentStatusDate" from="doc.eventDate"/>
+                <set field="eventShipmentStatusLastUpdatedStamp" from="doc.eventStatusLastUpdatedStamp"/>
+                <if condition="shipmentId">
+                    <set field="isLatestShipmentStatusEvent" from="false"/>
+                    <set field="isFreshShipmentStatusEvent" from="false"/>
+                    <set field="isNotFutureShipmentStatusEvent" from="false"/>
+                    <if condition="eventShipmentStatusId">
+                        <entity-find-one entity-name="org.apache.ofbiz.shipment.shipment.ShipmentStatus" value-field="eventShipmentStatusEntity">
+                            <field-map field-name="shipmentStatusId" from="eventShipmentStatusId"/>
+                        </entity-find-one>
+                        <if condition="!eventShipmentStatusDate &amp;&amp; eventShipmentStatusEntity">
+                            <set field="eventShipmentStatusDate" from="eventShipmentStatusEntity.statusDate"/>
+                        </if>
+                        <if condition="!eventShipmentStatusLastUpdatedStamp &amp;&amp; eventShipmentStatusEntity">
+                            <set field="eventShipmentStatusLastUpdatedStamp" from="eventShipmentStatusEntity.lastUpdatedStamp"/>
+                        </if>
+                    </if>
+                    <set field="shipmentEventReferenceTs" from="feedStamp ?: eventShipmentStatusLastUpdatedStamp ?: ec.user.nowTimestamp"/>
+                    <set field="shipmentStatusFutureCutoff" from="new java.sql.Timestamp(shipmentEventReferenceTs.time + (15L * 60L * 1000L))"/>
+                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentStatus" list="latestShipmentStatusList" limit="1">
+                        <econdition field-name="shipmentId" from="shipmentId"/>
+                        <econdition field-name="lastUpdatedStamp" operator="less-equals" from="shipmentStatusFutureCutoff"/>
+                        <order-by field-name="-lastUpdatedStamp"/>
+                        <order-by field-name="-statusDate"/>
+                        <order-by field-name="-shipmentStatusId"/>
+                    </entity-find>
+                    <set field="latestShipmentStatus" from="latestShipmentStatusList ? latestShipmentStatusList[0] : null"/>
+                    <if condition="latestShipmentStatus &amp;&amp; eventShipmentStatusId == latestShipmentStatus.shipmentStatusId">
+                        <set field="isLatestShipmentStatusEvent" from="true"/>
+                    </if>
+                    <set field="eventShipmentStatusDate" from="eventShipmentStatusDate ?: latestShipmentStatus?.statusDate"/>
+                    <set field="eventShipmentStatusFreshTs" from="eventShipmentStatusLastUpdatedStamp ?: feedStamp ?: eventShipmentStatusDate"/>
+                    <set field="shipmentStatusFreshCutoff" from="new java.sql.Timestamp(ec.user.nowTimestamp.time - (30L * 60L * 1000L))"/>
+                    <if condition="eventShipmentStatusFreshTs &amp;&amp; eventShipmentStatusFreshTs &gt;= shipmentStatusFreshCutoff">
+                        <set field="isFreshShipmentStatusEvent" from="true"/>
+                    </if>
+                    <if condition="eventShipmentStatusFreshTs &amp;&amp; eventShipmentStatusFreshTs &lt;= shipmentStatusFutureCutoff">
+                        <set field="isNotFutureShipmentStatusEvent" from="true"/>
+                    </if>
+                </if>
+
+                <set field="eventStatusMatchesShipment" from="true"/>
+                <script>
+                    // Block only backward transitions (shipment current status ahead of event status).
+                    def shipmentStatusRank = ['SHIPMENT_INPUT':10, 'SHIPMENT_APPROVED':20, 'SHIPMENT_PICKED':25, 'SHIPMENT_PACKED':30, 'SHIPMENT_SHIPPED':40, 'SHIPMENT_DELIVERED':50]
+                    Integer eventRank = shipmentStatusRank[doc.eventStatusId]
+                    Integer currentRank = shipmentStatusRank[doc.shipmentCurrentStatusId]
+                    if (eventRank != null &amp;&amp; currentRank != null &amp;&amp; currentRank > eventRank) eventStatusMatchesShipment = false
+                </script>
+                <set field="shouldDispatchShipmentStatus" from="shipmentId &amp;&amp; eventStatusMatchesShipment &amp;&amp; isLatestShipmentStatusEvent &amp;&amp; isFreshShipmentStatusEvent &amp;&amp; isNotFutureShipmentStatusEvent"/>
+                <if condition="shouldDispatchShipmentStatus">
+                    <set field="orderShipmentList" from="doc.orderShipments"/>
+                    <set field="orderShipment" from="orderShipmentList ? orderShipmentList[0] : null"/>
+                    <set field="orderId" from="doc.orderId ?: orderShipment?.orderId"/>
+                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentStatus" list="shipmentStatusList">
+                        <econdition field-name="shipmentId" from="shipmentId"/>
+                        <order-by field-name="-statusDate"/>
+                    </entity-find>
+                    <set field="previousStatus" from="shipmentStatusList?.size() > 1 ? shipmentStatusList[1].statusId : null"/>
+
+                    <set field="routeSegmentList" from="doc.routeSegments"/>
+                    <set field="routeSegment" from="routeSegmentList ? routeSegmentList[0] : null"/>
+                    <set field="paymentPrefList" from="orderShipment?.paymentPrefs ?: doc.paymentPrefs ?: doc.paymentPreferences"/>
+                    <set field="paymentPref" from="paymentPrefList ? paymentPrefList[0] : null"/>
+                    <set field="billContactList" from="orderShipment?.billContacts ?: doc.billContacts ?: doc.contactMechs"/>
+                    <set field="billContact" from="billContactList ? billContactList[0] : null"/>
+                    <if condition="billContactList">
+                        <iterate list="billContactList" entry="bc">
+                            <if condition="bc.contactMechPurposeTypeId == 'BILLING_LOCATION'">
+                                <set field="billContact" from="bc"/>
+                            </if>
+                        </iterate>
+
+                        <if condition="!billContact?.billToName">
+                            <iterate list="billContactList" entry="bc">
+                                <if condition="bc.billToName">
+                                    <set field="billContact" from="bc"/>
+                                </if>
+                            </iterate>
+                        </if>
+                    </if>
+
+                    <set field="adjustmentList" from="orderShipment?.adjustments ?: doc.adjustments"/>
+                    <set field="shippingCost" from="0"/>
+                    <if condition="adjustmentList">
+                        <iterate list="adjustmentList" entry="adj">
+                            <if condition="adj.adjustmentTypeId == 'SHIPPING_CHARGES'">
+                                <set field="shippingCost" from="shippingCost + (adj.adjustmentAmount ?: 0)"/>
+                            </if>
+                        </iterate>
+                    </if>
+                    <set field="billToNameFallback" from="null"/>
+                    <if condition="!billContact?.billToName &amp;&amp; orderId">
+                        <entity-find entity-name="org.apache.ofbiz.order.order.OrderContactMech" list="billingContactMechList" limit="1">
+                            <econdition field-name="orderId" from="orderId"/>
+                            <econdition field-name="contactMechPurposeTypeId" value="BILLING_LOCATION"/>
+                            <econdition field-name="thruDate" operator="is-null"/>
+                            <order-by field-name="-fromDate"/>
+                        </entity-find>
+                        <set field="billingContactMech" from="billingContactMechList ? billingContactMechList[0] : null"/>
+                        <if condition="billingContactMech?.contactMechId">
+                            <entity-find-one entity-name="org.apache.ofbiz.party.contact.PostalAddress" value-field="billingPostalAddress">
+                                <field-map field-name="contactMechId" from="billingContactMech.contactMechId"/>
+                            </entity-find-one>
+                            <set field="billToNameFallback" from="billingPostalAddress?.toName"/>
+                        </if>
+                    </if>
+                    <set field="orderTotal" from="orderShipment?.grandTotal ?: doc.grandTotal ?: 0"/>
+                    <set field="orderPrice" from="orderTotal - shippingCost"/>
+
+                    <set field="payloadItems" from="[]"/>
+                    <if condition="doc.items">
+                        <iterate list="doc.items" entry="item">
+                            <set field="upcValue" from="null"/>
+                            <if condition="item.identifications">
+                                <iterate list="item.identifications" entry="ident">
+                                    <if condition="!upcValue &amp;&amp; (ident.upc_type == 'UPCA' || ident.goodIdentificationTypeId == 'UPCA')">
+                                        <set field="upcValue" from="ident.upc ?: ident.idValue"/>
+                                    </if>
+                                </iterate>
+                                <if condition="!upcValue">
+                                    <set field="upcValue" from="item.identifications[0]?.upc ?: item.identifications[0]?.idValue"/>
+                                </if>
+                            </if>
+                            <if condition="!upcValue">
+                                <set field="upcValue" from="item.upc ?: item.idValue"/>
+                            </if>
+                            <set field="payloadItems" from="payloadItems + [[sku: item.sku ?: item.productId, upc: upcValue, product_name: item.product_name, quantity: item.quantity]]"/>
+                        </iterate>
+                    </if>
+
+                    <set field="countryLocale" from="orderShipment?.defaultLocaleString ?: doc.defaultLocaleString"/>
+                    <set field="countryCode" from="countryLocale ? countryLocale.substring(countryLocale.length()-2) : null"/>
+                    <set field="trackingCode" from="routeSegment?.trackingCode ?: routeSegment?.trackingIdNumber ?: doc.trackingCode"/>
+                    <if condition="!trackingCode">
+                        <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentPackageRouteSeg" list="shipmentPackageRouteSegList" limit="1">
+                            <econdition field-name="shipmentId" from="shipmentId"/>
+                            <order-by field-name="-lastUpdatedStamp"/>
+                        </entity-find>
+                        <set field="shipmentPackageRouteSeg" from="shipmentPackageRouteSegList ? shipmentPackageRouteSegList[0] : null"/>
+                        <set field="trackingCode" from="shipmentPackageRouteSeg?.trackingCode"/>
+                    </if>
+                    <entity-find entity-name="org.apache.ofbiz.shipment.shipment.ShipmentRouteSegment" list="shipmentRouteSegmentList" limit="1">
+                        <econdition field-name="shipmentId" from="shipmentId"/>
+                        <order-by field-name="-lastUpdatedStamp"/>
+                        <order-by field-name="-shipmentRouteSegmentId"/>
+                    </entity-find>
+                    <set field="shipmentRouteSegment" from="shipmentRouteSegmentList ? shipmentRouteSegmentList[0] : null"/>
+                    <if condition="!trackingCode">
+                        <set field="trackingCode" from="shipmentRouteSegment?.trackingIdNumber"/>
+                    </if>
+                    <set field="shippingGuide" from="routeSegment?.trackingUrl ?: doc.trackingUrl ?: shipmentRouteSegment?.trackingUrl ?: trackingCode"/>
+                    <set field="shippingMethod" from="routeSegment?.shipmentMethodDesc ?: routeSegment?.shipmentMethodTypeId ?: doc.shipmentMethodDesc ?: doc.shipmentMethodTypeId"/>
+                    <set field="payloadStatus" from="doc.eventStatusId"/>
+                    <set field="payload" from="[
+                        event_type: doc.eventStatusId,
+                        event_source_id: eventShipmentStatusId,
+                        shopify_order_name: doc.orderName ?: orderShipment?.orderName ?: orderId,
+                        shipment_id: shipmentId,
+                        facility_id: doc.originFacilityId,
+                        facility_name: doc.facilityName,
+                        items: payloadItems,
+                        tracking_code: trackingCode,
+                        shipping_guide: shippingGuide,
+                        previous_status: previousStatus,
+                        status: payloadStatus,
+                        user_id: doc.eventUserLoginId ?: ec.user.userId,
+                        shipping_method: shippingMethod,
+                        brand: orderShipment?.storeName ?: doc.storeName,
+                        country: countryCode,
+                        channel: orderShipment?.salesChannelDesc ?: doc.salesChannelDesc,
+                        payment_type: paymentPref?.paymentMethodDesc,
+                        bill_to: billContact?.billToName ?: billToNameFallback,
+                        currency: orderShipment?.currencyUom ?: doc.currencyUom,
+                        order_price: orderPrice,
+                        shipping_cost: shippingCost,
+                        total_price: orderTotal,
+                        event_date: doc.eventDate ?: ec.user.nowTimestamp
+                    ]"/>
+
+                    <service-call name="co.hotwax.webhook.WebhookServices.dispatch#WebhookEvent"
+                                  in-map="[topicEnumId: doc.eventStatusId, shipmentId: shipmentId, orderId: orderId,
+                                          eventContext: [payload: payload, previousStatus: previousStatus]]" ignore-error="true"/>
+                    <!-- Dispatch ORDER_COMPLETED from SHIPMENT_SHIPPED only when all shipments are shipped -->
+                    <if condition="doc.eventStatusId == 'SHIPMENT_SHIPPED' &amp;&amp; orderId">
+                        <script><![CDATA[
+                            def allShipped = true
+                            def orderShipments = ec.entity.find("org.apache.ofbiz.order.order.OrderShipment")
+                                    .condition("orderId", orderId).list()
+                            for (def os : (orderShipments ?: [])) {
+                                def latestStatusList = ec.entity.find("org.apache.ofbiz.shipment.shipment.ShipmentStatus")
+                                        .condition("shipmentId", os.shipmentId)
+                                        .orderBy("-lastUpdatedStamp")
+                                        .orderBy("-statusDate")
+                                        .orderBy("-shipmentStatusId")
+                                        .limit(1)
+                                        .list()
+                                def statusId = latestStatusList ? latestStatusList[0].statusId : null
+                                if (statusId != 'SHIPMENT_SHIPPED') { allShipped = false; break }
+                            }
+
+                            if (allShipped) {
+                                def completedStatusList = ec.entity.find("org.apache.ofbiz.order.order.OrderStatus")
+                                        .condition("orderId", orderId)
+                                        .condition("orderItemSeqId", null)
+                                        .condition("statusId", "ORDER_COMPLETED")
+                                        .orderBy("-statusDatetime")
+                                        .orderBy("-lastUpdatedStamp")
+                                        .limit(1)
+                                        .list()
+                                if (completedStatusList) {
+                                    def completedStatusId = completedStatusList[0].orderStatusId
+                                    def cond = ec.entity.conditionFactory.makeCondition(
+                                            "eventOrderStatusId",
+                                            org.moqui.entity.EntityCondition.ComparisonOperator.IN,
+                                            [completedStatusId]
+                                    )
+                                    def docs = ec.entityFacade.getDataDocuments("WebhookOrderStatus", cond, null, null)
+                                    if (docs) {
+                                        docs.each { d ->
+                                            ec.service.sync().name("co.hotwax.webhook.WebhookServices.process#WebhookOrderStatusDoc")
+                                                    .parameters([doc: d, feedStamp: ec.user.nowTimestamp, allowOrderCompleted: true]).call()
+                                            if (ec.message.hasError()) {
+                                                ec.logger.warn("Ignoring error running service co.hotwax.webhook.WebhookServices.process#WebhookOrderStatusDoc: " + ec.message.getErrorsString())
+                                                ec.message.clearErrors()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]]></script>
+                    </if>
+                </if>
+                <if condition="shipmentId &amp;&amp; !shouldDispatchShipmentStatus">
+                    <log level="info" message=">>> [WebhookDataFeed][skip] ShipmentStatus doc skipped shipmentId=${shipmentId} eventStatusId=${doc.eventStatusId} shipmentCurrentStatusId=${doc.shipmentCurrentStatusId} eventShipmentStatusId=${eventShipmentStatusId} statusMatchesCurrent=${eventStatusMatchesShipment} isLatest=${isLatestShipmentStatusEvent} isFresh=${isFreshShipmentStatusEvent} isNotFuture=${isNotFutureShipmentStatusEvent} freshTs=${eventShipmentStatusFreshTs} eventDate=${eventShipmentStatusDate}"/>
+                </if>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="process" noun="WebhookOrderItemDoc" authenticate="false">
+        <in-parameters>
+            <parameter name="doc" type="Map" required="true"/>
+            <parameter name="feedStamp" type="Timestamp"/>
+        </in-parameters>
+        <actions>
+            <set field="itemTopicEnumId" from="null"/>
+            <if condition="doc.itemStatusId in ['ITEM_BROKERED', 'ITEM_APPROVED', 'ORDER_APPROVED']">
+                <set field="itemTopicEnumId" from="'ITEM_BROKERED'"/>
+            </if>
+            <if condition="doc.itemStatusId in ['ITEM_REJECTED', 'ORDER_REJECTED']">
+                <set field="itemTopicEnumId" from="'ITEM_REJECTED'"/>
+            </if>
+            <set field="eventSourceId" from="(doc.orderItemSeqId ?: 'NA') + ':' + (doc.itemStatusId ?: 'NA') + ':' + (doc.eventDate ? doc.eventDate.time : ec.user.nowTimestamp.time)"/>
+            <if condition="doc.orderId &amp;&amp; (doc.orderItemSeqId ?: doc.eventOrderItemSeqId) &amp;&amp; itemTopicEnumId">
+                <set field="shipGroup" from="doc.shipGroups ? doc.shipGroups[0] : null"/>
+                <if condition="doc.shipGroupSeqId &amp;&amp; doc.shipGroups">
+                    <iterate list="doc.shipGroups" entry="sg">
+                        <if condition="sg.shipGroupSeqId == doc.shipGroupSeqId">
+                            <set field="shipGroup" from="sg"/>
+                        </if>
+                    </iterate>
+                </if>
+                <set field="paymentPref" from="doc.paymentPrefs ? doc.paymentPrefs[0] : null"/>
+                <set field="billContact" from="doc.billContacts ? doc.billContacts[0] : null"/>
+                <if condition="doc.billContacts">
+                    <iterate list="doc.billContacts" entry="bc">
+                        <if condition="bc.contactMechPurposeTypeId == 'BILLING_LOCATION'">
+                            <set field="billContact" from="bc"/>
+                        </if>
+                    </iterate>
+
+                    <if condition="!billContact?.billToName">
+                        <iterate list="doc.billContacts" entry="bc">
+                            <if condition="bc.billToName">
+                                <set field="billContact" from="bc"/>
+                            </if>
+                        </iterate>
+                    </if>
+                </if>
+
+                <set field="shippingCost" from="0"/>
+                <if condition="doc.adjustments">
+                    <iterate list="doc.adjustments" entry="adj">
+                        <if condition="adj.adjustmentTypeId == 'SHIPPING_CHARGES'">
+                            <set field="shippingCost" from="shippingCost + (adj.adjustmentAmount ?: 0)"/>
+                        </if>
+                    </iterate>
+                </if>
+                <set field="orderPrice" from="(doc.grandTotal ?: 0) - shippingCost"/>
+
+                <set field="countryCode" from="doc.defaultLocaleString ? doc.defaultLocaleString.substring(doc.defaultLocaleString.length()-2) : null"/>
+                <set field="rejectionReasonId" from="doc.rejectionReasonId ?: doc.varianceReasonEnumId"/>
+                <if condition="!rejectionReasonId &amp;&amp; doc.itemRes">
+                    <iterate list="doc.itemRes" entry="res">
+                        <if condition="!rejectionReasonId">
+                            <set field="rejectionReasonId" from="res.rejectionReasonId ?: res.varianceReasonEnumId"/>
+                        </if>
+                    </iterate>
+                </if>
+                <set field="upcValue" from="null"/>
+                <if condition="doc.identifications">
+                    <iterate list="doc.identifications" entry="ident">
+                        <if condition="!upcValue &amp;&amp; (ident.upc_type == 'UPCA' || ident.goodIdentificationTypeId == 'UPCA')">
+                            <set field="upcValue" from="ident.upc ?: ident.idValue"/>
+                        </if>
+                    </iterate>
+                    <if condition="!upcValue">
+                        <set field="upcValue" from="doc.identifications[0]?.upc ?: doc.identifications[0]?.idValue"/>
+                    </if>
+                </if>
+                <if condition="!upcValue">
+                    <set field="upcValue" from="doc.upc ?: doc.idValue"/>
+                </if>
+                <set field="payload" from="[
+                    event_type: itemTopicEnumId,
+                    event_source_id: eventSourceId,
+                    shopify_order_name: doc.orderName ?: doc.orderId,
+                    order_item_seq_id: doc.orderItemSeqId,
+                    sku: doc.sku ?: doc.productId,
+                    upc: upcValue,
+                    product_name: doc.product_name,
+                    previous_status: 'ITEM_APPROVED',
+                    facility_id: shipGroup?.facilityId,
+                    facility_name: shipGroup?.facilityName,
+                    status: itemTopicEnumId,
+                    user_id: doc.eventUserLoginId ?: ec.user.userId,
+                    shipping_method: shipGroup?.shipmentMethodDesc ?: shipGroup?.shipmentMethodTypeId,
+                    brand: doc.storeName,
+                    country: countryCode,
+                    channel: doc.salesChannelDesc,
+                    payment_type: paymentPref?.paymentMethodDesc,
+                    bill_to: billContact?.billToName,
+                    currency: doc.currencyUom,
+                    order_price: orderPrice,
+                    shipping_cost: shippingCost,
+                    total_price: doc.grandTotal,
+                    event_date: doc.eventDate ?: ec.user.nowTimestamp,
+                    rejection_reason: rejectionReasonId
+                ]"/>
+
+                <service-call name="co.hotwax.webhook.WebhookServices.dispatch#WebhookEvent"
+                              in-map="[topicEnumId: itemTopicEnumId, orderId: doc.orderId,
+                                       orderItemSeqId: doc.orderItemSeqId,
+                                       eventContext: [payload: payload, rejectionReason: rejectionReasonId,
+                                                      previousStatus: 'ITEM_APPROVED']]" ignore-error="true"/>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="poll" noun="WebhookOrderStatus" authenticate="false">
+        <description>
+            Poll OrderStatus rows and dispatch webhook events (manual invocation, non-job version).
+        </description>
+
+        <in-parameters>
+            <parameter name="fromDate" type="Timestamp"/>
+            <parameter name="thruDate" type="Timestamp"/>
+            <parameter name="statusIds" type="List"/>
+            <parameter name="orderId"/>
+        </in-parameters>
+
+        <out-parameters>
+            <parameter name="documentCount" type="Long"/>
+        </out-parameters>
+
+        <actions>
+            <script>
+                import org.moqui.entity.EntityCondition
+
+                def aef = ec.artifactExecutionFacade
+                boolean enableAuthz = !aef.disableAuthz()
+                ec.userFacade.loginAnonymousIfNoUser()
+
+                try {
+                    def nowDate = ec.user.nowTimestamp
+                    if (!thruDate) thruDate = nowDate
+
+                    def statusIdList = statusIds ?: ['ORDER_CREATED','ORDER_APPROVED','ORDER_COMPLETED']
+
+                    def orderStatusFind = ec.entity.find("org.apache.ofbiz.order.order.OrderStatus")
+                            .condition("orderItemSeqId", null)
+                            .condition("statusId", EntityCondition.ComparisonOperator.IN, statusIdList)
+
+                    if (fromDate) orderStatusFind.condition("lastUpdatedStamp", EntityCondition.ComparisonOperator.GREATER_THAN_EQUAL_TO, fromDate)
+                    if (thruDate) orderStatusFind.condition("lastUpdatedStamp", EntityCondition.ComparisonOperator.LESS_THAN, thruDate)
+                    if (orderId) orderStatusFind.condition("orderId", orderId)
+
+                    def orderStatusList = orderStatusFind.orderBy("lastUpdatedStamp").orderBy("statusDatetime").list()
+                    def orderStatusIds = orderStatusList?.collect { it.orderStatusId } ?: []
+
+                    documentList = []
+                    if (orderStatusIds) {
+                        def condition = ec.entity.conditionFactory.makeCondition(
+                                "eventOrderStatusId",
+                                EntityCondition.ComparisonOperator.IN,
+                                orderStatusIds
+                        )
+                        def docs = ec.entityFacade.getDataDocuments("WebhookOrderStatus", condition, null, null)
+                        if (docs) documentList.addAll(docs)
+                    }
+
+                    documentCount = documentList?.size() ?: 0
+
+                    if (documentList) {
+                        ec.service.sync().name("co.hotwax.webhook.WebhookServices.receive#WebhookEvents")
+                                .parameters([documentList: documentList]).call()
+                        if (ec.message.hasError()) {
+                            ec.logger.warn("Ignoring error running service co.hotwax.webhook.WebhookServices.receive#WebhookEvents: " + ec.message.getErrorsString())
+                            ec.message.clearErrors()
+                        }
+                    }
+                } finally {
+                    if (enableAuthz) aef.enableAuthz()
+                }
+            </script>
+        </actions>
+    </service>
+
+</services>
