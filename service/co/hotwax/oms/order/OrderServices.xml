@@ -107,19 +107,10 @@ under the License.
                             <if condition="shipToPostal.name &amp;&amp; !shipToPostal.toName">
                                 <set field="shipToPostal.toName" from="shipToPostal.name"/>
                             </if>
-                            <set field="shipToPostalContactMechId" from="shipToPostal.id"/>
-                            <if condition="!shipToPostalContactMechId &amp;&amp; shipToPostal.externalId">
-                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToPostalContactMech">
-                                    <field-map field-name="externalId" from="shipToPostal.externalId"/>
-                                </entity-find-one>
-                                <set field="shipToPostalContactMechId" from="shipToPostalContactMech?.contactMechId"/>
-                            </if>
-                            <if condition="!shipToPostalContactMechId">
-                                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
-                                              in-map="shipToPostal"
-                                              out-map="shipToPostalOut"/>
-                                <set field="shipToPostalContactMechId" from="shipToPostalOut.contactMechId"/>
-                            </if>
+                            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                                          in-map="shipToPostal"
+                                          out-map="shipToPostalOut"/>
+                            <set field="shipToPostalContactMechId" from="shipToPostalOut.contactMechId"/>
                             <if condition="shipToPostalContactMechId">
                                 <set field="shipGroupMap.contactMechId" from="shipToPostalContactMechId"/>
                                 <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'SHIPPING_LOCATION', contactMechId:shipToPostalContactMechId]]"/>
@@ -130,16 +121,9 @@ under the License.
                         </if>
                         <set field="shipToEmail" from="shipTo.email"/>
                         <if condition="shipToEmail">
-                            <set field="shipToEmailContactMechId" from="shipToEmail.id"/>
-                            <if condition="!shipToEmailContactMechId &amp;&amp; shipToEmail.externalId">
-                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToEmailContactMech">
-                                    <field-map field-name="externalId" from="shipToEmail.externalId"/>
-                                </entity-find-one>
-                                <set field="shipToEmailContactMechId" from="shipToEmailContactMech?.contactMechId"/>
-                            </if>
-                            <if condition="!shipToEmailContactMechId &amp;&amp; shipToEmail.infoString">
+                            <if condition="shipToEmail.infoString">
                                 <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
-                                              in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:shipToEmail.infoString, externalId:shipToEmail.externalId]"
+                                              in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:shipToEmail.infoString]"
                                               out-map="shipToEmailCreateOut"/>
                                 <set field="shipToEmailContactMechId" from="shipToEmailCreateOut.contactMechId"/>
                             </if>
@@ -149,19 +133,10 @@ under the License.
                         </if>
                         <set field="shipToPhone" from="shipTo.phoneNumber"/>
                         <if condition="shipToPhone">
-                            <set field="shipToPhoneContactMechId" from="shipToPhone.id"/>
-                            <if condition="!shipToPhoneContactMechId &amp;&amp; shipToPhone.externalId">
-                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToPhoneContactMech">
-                                    <field-map field-name="externalId" from="shipToPhone.externalId"/>
-                                </entity-find-one>
-                                <set field="shipToPhoneContactMechId" from="shipToPhoneContactMech?.contactMechId"/>
-                            </if>
-                            <if condition="!shipToPhoneContactMechId">
-                                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
-                                              in-map="shipToPhone"
-                                              out-map="shipToPhoneOut"/>
-                                <set field="shipToPhoneContactMechId" from="shipToPhoneOut.contactMechId"/>
-                            </if>
+                            <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                                          in-map="shipToPhone"
+                                          out-map="shipToPhoneOut"/>
+                            <set field="shipToPhoneContactMechId" from="shipToPhoneOut.contactMechId"/>
                             <if condition="shipToPhoneContactMechId">
                                 <set field="shipGroupMap.telecomContactMechId" from="shipToPhoneContactMechId"/>
                                 <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'PHONE_SHIPPING', contactMechId:shipToPhoneContactMechId]]"/>
@@ -358,19 +333,13 @@ under the License.
             <parameter name="billTo" type="Map">
                 <parameter name="postalAddress" type="Map">
                     <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk"/>
-                    <parameter name="id"/>
-                    <parameter name="externalId"/>
                     <parameter name="name"/>
                 </parameter>
                 <parameter name="email" type="Map">
-                    <parameter name="id"/>
-                    <parameter name="externalId"/>
                     <parameter name="infoString"/>
                 </parameter>
                 <parameter name="phoneNumber" type="Map">
                     <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk"/>
-                    <parameter name="id"/>
-                    <parameter name="externalId"/>
                 </parameter>
             </parameter>
             <parameter name="identifications" type="List">
@@ -402,20 +371,14 @@ under the License.
                     <parameter name="shipTo" type="Map">
                         <parameter name="postalAddress" type="Map">
                             <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk"/>
-                            <parameter name="id"/>
-                            <parameter name="externalId"/>
                             <parameter name="name"/>
                             <parameter name="additionalPurpose"/>
                         </parameter>
                         <parameter name="email" type="Map">
-                            <parameter name="id"/>
-                            <parameter name="externalId"/>
                             <parameter name="infoString"/>
                         </parameter>
                         <parameter name="phoneNumber" type="Map">
                             <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk"/>
-                            <parameter name="id"/>
-                            <parameter name="externalId"/>
                         </parameter>
                     </parameter>
                     <parameter name="items" type="List">
@@ -534,7 +497,7 @@ under the License.
                 <if condition="orderEmail">
                     <if condition="orderEmail.infoString">
                         <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
-                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderEmail.infoString, externalId:orderEmail.externalId]"
+                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderEmail.infoString]"
                                       out-map="orderEmailCreateOut"/>
                         <set field="orderEmailContactMechId" from="orderEmailCreateOut.contactMechId"/>
                     </if>
@@ -549,35 +512,19 @@ under the License.
                     <if condition="billToPostal.name &amp;&amp; !billToPostal.toName">
                         <set field="billToPostal.toName" from="billToPostal.name"/>
                     </if>
-                    <set field="billToPostalContactMechId" from="billToPostal.id"/>
-                    <if condition="!billToPostalContactMechId &amp;&amp; billToPostal.externalId">
-                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToPostalContactMech">
-                            <field-map field-name="externalId" from="billToPostal.externalId"/>
-                        </entity-find-one>
-                        <set field="billToPostalContactMechId" from="billToPostalContactMech?.contactMechId"/>
-                    </if>
-                    <if condition="!billToPostalContactMechId">
-                        <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
-                                      in-map="billToPostal"
-                                      out-map="billToPostalOut"/>
-                        <set field="billToPostalContactMechId" from="billToPostalOut.contactMechId"/>
-                    </if>
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                                  in-map="billToPostal"
+                                  out-map="billToPostalOut"/>
+                    <set field="billToPostalContactMechId" from="billToPostalOut.contactMechId"/>
                     <if condition="billToPostalContactMechId">
                         <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'BILLING_LOCATION', contactMechId:billToPostalContactMechId]]"/>
                     </if>
                 </if>
                 <set field="billToEmail" from="billTo.email"/>
                 <if condition="billToEmail">
-                    <set field="billToEmailContactMechId" from="billToEmail.id"/>
-                    <if condition="!billToEmailContactMechId &amp;&amp; billToEmail.externalId">
-                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToEmailContactMech">
-                            <field-map field-name="externalId" from="billToEmail.externalId"/>
-                        </entity-find-one>
-                        <set field="billToEmailContactMechId" from="billToEmailContactMech?.contactMechId"/>
-                    </if>
-                    <if condition="!billToEmailContactMechId &amp;&amp; billToEmail.infoString">
+                    <if condition="billToEmail.infoString">
                         <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
-                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:billToEmail.infoString, externalId:billToEmail.externalId]"
+                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:billToEmail.infoString]"
                                       out-map="billToEmailCreateOut"/>
                         <set field="billToEmailContactMechId" from="billToEmailCreateOut.contactMechId"/>
                     </if>
@@ -587,19 +534,10 @@ under the License.
                 </if>
                 <set field="billToPhone" from="billTo.phoneNumber"/>
                 <if condition="billToPhone">
-                    <set field="billToPhoneContactMechId" from="billToPhone.id"/>
-                    <if condition="!billToPhoneContactMechId &amp;&amp; billToPhone.externalId">
-                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToPhoneContactMech">
-                            <field-map field-name="externalId" from="billToPhone.externalId"/>
-                        </entity-find-one>
-                        <set field="billToPhoneContactMechId" from="billToPhoneContactMech?.contactMechId"/>
-                    </if>
-                    <if condition="!billToPhoneContactMechId">
-                        <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
-                                      in-map="billToPhone"
-                                      out-map="billToPhoneOut"/>
-                        <set field="billToPhoneContactMechId" from="billToPhoneOut.contactMechId"/>
-                    </if>
+                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                                  in-map="billToPhone"
+                                  out-map="billToPhoneOut"/>
+                    <set field="billToPhoneContactMechId" from="billToPhoneOut.contactMechId"/>
                     <if condition="billToPhoneContactMechId">
                         <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'PHONE_BILLING', contactMechId:billToPhoneContactMechId]]"/>
                     </if>
