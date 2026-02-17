@@ -1,25 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <entity-facade-xml type="ext-upgrade">
-
-    <moqui.basic.EnumerationType description="Webhook Event Topics" enumTypeId="WebhookTopic"/>
-
-    <moqui.basic.Enumeration enumId="ORDER_CREATED" enumTypeId="WebhookTopic" description="Order Created"/>
-    <moqui.basic.Enumeration enumId="ORDER_APPROVED" enumTypeId="WebhookTopic" description="Order Approved"/>
-    <moqui.basic.Enumeration enumId="ORDER_COMPLETED" enumTypeId="WebhookTopic" description="Order Completed"/>
-
-    <moqui.basic.Enumeration enumId="ITEM_BROKERED" enumTypeId="WebhookTopic" description="Item Brokered"/>
-    <moqui.basic.Enumeration enumId="ITEM_REJECTED" enumTypeId="WebhookTopic" description="Item Rejected"/>
-
-    <moqui.basic.Enumeration enumId="SHIPMENT_APPROVED" enumTypeId="WebhookTopic" description="Shipment Approved"/>
-    <moqui.basic.Enumeration enumId="SHIPMENT_PACKED" enumTypeId="WebhookTopic" description="Shipment Packed"/>
-    <moqui.basic.Enumeration enumId="SHIPMENT_SHIPPED" enumTypeId="WebhookTopic" description="Shipment Shipped"/>
-
-    <!-- System Message Type for Notifications -->
-    <moqui.service.message.SystemMessageType systemMessageTypeId="WebhookNotification"
-                                             description="Webhook Event Notification"
-                                             sendServiceName="co.hotwax.webhook.WebhookServices.send#WebhookNotification"/>
-
-
     <dataDocuments dataDocumentId="WebhookOrderStatus" documentName="WebhookOrderStatus"
                    primaryEntityName="org.apache.ofbiz.order.order.OrderStatus" >
         <fields fieldSeqId="01" fieldPath="orderStatusId"/>
@@ -176,8 +156,8 @@
     </dataDocuments>
 
     <moqui.entity.feed.DataFeed dataFeedId="WebhookEvents" dataFeedTypeEnumId="DTFDTP_RT_PUSH"
-                                feedName="Webhook Events Feed"
-                                feedReceiveServiceName="co.hotwax.webhook.WebhookServices.receive#WebhookEvents">
+            feedName="Webhook Events Feed"
+            feedReceiveServiceName="co.hotwax.webhook.WebhookServices.receive#WebhookEvents">
         <documents dataDocumentId="WebhookOrderStatus" feedStampField="lastUpdatedStamp" feedTrigger="INSERT"/>
         <documents dataDocumentId="WebhookShipmentStatus" feedStampField="lastUpdatedStamp" feedTrigger="INSERT"/>
         <documents dataDocumentId="WebhookOrderItem" feedStampField="lastUpdatedStamp" feedTrigger="UPDATE"/>
