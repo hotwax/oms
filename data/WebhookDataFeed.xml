@@ -18,6 +18,7 @@
         <fields fieldSeqId="14" fieldPath="org.apache.ofbiz.order.order.OrderHeader:salesChannelEnumId" fieldNameAlias="salesChannelEnumId"/>
         <fields fieldSeqId="15" fieldPath="org.apache.ofbiz.order.order.OrderHeader:productStoreId" fieldNameAlias="productStoreId"/>
         <fields fieldSeqId="16" fieldPath="org.apache.ofbiz.order.order.OrderHeader:entryDate" fieldNameAlias="orderEntryDate"/>
+        <fields fieldSeqId="17" fieldPath="org.apache.ofbiz.order.order.OrderHeader:orderTypeId" fieldNameAlias="orderTypeId"/>
 
         <fields fieldSeqId="20" fieldPath="org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:storeName" fieldNameAlias="storeName"/>
         <fields fieldSeqId="21" fieldPath="org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:defaultLocaleString" fieldNameAlias="defaultLocaleString"/>
@@ -72,7 +73,8 @@
         <fields fieldSeqId="23" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:grandTotal" fieldNameAlias="grandTotal"/>
         <fields fieldSeqId="24" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:salesChannelEnumId" fieldNameAlias="salesChannelEnumId"/>
         <fields fieldSeqId="25" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:productStoreId" fieldNameAlias="productStoreId"/>
-        <fields fieldSeqId="26" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:primaryOrderId" fieldNameAlias="primaryOrderId"/>
+        <fields fieldSeqId="26" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:orderTypeId" fieldNameAlias="orderTypeId"/>
+        <fields fieldSeqId="27" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:primaryOrderId" fieldNameAlias="primaryOrderId"/>
 
         <fields fieldSeqId="30" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:storeName" fieldNameAlias="storeName"/>
         <fields fieldSeqId="31" fieldPath="org.apache.ofbiz.shipment.shipment.Shipment:Primary#org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:defaultLocaleString" fieldNameAlias="defaultLocaleString"/>
@@ -117,6 +119,7 @@
         <fields fieldSeqId="13" fieldPath="org.apache.ofbiz.order.order.OrderHeader:grandTotal" fieldNameAlias="grandTotal"/>
         <fields fieldSeqId="14" fieldPath="org.apache.ofbiz.order.order.OrderHeader:salesChannelEnumId" fieldNameAlias="salesChannelEnumId"/>
         <fields fieldSeqId="15" fieldPath="org.apache.ofbiz.order.order.OrderHeader:productStoreId" fieldNameAlias="productStoreId"/>
+        <fields fieldSeqId="16" fieldPath="org.apache.ofbiz.order.order.OrderHeader:orderTypeId" fieldNameAlias="orderTypeId"/>
 
         <fields fieldSeqId="20" fieldPath="org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:storeName" fieldNameAlias="storeName"/>
         <fields fieldSeqId="21" fieldPath="org.apache.ofbiz.order.order.OrderHeader:org.apache.ofbiz.product.store.ProductStore:defaultLocaleString" fieldNameAlias="defaultLocaleString"/>
