@@ -45,9 +45,6 @@ under the License.
         <relationship type="many" related="co.hotwax.order.OrderIdentification" short-alias="identifications">
             <key-map field-name="orderId"/>
         </relationship>
-        <relationship type="many" related="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" short-alias="itemShipGroupAssocs">
-            <key-map field-name="orderId"/>
-        </relationship>
         <relationship type="many" related="org.apache.ofbiz.order.order.OrderContent" short-alias="contents">
             <key-map field-name="orderId"/>
         </relationship>
@@ -66,7 +63,6 @@ under the License.
             <detail relationship="shipGroups" use-master="default"/>
             <detail relationship="statuses"/>
             <detail relationship="identifications"/>
-            <detail relationship="itemShipGroupAssocs"/>
             <detail relationship="contents"/>
             <detail relationship="itemAssocs"/>
         </master>

@@ -63,7 +63,6 @@ under the License.
         <in-parameters>
             <parameter name="shipGroups" type="List"/>
             <parameter name="contactMechs" type="List"/>
-            <parameter name="itemShipGroupAssocs" type="List"/>
             <parameter name="shipBy"/>
             <parameter name="shipAfter"/>
             <parameter name="productStoreId"/>
@@ -72,12 +71,8 @@ under the License.
         <out-parameters>
             <parameter name="shipGroups"/>
             <parameter name="contactMechs"/>
-            <parameter name="itemShipGroupAssocs"/>
         </out-parameters>
         <actions>
-            <if condition="!itemShipGroupAssocs">
-                <set field="itemShipGroupAssocs" from="[]"/>
-            </if>
             <if condition="!shipGroups">
                 <return error="true" message="Missing ship groups, skipping order import"/>
             </if>
@@ -290,7 +285,6 @@ under the License.
                                 </if>
                             </iterate>
                         </if>
-                        <set field="itemShipGroupAssocs" from="itemShipGroupAssocs + [[orderItemSeqId:itemMap.orderItemSeqId, quantity:itemMap.quantity]]"/>
                         <set field="normalizedItems" from="normalizedItems + itemMap"/>
                     </iterate>
                     <set field="shipGroupMap.items" from="normalizedItems"/>
@@ -301,9 +295,6 @@ under the License.
 
             <if condition="contactMechs">
                 <set field="contactMechs" from="contactMechs.unique { it.contactMechPurposeTypeId + '|' + it.contactMechId }"/>
-            </if>
-            <if condition="itemShipGroupAssocs">
-                <set field="itemShipGroupAssocs" from="itemShipGroupAssocs.unique { it.orderItemSeqId + '|' + it.shipGroupSeqId }"/>
             </if>
         </actions>
     </service>
@@ -387,11 +378,6 @@ under the License.
                     <parameter name="orderIdentificationTypeId"/>
                     <parameter name="idValue"/>
                     <parameter name="fromDate"/>
-                </parameter>
-            </parameter>
-            <parameter name="itemShipGroupAssocs" type="List">
-                <parameter name="assoc" type="Map">
-                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" include="nonpk"/>
                 </parameter>
             </parameter>
             <parameter name="tags" type="List"/>
@@ -811,31 +797,11 @@ under the License.
 
             <service-call name="co.hotwax.oms.order.OrderServices.prepare#SalesOrderShipGroups" in-map="context" out-map="context"/>
 
-            <set field="pendingItemShipGroupAssocs" from="itemShipGroupAssocs"/>
-            <set field="itemShipGroupAssocs" from="[]"/>
-
             <set field="presentmentCurrencyCode" from="null"/>
             <log message="\n\n========Context: ==== ${context} =========================\n\n"/>
             <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="context" out-map="orderOut"/>
             <set field="orderId" from="orderOut.orderId"/>
 
-            <if condition="pendingItemShipGroupAssocs">
-                <iterate list="pendingItemShipGroupAssocs" entry="isga">
-                    <if condition="!isga.orderId">
-                        <set field="isga.orderId" from="orderId"/>
-                    </if>
-                    <if condition="isga.orderItemSeqId &amp;&amp; isga.shipGroupSeqId">
-                        <entity-find-one entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="existingIsga">
-                            <field-map field-name="orderId" from="isga.orderId"/>
-                            <field-map field-name="orderItemSeqId" from="isga.orderItemSeqId"/>
-                            <field-map field-name="shipGroupSeqId" from="isga.shipGroupSeqId"/>
-                        </entity-find-one>
-                        <if condition="!existingIsga">
-                            <service-call name="create#org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" in-map="isga"/>
-                        </if>
-                    </if>
-                </iterate>
-            </if>
             <if condition="tags">
                 <iterate list="tags" entry="tagText">
                     <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:tagText, noteDateTime:ec.user.nowTimestamp]" out-map="tagNoteOut"/>
