@@ -446,7 +446,7 @@ under the License.
                                     <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderAdjustment" include="nonpk"/>
                                     <parameter name="type"/>
                                     <parameter name="setShipGroup"/>
-                                    <parameter name="adjustmentAttributes" type="List">
+                                    <parameter name="attributes" type="List">
                                         <parameter name="attribute" type="Map">
                                             <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderAdjustmentAttribute" include="nonpk"/>
                                         </parameter>
