@@ -58,6 +58,777 @@ under the License.
         </actions>
     </service>
 
+    <service verb="prepare" noun="SalesOrderShipGroups">
+        <description>Normalize ship groups and items for sales order creation.</description>
+        <in-parameters>
+            <parameter name="shipGroups" type="List"/>
+            <parameter name="contactMechs" type="List"/>
+            <parameter name="itemShipGroupAssocs" type="List"/>
+            <parameter name="shipBy"/>
+            <parameter name="shipAfter"/>
+            <parameter name="productStoreId"/>
+            <parameter name="orderStatusDatetime"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="shipGroups"/>
+            <parameter name="contactMechs"/>
+            <parameter name="itemShipGroupAssocs"/>
+        </out-parameters>
+        <actions>
+            <if condition="!itemShipGroupAssocs">
+                <set field="itemShipGroupAssocs" from="[]"/>
+            </if>
+            <if condition="!shipGroups">
+                <return error="true" message="Missing ship groups, skipping order import"/>
+            </if>
+            <if condition="shipGroups">
+                <set field="normalizedShipGroups" from="[]"/>
+                <iterate list="shipGroups" entry="shipGroup">
+                    <set field="shipGroupMap" from="shipGroup"/>
+                    <if condition="!shipGroupMap.carrierRoleTypeId">
+                        <set field="shipGroupMap.carrierRoleTypeId" value="CARRIER"/>
+                    </if>
+                    <if condition="!shipGroupMap.isGift">
+                        <set field="shipGroupMap.isGift" value="N"/>
+                    </if>
+                    <if condition="!shipGroupMap.shipByDate &amp;&amp; shipBy">
+                        <set field="shipGroupMap.shipByDate" from="shipBy"/>
+                    </if>
+                    <if condition="!shipGroupMap.shipAfterDate &amp;&amp; shipAfter">
+                        <set field="shipGroupMap.shipAfterDate" from="shipAfter"/>
+                    </if>
+                    <if condition="!shipGroupMap.facilityId &amp;&amp; shipGroupMap.externalId">
+                        <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="shipGroupFacility">
+                            <field-map field-name="externalId" from="shipGroupMap.externalId"/>
+                        </entity-find-one>
+                        <if condition="shipGroupFacility">
+                            <set field="shipGroupMap.facilityId" from="shipGroupFacility.facilityId"/>
+                        </if>
+                    </if>
+                    <if condition="shipGroup.shipTo">
+                        <set field="shipTo" from="shipGroup.shipTo"/>
+                        <set field="shipToPostal" from="shipTo.postalAddress"/>
+                        <if condition="shipToPostal">
+                            <if condition="shipToPostal.name &amp;&amp; !shipToPostal.toName">
+                                <set field="shipToPostal.toName" from="shipToPostal.name"/>
+                            </if>
+                            <set field="shipToPostalContactMechId" from="shipToPostal.id"/>
+                            <if condition="!shipToPostalContactMechId &amp;&amp; shipToPostal.externalId">
+                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToPostalContactMech">
+                                    <field-map field-name="externalId" from="shipToPostal.externalId"/>
+                                </entity-find-one>
+                                <set field="shipToPostalContactMechId" from="shipToPostalContactMech?.contactMechId"/>
+                            </if>
+                            <if condition="!shipToPostalContactMechId">
+                                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                                              in-map="shipToPostal"
+                                              out-map="shipToPostalOut"/>
+                                <set field="shipToPostalContactMechId" from="shipToPostalOut.contactMechId"/>
+                            </if>
+                            <if condition="shipToPostalContactMechId">
+                                <set field="shipGroupMap.contactMechId" from="shipToPostalContactMechId"/>
+                                <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'SHIPPING_LOCATION', contactMechId:shipToPostalContactMechId]]"/>
+                                <if condition="shipToPostal.additionalPurpose">
+                                    <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:shipToPostal.additionalPurpose, contactMechId:shipToPostalContactMechId]]"/>
+                                </if>
+                            </if>
+                        </if>
+                        <set field="shipToEmail" from="shipTo.email"/>
+                        <if condition="shipToEmail">
+                            <set field="shipToEmailContactMechId" from="shipToEmail.id"/>
+                            <if condition="!shipToEmailContactMechId &amp;&amp; shipToEmail.externalId">
+                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToEmailContactMech">
+                                    <field-map field-name="externalId" from="shipToEmail.externalId"/>
+                                </entity-find-one>
+                                <set field="shipToEmailContactMechId" from="shipToEmailContactMech?.contactMechId"/>
+                            </if>
+                            <if condition="!shipToEmailContactMechId &amp;&amp; shipToEmail.infoString">
+                                <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
+                                              in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:shipToEmail.infoString, externalId:shipToEmail.externalId]"
+                                              out-map="shipToEmailCreateOut"/>
+                                <set field="shipToEmailContactMechId" from="shipToEmailCreateOut.contactMechId"/>
+                            </if>
+                            <if condition="shipToEmailContactMechId">
+                                <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'SHIPPING_EMAIL', contactMechId:shipToEmailContactMechId]]"/>
+                            </if>
+                        </if>
+                        <set field="shipToPhone" from="shipTo.phoneNumber"/>
+                        <if condition="shipToPhone">
+                            <set field="shipToPhoneContactMechId" from="shipToPhone.id"/>
+                            <if condition="!shipToPhoneContactMechId &amp;&amp; shipToPhone.externalId">
+                                <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="shipToPhoneContactMech">
+                                    <field-map field-name="externalId" from="shipToPhone.externalId"/>
+                                </entity-find-one>
+                                <set field="shipToPhoneContactMechId" from="shipToPhoneContactMech?.contactMechId"/>
+                            </if>
+                            <if condition="!shipToPhoneContactMechId">
+                                <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                                              in-map="shipToPhone"
+                                              out-map="shipToPhoneOut"/>
+                                <set field="shipToPhoneContactMechId" from="shipToPhoneOut.contactMechId"/>
+                            </if>
+                            <if condition="shipToPhoneContactMechId">
+                                <set field="shipGroupMap.telecomContactMechId" from="shipToPhoneContactMechId"/>
+                                <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'PHONE_SHIPPING', contactMechId:shipToPhoneContactMechId]]"/>
+                            </if>
+                        </if>
+                    </if>
+                    <if condition="shipGroupMap.contactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'SHIPPING_LOCATION', contactMechId:shipGroupMap.contactMechId]]"/>
+                    </if>
+                    <if condition="shipGroupMap.telecomContactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'PHONE_SHIPPING', contactMechId:shipGroupMap.telecomContactMechId]]"/>
+                    </if>
+                    <set field="normalizedItems" from="[]"/>
+                    <iterate list="shipGroup.items" entry="item">
+                    <set field="itemMap" from="item"/>
+                        <if condition="itemMap.itemExternalId &amp;&amp; !itemMap.externalId">
+                            <set field="itemMap.externalId" from="itemMap.itemExternalId"/>
+                        </if>
+                        <if condition="itemMap.status &amp;&amp; !itemMap.statusId">
+                            <set field="itemMap.statusId" from="itemMap.status"/>
+                        </if>
+                        <if condition="!itemMap.statusId">
+                            <set field="itemMap.statusId" value="ITEM_CREATED"/>
+                        </if>
+                        <if condition="itemMap.description &amp;&amp; !itemMap.itemDescription">
+                            <set field="itemMap.itemDescription" from="itemMap.description"/>
+                        </if>
+                        <if condition="!itemMap.orderItemTypeId">
+                            <set field="itemMap.orderItemTypeId" value="PRODUCT_ORDER_ITEM"/>
+                        </if>
+                        <if condition="!itemMap.isPromo">
+                            <set field="itemMap.isPromo" value="N"/>
+                        </if>
+                        <if condition="!itemMap.isModifiedPrice">
+                            <set field="itemMap.isModifiedPrice" value="Y"/>
+                        </if>
+                        <if condition="!itemMap.requestedShipMethTypeId &amp;&amp; shipGroupMap.shipmentMethodTypeId">
+                            <set field="itemMap.requestedShipMethTypeId" from="shipGroupMap.shipmentMethodTypeId"/>
+                        </if>
+                        <if condition="!itemMap.productId &amp;&amp; itemMap.sku">
+                            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="skuProduct">
+                                <field-map field-name="internalName" from="itemMap.sku"/>
+                            </entity-find-one>
+                            <if condition="skuProduct">
+                                <set field="itemMap.productId" from="skuProduct.productId"/>
+                            </if>
+                        </if>
+                        <if condition="!itemMap.productId &amp;&amp; itemMap.idType &amp;&amp; itemMap.idValue">
+                            <entity-find entity-name="org.apache.ofbiz.product.product.GoodIdentification" list="goodIdList" limit="1">
+                                <econdition field-name="goodIdentificationTypeId" from="itemMap.idType"/>
+                                <econdition field-name="idValue" from="itemMap.idValue"/>
+                                <date-filter/>
+                            </entity-find>
+                            <if condition="goodIdList">
+                                <set field="itemMap.productId" from="goodIdList[0].productId"/>
+                            </if>
+                        </if>
+                        <if condition="!itemMap.itemDescription &amp;&amp; itemMap.productId">
+                            <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="itemProduct">
+                                <field-map field-name="productId" from="itemMap.productId"/>
+                            </entity-find-one>
+                            <if condition="itemProduct">
+                                <set field="itemMap.itemDescription" from="itemProduct.productName ?: itemProduct.internalName"/>
+                            </if>
+                        </if>
+                        <if condition="productStoreId &amp;&amp; itemMap.productId &amp;&amp; !itemMap.prodCatalogId">
+                            <entity-find entity-name="org.apache.ofbiz.product.store.ProductStoreCatalog" list="storeCatalogList" limit="1">
+                                <econdition field-name="productStoreId" from="productStoreId"/>
+                                <date-filter/>
+                                <order-by field-name="sequenceNum"/>
+                            </entity-find>
+                            <if condition="storeCatalogList">
+                                <set field="itemMap.prodCatalogId" from="storeCatalogList[0].prodCatalogId"/>
+                            </if>
+                        </if>
+                        <if condition="!item.adjustments &amp;&amp; item.itemAdjustments">
+                            <set field="item.adjustments" from="item.itemAdjustments"/>
+                        </if>
+                        <if condition="item.adjustments">
+                            <set field="normalizedItemAdjustments" from="[]"/>
+                            <iterate list="item.adjustments" entry="itemAdj">
+                                <set field="itemAdjMap" from="itemAdj"/>
+                                <if condition="!itemAdjMap.orderAdjustmentTypeId &amp;&amp; itemAdjMap.type">
+                                    <set field="itemAdjMap.orderAdjustmentTypeId" from="itemAdjMap.type"/>
+                                </if>
+                                <if condition="itemAdjMap.setShipGroup == 'N'">
+                                    <set field="itemAdjMap.shipGroupSeqId" value="_NA_"/>
+                                </if>
+                                <if condition="itemAdj.adjustmentAttributes">
+                                    <set field="itemAdjMap.attributes" from="itemAdj.adjustmentAttributes"/>
+                                </if>
+                                <set field="normalizedItemAdjustments" from="normalizedItemAdjustments + itemAdjMap"/>
+                            </iterate>
+                            <set field="itemMap.adjustments" from="normalizedItemAdjustments"/>
+                        </if>
+                        <if condition="itemMap.statuses">
+                            <iterate list="itemMap.statuses" entry="itemStatus">
+                                <if condition="!itemStatus.statusId &amp;&amp; itemMap.statusId">
+                                    <set field="itemStatus.statusId" from="itemMap.statusId"/>
+                                </if>
+                                <if condition="!itemStatus.statusDatetime">
+                                    <set field="itemStatus.statusDatetime" from="orderStatusDatetime ?: ec.user.nowTimestamp"/>
+                                </if>
+                                <if condition="!itemStatus.statusUserLogin">
+                                    <set field="itemStatus.statusUserLogin" from="ec.user.getUsername()"/>
+                                </if>
+                            </iterate>
+                        </if>
+                        <if condition="!itemMap.statuses &amp;&amp; itemMap.statusId">
+                            <set field="itemMap.statuses" from="[[statusId:itemMap.statusId, statusDatetime:(orderStatusDatetime ?: ec.user.nowTimestamp), statusUserLogin:ec.user.getUsername()]]"/>
+                        </if>
+                        <if condition="itemMap.assocs">
+                            <iterate list="itemMap.assocs" entry="assoc">
+                                <if condition="assoc.toOrderExternalId &amp;&amp; !assoc.toOrderId">
+                                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="assocOrder">
+                                        <field-map field-name="externalId" from="assoc.toOrderExternalId"/>
+                                    </entity-find-one>
+                                    <if condition="assocOrder">
+                                        <set field="assoc.toOrderId" from="assocOrder.orderId"/>
+                                    </if>
+                                </if>
+                            </iterate>
+                        </if>
+                        <set field="itemShipGroupAssocs" from="itemShipGroupAssocs + [[orderItemSeqId:itemMap.orderItemSeqId, quantity:itemMap.quantity]]"/>
+                        <set field="normalizedItems" from="normalizedItems + itemMap"/>
+                    </iterate>
+                    <set field="shipGroupMap.items" from="normalizedItems"/>
+                    <set field="normalizedShipGroups" from="normalizedShipGroups + shipGroupMap"/>
+                </iterate>
+                <set field="shipGroups" from="normalizedShipGroups"/>
+            </if>
+
+            <if condition="contactMechs">
+                <set field="contactMechs" from="contactMechs.unique { it.contactMechPurposeTypeId + '|' + it.contactMechId }"/>
+            </if>
+            <if condition="itemShipGroupAssocs">
+                <set field="itemShipGroupAssocs" from="itemShipGroupAssocs.unique { it.orderItemSeqId + '|' + it.shipGroupSeqId }"/>
+            </if>
+        </actions>
+    </service>
+
+    <service verb="create" noun="SalesOrder">
+        <description>Create a sales order using master-detail persistence.</description>
+        <in-parameters>
+            <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderHeader" include="nonpk"/>
+            <parameter name="channel"/>
+            <parameter name="currencyCode"/>
+            <parameter name="presentmentCurrencyCode"/>
+            <parameter name="originExternalFacilityId"/>
+            <parameter name="orderStatusDatetime"/>
+            <parameter name="shipBy"/>
+            <parameter name="shipAfter"/>
+            <parameter name="customerId"/>
+            <parameter name="customerExternalId"/>
+            <parameter name="customerIdentificationType"/>
+            <parameter name="customerIdentificationValue"/>
+            <parameter name="firstName"/>
+            <parameter name="lastName"/>
+            <parameter name="customerEmail"/>
+            <parameter name="customerPhone"/>
+            <parameter name="adjustments" type="List">
+                <parameter name="adjustment" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderAdjustment" include="nonpk"/>
+                    <parameter name="type"/>
+                    <parameter name="adjustmentAttributes" type="List">
+                        <parameter name="attribute" type="Map">
+                            <parameter name="attrName"/>
+                            <parameter name="attrValue"/>
+                            <parameter name="attrDescription"/>
+                        </parameter>
+                    </parameter>
+                </parameter>
+            </parameter>
+            <parameter name="attributes" type="List">
+                <parameter name="attribute" type="Map">
+                    <parameter name="attrName"/>
+                    <parameter name="attrValue"/>
+                    <parameter name="attrDescription"/>
+                </parameter>
+            </parameter>
+            <parameter name="contents" type="List">
+                <parameter name="content" type="Map">
+                    <parameter name="orderItemSeqId"/>
+                    <parameter name="orderContentTypeId"/>
+                    <parameter name="fromDate"/>
+                </parameter>
+            </parameter>
+            <parameter name="contactMechs" type="List">
+                <parameter name="contactMech" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderContactMech"/>
+                </parameter>
+            </parameter>
+            <parameter name="orderContacts" type="Map">
+                <parameter name="email" type="Map">
+                    <parameter name="infoString"/>
+                </parameter>
+            </parameter>
+            <parameter name="billTo" type="Map">
+                <parameter name="postalAddress" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk"/>
+                    <parameter name="id"/>
+                    <parameter name="externalId"/>
+                    <parameter name="name"/>
+                </parameter>
+                <parameter name="email" type="Map">
+                    <parameter name="id"/>
+                    <parameter name="externalId"/>
+                    <parameter name="infoString"/>
+                </parameter>
+                <parameter name="phoneNumber" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk"/>
+                    <parameter name="id"/>
+                    <parameter name="externalId"/>
+                </parameter>
+            </parameter>
+            <parameter name="identifications" type="List">
+                <parameter name="identification" type="Map">
+                    <parameter name="orderIdentificationTypeId"/>
+                    <parameter name="idValue"/>
+                    <parameter name="fromDate"/>
+                </parameter>
+            </parameter>
+            <parameter name="itemShipGroupAssocs" type="List">
+                <parameter name="assoc" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" include="nonpk"/>
+                </parameter>
+            </parameter>
+            <parameter name="tags" type="List"/>
+            <parameter name="note" type="List">
+                <parameter name="noteText"/>
+            </parameter>
+            <parameter name="paymentPreferences" type="List">
+                <parameter name="paymentPreference" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderPaymentPreference" include="nonpk"/>
+                </parameter>
+            </parameter>
+            <parameter name="roles" type="List">
+                <parameter name="role" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderRole" include="nonpk"/>
+                </parameter>
+            </parameter>
+            <parameter name="orderAdditionalPartyRoleMap" type="Map"/>
+            <parameter name="shipGroups" type="List">
+                <parameter name="shipGroup" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" include="nonpk"/>
+                    <parameter name="externalId"/>
+                    <parameter name="shipTo" type="Map">
+                        <parameter name="postalAddress" type="Map">
+                            <auto-parameters entity-name="org.apache.ofbiz.party.contact.PostalAddress" include="nonpk"/>
+                            <parameter name="id"/>
+                            <parameter name="externalId"/>
+                            <parameter name="name"/>
+                            <parameter name="additionalPurpose"/>
+                        </parameter>
+                        <parameter name="email" type="Map">
+                            <parameter name="id"/>
+                            <parameter name="externalId"/>
+                            <parameter name="infoString"/>
+                        </parameter>
+                        <parameter name="phoneNumber" type="Map">
+                            <auto-parameters entity-name="org.apache.ofbiz.party.contact.TelecomNumber" include="nonpk"/>
+                            <parameter name="id"/>
+                            <parameter name="externalId"/>
+                        </parameter>
+                    </parameter>
+                    <parameter name="items" type="List">
+                        <parameter name="item" type="Map">
+                            <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItem" include="nonpk"/>
+                            <parameter name="itemExternalId"/>
+                            <parameter name="sku"/>
+                            <parameter name="idType"/>
+                            <parameter name="idValue"/>
+                            <parameter name="status"/>
+                            <parameter name="description"/>
+                            <parameter name="adjustments" type="List">
+                                <parameter name="adjustment" type="Map">
+                                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderAdjustment" include="nonpk"/>
+                                    <parameter name="type"/>
+                                    <parameter name="setShipGroup"/>
+                                    <parameter name="adjustmentAttributes" type="List">
+                                        <parameter name="attribute" type="Map">
+                                            <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderAdjustmentAttribute" include="nonpk"/>
+                                        </parameter>
+                                    </parameter>
+                                </parameter>
+                            </parameter>
+                            <parameter name="attributes" type="List">
+                                <parameter name="attribute" type="Map">
+                                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemAttribute" include="nonpk"/>
+                                </parameter>
+                            </parameter>
+                            <parameter name="statuses" type="List">
+                                <parameter name="status" type="Map">
+                                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderStatus" include="nonpk"/>
+                                </parameter>
+                            </parameter>
+                            <parameter name="assocs" type="List">
+                                <parameter name="assoc" type="Map">
+                                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderItemAssoc" include="nonpk"/>
+                                    <parameter name="toOrderExternalId"/>
+                                </parameter>
+                            </parameter>
+                        </parameter>
+                    </parameter>
+                </parameter>
+            </parameter>
+            <parameter name="statuses" type="List">
+                <parameter name="status" type="Map">
+                    <auto-parameters entity-name="org.apache.ofbiz.order.order.OrderStatus" include="nonpk"/>
+                </parameter>
+            </parameter>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="orderId"/>
+        </out-parameters>
+        <actions>
+
+            <if condition="!orderTypeId">
+                <set field="orderTypeId" value="SALES_ORDER"/>
+            </if>
+            <if condition="!statusId">
+                <set field="statusId" value="ORDER_CREATED"/>
+            </if>
+            <if condition="!orderDate">
+                <set field="orderDate" from="ec.user.nowTimestamp"/>
+            </if>
+            <if condition="!entryDate">
+                <set field="entryDate" from="ec.user.nowTimestamp"/>
+            </if>
+            <if condition="channel &amp;&amp; !salesChannelEnumId">
+                <set field="salesChannelEnumId" from="channel"/>
+            </if>
+            <if condition="!salesChannelEnumId">
+                <set field="salesChannelEnumId" value="UNKNWN_SALES_CHANNEL"/>
+            </if>
+            <if condition="currencyCode &amp;&amp; !currencyUom">
+                <set field="currencyUom" from="currencyCode"/>
+            </if>
+            <if condition="presentmentCurrencyCode &amp;&amp; !presentmentCurrencyUom">
+                <set field="presentmentCurrencyUom" from="presentmentCurrencyCode"/>
+            </if>
+            <if condition="!originFacilityId &amp;&amp; originExternalFacilityId">
+                <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="originFacility">
+                    <field-map field-name="externalId" from="originExternalFacilityId"/>
+                </entity-find-one>
+                <if condition="originFacility">
+                    <set field="originFacilityId" from="originFacility.facilityId"/>
+                </if>
+            </if>
+            <if condition="productStoreId">
+                <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore">
+                    <field-map field-name="productStoreId"/>
+                </entity-find-one>
+                <if condition="productStore">
+                    <if condition="(!originFacilityId) &amp;&amp; (productStore.oneInventoryFacility == 'Y')">
+                        <set field="originFacilityId" from="productStore.inventoryFacilityId"/>
+                    </if>
+                    <if condition="(!salesChannelEnumId || salesChannelEnumId == 'UNKNWN_SALES_CHANNEL') &amp;&amp; productStore.defaultSalesChannelEnumId">
+                        <set field="salesChannelEnumId" from="productStore.defaultSalesChannelEnumId"/>
+                    </if>
+                    <if condition="!billFromVendorPartyId &amp;&amp; productStore.payToPartyId">
+                        <set field="billFromVendorPartyId" from="productStore.payToPartyId"/>
+                    </if>
+                    <if condition="!shipFromVendorPartyId &amp;&amp; productStore.payToPartyId">
+                        <set field="shipFromVendorPartyId" from="productStore.payToPartyId"/>
+                    </if>
+                    <if condition="orderTypeId == 'TRANSFER_ORDER' &amp;&amp; !customerId &amp;&amp; productStore.payToPartyId">
+                        <set field="customerId" from="productStore.payToPartyId"/>
+                    </if>
+                </if>
+            </if>
+
+            <!-- Build contactMechs from orderContacts/billTo maps -->
+            <if condition="!contactMechs">
+                <set field="contactMechs" from="[]"/>
+            </if>
+            <if condition="orderContacts">
+                <set field="orderEmail" from="orderContacts.email"/>
+                <if condition="orderEmail">
+                    <if condition="orderEmail.infoString">
+                        <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
+                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:orderEmail.infoString, externalId:orderEmail.externalId]"
+                                      out-map="orderEmailCreateOut"/>
+                        <set field="orderEmailContactMechId" from="orderEmailCreateOut.contactMechId"/>
+                    </if>
+                    <if condition="orderEmailContactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'ORDER_EMAIL', contactMechId:orderEmailContactMechId]]"/>
+                    </if>
+                </if>
+            </if>
+            <if condition="billTo">
+                <set field="billToPostal" from="billTo.postalAddress"/>
+                <if condition="billToPostal">
+                    <if condition="billToPostal.name &amp;&amp; !billToPostal.toName">
+                        <set field="billToPostal.toName" from="billToPostal.name"/>
+                    </if>
+                    <set field="billToPostalContactMechId" from="billToPostal.id"/>
+                    <if condition="!billToPostalContactMechId &amp;&amp; billToPostal.externalId">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToPostalContactMech">
+                            <field-map field-name="externalId" from="billToPostal.externalId"/>
+                        </entity-find-one>
+                        <set field="billToPostalContactMechId" from="billToPostalContactMech?.contactMechId"/>
+                    </if>
+                    <if condition="!billToPostalContactMechId">
+                        <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
+                                      in-map="billToPostal"
+                                      out-map="billToPostalOut"/>
+                        <set field="billToPostalContactMechId" from="billToPostalOut.contactMechId"/>
+                    </if>
+                    <if condition="billToPostalContactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'BILLING_LOCATION', contactMechId:billToPostalContactMechId]]"/>
+                    </if>
+                </if>
+                <set field="billToEmail" from="billTo.email"/>
+                <if condition="billToEmail">
+                    <set field="billToEmailContactMechId" from="billToEmail.id"/>
+                    <if condition="!billToEmailContactMechId &amp;&amp; billToEmail.externalId">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToEmailContactMech">
+                            <field-map field-name="externalId" from="billToEmail.externalId"/>
+                        </entity-find-one>
+                        <set field="billToEmailContactMechId" from="billToEmailContactMech?.contactMechId"/>
+                    </if>
+                    <if condition="!billToEmailContactMechId &amp;&amp; billToEmail.infoString">
+                        <service-call name="create#org.apache.ofbiz.party.contact.ContactMech"
+                                      in-map="[contactMechTypeId:'EMAIL_ADDRESS', infoString:billToEmail.infoString, externalId:billToEmail.externalId]"
+                                      out-map="billToEmailCreateOut"/>
+                        <set field="billToEmailContactMechId" from="billToEmailCreateOut.contactMechId"/>
+                    </if>
+                    <if condition="billToEmailContactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'BILLING_EMAIL', contactMechId:billToEmailContactMechId]]"/>
+                    </if>
+                </if>
+                <set field="billToPhone" from="billTo.phoneNumber"/>
+                <if condition="billToPhone">
+                    <set field="billToPhoneContactMechId" from="billToPhone.id"/>
+                    <if condition="!billToPhoneContactMechId &amp;&amp; billToPhone.externalId">
+                        <entity-find-one entity-name="org.apache.ofbiz.party.contact.ContactMech" value-field="billToPhoneContactMech">
+                            <field-map field-name="externalId" from="billToPhone.externalId"/>
+                        </entity-find-one>
+                        <set field="billToPhoneContactMechId" from="billToPhoneContactMech?.contactMechId"/>
+                    </if>
+                    <if condition="!billToPhoneContactMechId">
+                        <service-call name="co.hotwax.oms.contact.ContactMechServices.create#TelecomNumber"
+                                      in-map="billToPhone"
+                                      out-map="billToPhoneOut"/>
+                        <set field="billToPhoneContactMechId" from="billToPhoneOut.contactMechId"/>
+                    </if>
+                    <if condition="billToPhoneContactMechId">
+                        <set field="contactMechs" from="contactMechs + [[contactMechPurposeTypeId:'PHONE_BILLING', contactMechId:billToPhoneContactMechId]]"/>
+                    </if>
+                </if>
+            </if>
+
+            <!-- Create customer party if needed -->
+            <set field="customerPartyId" from="customerId"/>
+            <if condition="!customerPartyId &amp;&amp; customerExternalId">
+                <entity-find entity-name="org.apache.ofbiz.party.party.Party" list="customerPartyList" limit="1">
+                    <econdition field-name="externalId" from="customerExternalId"/>
+                </entity-find>
+                <set field="customerPartyId" from="customerPartyList ? customerPartyList[0].partyId : null"/>
+            </if>
+            <if condition="!customerPartyId &amp;&amp; customerIdentificationType &amp;&amp; customerIdentificationValue">
+                <entity-find entity-name="org.apache.ofbiz.party.party.PartyIdentification" list="customerIdentList" limit="1">
+                    <econdition field-name="partyIdentificationTypeId" from="customerIdentificationType"/>
+                    <econdition field-name="idValue" from="customerIdentificationValue"/>
+                </entity-find>
+                <set field="customerPartyId" from="customerIdentList ? customerIdentList[0].partyId : null"/>
+            </if>
+            <if condition="!customerPartyId">
+                <set field="primaryEmail" from="customerEmail ?: orderContacts?.email?.infoString ?: billTo?.email?.infoString"/>
+                <set field="primaryPhone" from="customerPhone ?: billTo?.phoneNumber?.contactNumber"/>
+                <set field="customerPartyIdentifications" from="[:]"/>
+                <if condition="customerIdentificationType &amp;&amp; customerIdentificationValue">
+                    <set field="customerPartyIdentifications" from="[(customerIdentificationType):customerIdentificationValue]"/>
+                </if>
+
+                <set field="partyRoles" from="[[roleTypeId:'PLACING_CUSTOMER'], [roleTypeId:'END_USER_CUSTOMER'], [roleTypeId:'SHIP_TO_CUSTOMER'], [roleTypeId:'BILL_TO_CUSTOMER']]"/>
+                <set field="customerCreateIn" from="[externalId:customerExternalId, firstName:firstName, lastName:lastName,
+                    roleTypeId:'CUSTOMER', partyIdentifications:customerPartyIdentifications, primaryEmail:primaryEmail,
+                    primaryPhoneNumber:primaryPhone, toName:billTo?.postalAddress?.toName ?: billTo?.postalAddress?.name,
+                    address1:billTo?.postalAddress?.address1, address2:billTo?.postalAddress?.address2, city:billTo?.postalAddress?.city,
+                    stateProvinceGeoId:billTo?.postalAddress?.stateProvinceGeoId, postalCode:billTo?.postalAddress?.postalCode,
+                    countryGeoId:billTo?.postalAddress?.countryGeoId, roles:partyRoles]"/>
+                <service-call name="co.hotwax.oms.party.PartyServices.create#Party" in-map="customerCreateIn" out-map="customerCreateOut"/>
+                <set field="customerPartyId" from="customerCreateOut.partyId"/>
+                <else>
+                    <set field="partyRoles" from="[[partyId: customerPartyId, roleTypeId:'PLACING_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'END_USER_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'SHIP_TO_CUSTOMER'], [partyId: customerPartyId, roleTypeId:'BILL_TO_CUSTOMER']]"/>
+                    <service-call name="store#org.apache.ofbiz.party.party.Person" in-map="[partyId: customerPartyId, roles: partyRoles]"/>
+                </else>
+            </if>
+            <if condition="!roles &amp;&amp; customerPartyId">
+                <set field="roles" from="[[partyId:customerPartyId, roleTypeId:'PLACING_CUSTOMER'],
+                                          [partyId:customerPartyId, roleTypeId:'END_USER_CUSTOMER'],
+                                          [partyId:customerPartyId, roleTypeId:'SHIP_TO_CUSTOMER'],
+                                          [partyId:customerPartyId, roleTypeId:'BILL_TO_CUSTOMER']]"/>
+            </if>
+            <if condition="roles &amp;&amp; customerPartyId">
+                <iterate list="roles" entry="role">
+                    <if condition="!role.partyId">
+                        <set field="role.partyId" from="customerPartyId"/>
+                    </if>
+                </iterate>
+            </if>
+            <if condition="!roles"><set field="roles" from="[]"/></if>
+            <if condition="billFromVendorPartyId">
+                <set field="roles" from="roles + [[partyId:billFromVendorPartyId, roleTypeId:'BILL_FROM_VENDOR']]"/>
+            </if>
+            <if condition="shipFromVendorPartyId">
+                <set field="roles" from="roles + [[partyId:shipFromVendorPartyId, roleTypeId:'SHIP_FROM_VENDOR']]"/>
+            </if>
+            <if condition="orderAdditionalPartyRoleMap">
+                <iterate list="orderAdditionalPartyRoleMap.entrySet()" entry="roleEntry">
+                    <set field="additionalRoleTypeId" from="roleEntry.key"/>
+                    <iterate list="roleEntry.value" entry="additionalPartyId">
+                        <set field="roles" from="roles + [[partyId:additionalPartyId, roleTypeId:additionalRoleTypeId]]"/>
+                    </iterate>
+                </iterate>
+            </if>
+
+            <!-- Normalize alternate parameter names from OMS payloads -->
+            <if condition="!adjustments &amp;&amp; orderAdjustments">
+                <set field="adjustments" from="orderAdjustments"/>
+            </if>
+            <if condition="!attributes &amp;&amp; orderAttributes">
+                <set field="attributes" from="orderAttributes"/>
+            </if>
+            <if condition="!identifications &amp;&amp; orderIdentifications">
+                <set field="identifications" from="orderIdentifications"/>
+            </if>
+            <if condition="!paymentPreferences &amp;&amp; orderPaymentPref">
+                <set field="paymentPreferences" from="orderPaymentPref"/>
+            </if>
+            <if condition="!shipGroups &amp;&amp; shipGroup">
+                <set field="shipGroups" from="shipGroup"/>
+            </if>
+            <if condition="!itemAssocs &amp;&amp; orderItemAssociations">
+                <set field="itemAssocs" from="orderItemAssociations"/>
+            </if>
+
+            <if condition="itemAssocs">
+                <iterate list="itemAssocs" entry="assoc">
+                    <if condition="assoc.toOrderExternalId &amp;&amp; !assoc.toOrderId">
+                        <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="assocOrder">
+                            <field-map field-name="externalId" from="assoc.toOrderExternalId"/>
+                        </entity-find-one>
+                        <if condition="assocOrder">
+                            <set field="assoc.toOrderId" from="assocOrder.orderId"/>
+                        </if>
+                    </if>
+                    <if condition="!assoc.shipGroupSeqId">
+                        <set field="assoc.shipGroupSeqId" value="_NA_"/>
+                    </if>
+                    <if condition="!assoc.toShipGroupSeqId">
+                        <set field="assoc.toShipGroupSeqId" value="_NA_"/>
+                    </if>
+                </iterate>
+            </if>
+
+            <!-- Normalize OrderAdjustment attributes -->
+            <if condition="adjustments">
+                <set field="normalizedAdjustments" from="[]"/>
+                <iterate list="adjustments" entry="adjustment">
+                    <set field="adjustmentMap" from="adjustment"/>
+                    <if condition="!adjustmentMap.orderAdjustmentTypeId &amp;&amp; adjustmentMap.type">
+                        <set field="adjustmentMap.orderAdjustmentTypeId" from="adjustmentMap.type"/>
+                    </if>
+                    <if condition="!adjustmentMap.orderItemSeqId">
+                        <set field="adjustmentMap.orderItemSeqId" value="_NA_"/>
+                    </if>
+                    <if condition="adjustment.adjustmentAttributes">
+                        <set field="adjustmentMap.attributes" from="adjustment.adjustmentAttributes"/>
+                    </if>
+                    <set field="normalizedAdjustments" from="normalizedAdjustments + adjustmentMap"/>
+                </iterate>
+                <set field="adjustments" from="normalizedAdjustments"/>
+            </if>
+
+            <!-- Normalize identifications -->
+            <if condition="identifications">
+                <iterate list="identifications" entry="identification">
+                    <if condition="!identification.fromDate">
+                        <set field="identification.fromDate" from="ec.user.nowTimestamp"/>
+                    </if>
+                </iterate>
+            </if>
+            <if condition="statuses">
+                <iterate list="statuses" entry="status">
+                    <if condition="!status.statusDatetime">
+                        <set field="status.statusDatetime" from="orderStatusDatetime ?: ec.user.nowTimestamp"/>
+                    </if>
+                    <if condition="!status.statusUserLogin">
+                        <set field="status.statusUserLogin" from="ec.user.getUsername()"/>
+                    </if>
+                </iterate>
+            </if>
+            <if condition="!statuses &amp;&amp; statusId">
+                <set field="statuses" from="[[statusId:statusId, statusDatetime:(orderStatusDatetime ?: ec.user.nowTimestamp), statusUserLogin:ec.user.getUsername()]]"/>
+            </if>
+
+            <!-- Normalize order contents -->
+            <if condition="contents">
+                <set field="normalizedOrderContents" from="[]"/>
+                <iterate list="contents" entry="orderContent">
+                    <if condition="!orderContent.orderItemSeqId">
+                        <set field="orderContent.orderItemSeqId" value="_NA_"/>
+                    </if>
+                    <if condition="!orderContent.fromDate">
+                        <set field="orderContent.fromDate" from="ec.user.nowTimestamp"/>
+                    </if>
+                    <if condition="orderContent.contentId &amp;&amp; orderContent.orderContentTypeId">
+                        <set field="normalizedOrderContents" from="normalizedOrderContents + orderContent"/>
+                    <else>
+                        <log level="warn" message="Skipping OrderContent missing contentId/orderContentTypeId: ${orderContent}"/>
+                    </else>
+                    </if>
+                </iterate>
+                <set field="contents" from="normalizedOrderContents"/>
+            </if>
+
+            <service-call name="co.hotwax.oms.order.OrderServices.prepare#SalesOrderShipGroups" in-map="context" out-map="context"/>
+
+            <set field="pendingItemShipGroupAssocs" from="itemShipGroupAssocs"/>
+            <set field="itemShipGroupAssocs" from="[]"/>
+
+            <set field="presentmentCurrencyCode" from="null"/>
+            <log message="\n\n========Context: ==== ${context} =========================\n\n"/>
+            <service-call name="create#org.apache.ofbiz.order.order.OrderHeader" in-map="context" out-map="orderOut"/>
+            <set field="orderId" from="orderOut.orderId"/>
+
+            <if condition="pendingItemShipGroupAssocs">
+                <iterate list="pendingItemShipGroupAssocs" entry="isga">
+                    <if condition="!isga.orderId">
+                        <set field="isga.orderId" from="orderId"/>
+                    </if>
+                    <if condition="isga.orderItemSeqId &amp;&amp; isga.shipGroupSeqId">
+                        <entity-find-one entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="existingIsga">
+                            <field-map field-name="orderId" from="isga.orderId"/>
+                            <field-map field-name="orderItemSeqId" from="isga.orderItemSeqId"/>
+                            <field-map field-name="shipGroupSeqId" from="isga.shipGroupSeqId"/>
+                        </entity-find-one>
+                        <if condition="!existingIsga">
+                            <service-call name="create#org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" in-map="isga"/>
+                        </if>
+                    </if>
+                </iterate>
+            </if>
+            <if condition="tags">
+                <iterate list="tags" entry="tagText">
+                    <service-call name="create#org.apache.ofbiz.common.note.NoteData" in-map="[noteInfo:tagText, noteDateTime:ec.user.nowTimestamp]" out-map="tagNoteOut"/>
+                    <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, noteId:tagNoteOut.noteId, internalNote:'Y']"/>
+                </iterate>
+            </if>
+            <!-- Persist simple note strings as NoteData + OrderHeaderNote -->
+            <if condition="note">
+                <iterate list="note" entry="noteText">
+                    <service-call name="create#org.apache.ofbiz.party.communication.CommunicationEvent" in-map="[content:noteText, subject:'NA', communicationEventTypeId:'ORDER_NOTE']" out-map="communicationEvent"/>
+                    <service-call name="create#org.apache.ofbiz.order.order.CommunicationEventOrder" in-map="[orderId:orderId, communicationEventId:communicationEvent.communicationEventId]"/>
+                </iterate>
+            </if>
+        </actions>
+    </service>
+
     <service verb="change" noun="OrderItemStatus">
         <description>Change the status of a sales order item</description>
         <in-parameters>
@@ -77,6 +848,9 @@ under the License.
             <!-- Log and return with error if order item doesn't exist -->
             <if condition="!orderItem">
                 <return type="warning" message="OrderItem [ID: ${orderId}:${orderItemSeqId}] - Not found"/>
+            </if>
+            <if condition="orderItem.statusId == 'ITEM_COMPLETED' || (orderItem.statusId == 'ITEM_CANCELLED' &amp;&amp; !(['ITEM_APPROVED', 'ITEM_COMPLETED'].contains(statusId)))">
+                <return message="Skipping item status update as status is already completed or cancelled"/>
             </if>
 
             <!-- Update the status of the order item -->
@@ -195,13 +969,16 @@ under the License.
         </out-parameters>
         <actions>
             <entity-find-one entity-name="org.apache.ofbiz.product.facility.Facility" value-field="facility" cache="true"/>
-            <!-- Since a new ShipGroup is created for each routing attempt,
-                 reuse the existing ShipGroup only if the facility type is "virtual".
-                Additionally, filtering based on the shipment method type may be required in future.
+            <!-- Since a new ShipGroup can be created during routing/allocation attempts,
+                 reuse an existing ShipGroup when:
+                 1) destination facility is virtual, or
+                 2) shipment method is store pickup (pickup items for the same facility should stay grouped).
             -->
             <set field="hasParentType"
                  from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.facility.FacilityType', 'facilityTypeId', facility?.facilityTypeId, 'parentTypeId', 'VIRTUAL_FACILITY')" type="Boolean"/>
-            <if condition="hasParentType">
+            <set field="isStorePickupShipMethod"
+                 from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.shipment.shipment.ShipmentMethodType', 'shipmentMethodTypeId', shipmentMethodTypeId, 'parentTypeId', 'STOREPICKUP')" type="Boolean"/>
+            <if condition="hasParentType || isStorePickupShipMethod || 'POS_COMPLETED' == shipmentMethodTypeId">
                 <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="orderItemShipGroups">
                     <econdition field-name="orderId" from="orderId"/>
                     <econdition field-name="facilityId" from="facilityId"/>
@@ -643,6 +1420,430 @@ under the License.
                     <service-call name="create#org.apache.ofbiz.order.order.OrderHeaderNote" in-map="[orderId:orderId, internalNote:'N', noteId:noteDataResponse.noteId]"/>
                 </if>
             </if>
+        </actions>
+    </service>
+
+    <service verb="split" noun="OrderASNItems">
+        <description>Split sales order items into preorder/backorder ship groups</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader">
+                <return type="warning" message="Order not found for orderId ${orderId}"/>
+            </if>
+
+            <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+            </entity-find-one>
+            <set field="allowSplit" from="productStore?.allowSplit != 'N'"/>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemAttribute" list="preOrderAttrList" distinct="true">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="attrName" value="PreOrderItemProperty"/>
+                <select-field field-name="orderItemSeqId"/>
+            </entity-find>
+            <set field="preOrderItemSeqIds" from="preOrderAttrList*.orderItemSeqId"/>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemAttribute" list="backOrderAttrList" distinct="true">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="attrName" value="BackOrderItemProperty"/>
+                <select-field field-name="orderItemSeqId"/>
+            </entity-find>
+            <set field="backOrderItemSeqIds" from="backOrderAttrList*.orderItemSeqId"/>
+
+            <set field="preOrderOrBackOrder" from="[:]"/>
+            <if condition="allowSplit">
+                <if condition="preOrderItemSeqIds">
+                    <set field="preOrderOrBackOrder" from="preOrderOrBackOrder + ['PRE_ORDER': preOrderItemSeqIds]"/>
+                </if>
+                <if condition="backOrderItemSeqIds">
+                    <set field="preOrderOrBackOrder" from="preOrderOrBackOrder + ['BACKORDER': backOrderItemSeqIds]"/>
+                </if>
+            </if>
+            <if condition="!allowSplit">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="allOrderItems" distinct="true">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <select-field field-name="orderItemSeqId"/>
+                </entity-find>
+                <set field="allItemSeqIds" from="allOrderItems*.orderItemSeqId"/>
+                <if condition="allItemSeqIds &amp;&amp; preOrderItemSeqIds">
+                    <set field="preOrderOrBackOrder" from="['PRE_ORDER': allItemSeqIds]"/>
+                </if>
+                <if condition="allItemSeqIds &amp;&amp; !preOrderItemSeqIds &amp;&amp; backOrderItemSeqIds">
+                    <set field="preOrderOrBackOrder" from="['BACKORDER': allItemSeqIds]"/>
+                </if>
+            </if>
+
+            <if condition="!preOrderOrBackOrder"><return/></if>
+
+            <iterate list="preOrderOrBackOrder.entrySet()" entry="entry">
+                <set field="facilityTypeId" from="entry.key"/>
+                <set field="orderItemSeqIds" from="entry.value"/>
+                <if condition="!orderItemSeqIds"><continue/></if>
+
+                <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList" limit="1">
+                    <econdition field-name="facilityTypeId" from="facilityTypeId"/>
+                </entity-find>
+                <set field="facility" from="facilityList ? facilityList[0] : null"/>
+                <if condition="!facility">
+                    <log level="warn" message="No facility found for facilityTypeId ${facilityTypeId} while splitting order ${orderId}"/>
+                    <continue/>
+                </if>
+
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItemList">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <set field="orderItemBySeq" from="orderItemList.collectEntries{[(it.orderItemSeqId): it]}"/>
+                <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList">
+                    <econdition field-name="orderId" from="orderId"/>
+                </entity-find>
+                <set field="shipGroupBySeq" from="shipGroupList.collectEntries{[(it.shipGroupSeqId): it]}"/>
+
+                <entity-find entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" list="assocList">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="orderItemSeqId" operator="in" from="orderItemSeqIds"/>
+                </entity-find>
+                <set field="filteredAssocs" from="[]"/>
+                <iterate list="assocList" entry="assoc">
+                    <set field="assocItem" from="orderItemBySeq[assoc.orderItemSeqId]"/>
+                    <set field="assocShipGroup" from="shipGroupBySeq[assoc.shipGroupSeqId]"/>
+                    <if condition="!assocItem || !assocShipGroup"><continue/></if>
+                    <if condition="assocShipGroup.facilityId != '_NA_'"><continue/></if>
+                    <if condition="['ITEM_CANCELLED','ITEM_COMPLETED'].contains(assocItem.statusId)"><continue/></if>
+                    <set field="filteredAssocs" from="filteredAssocs + [assoc]"/>
+                </iterate>
+                <if condition="!filteredAssocs"><continue/></if>
+
+                <set field="shipGroupSeqIds" from="filteredAssocs*.shipGroupSeqId.findAll{it}.unique()"/>
+                <iterate list="shipGroupSeqIds" entry="shipGroupSeqId">
+                    <set field="groupItemSeqIds" from="filteredAssocs.findAll{it.shipGroupSeqId == shipGroupSeqId}*.orderItemSeqId.findAll{it}.unique()"/>
+                    <if condition="!groupItemSeqIds"><continue/></if>
+
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="existingGroupList" limit="1">
+                        <econdition field-name="orderId" from="orderId"/>
+                        <econdition field-name="facilityId" from="facility.facilityId"/>
+                    </entity-find>
+                    <set field="existingGroup" from="existingGroupList ? existingGroupList[0] : null"/>
+                    <set field="newShipGroupSeqId" from="existingGroup?.shipGroupSeqId"/>
+
+                    <if condition="!newShipGroupSeqId">
+                        <entity-find-count entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" count-field="remainingCount">
+                            <econdition field-name="orderId" from="orderId"/>
+                            <econdition field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                            <econdition field-name="orderItemSeqId" operator="not-in" from="groupItemSeqIds"/>
+                        </entity-find-count>
+                        <if condition="remainingCount == 0">
+                            <service-call name="update#org.apache.ofbiz.order.order.OrderItemShipGroup"
+                                          in-map="[orderId:orderId, shipGroupSeqId:shipGroupSeqId, facilityId:facility.facilityId, orderFacilityId:facility.facilityId]"/>
+                            <set field="newShipGroupSeqId" from="shipGroupSeqId"/>
+                        </if>
+                        <if condition="!newShipGroupSeqId">
+                            <entity-find-count entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" count-field="shipGroupCount">
+                                <econdition field-name="orderId" from="orderId"/>
+                            </entity-find-count>
+                            <set field="newShipGroupSeqId" from="String.format('%05d', (shipGroupCount ?: 0) + 1)"/>
+                            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="baseShipGroup">
+                                <field-map field-name="orderId" from="orderId"/>
+                                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                            </entity-find-one>
+                            <set field="createMap" from="baseShipGroup?.getValueMap() ?: [:]"/>
+                            <set field="createMap.orderId" from="orderId"/>
+                            <set field="createMap.shipGroupSeqId" from="newShipGroupSeqId"/>
+                            <set field="createMap.facilityId" from="facility.facilityId"/>
+                            <set field="createMap.orderFacilityId" from="facility.facilityId"/>
+                            <service-call name="create#org.apache.ofbiz.order.order.OrderItemShipGroup" in-map="createMap"/>
+                        </if>
+                    </if>
+
+                    <if condition="newShipGroupSeqId &amp;&amp; newShipGroupSeqId != shipGroupSeqId">
+                        <iterate list="groupItemSeqIds" entry="orderItemSeqId">
+                            <entity-find-one entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="assocRecord">
+                                <field-map field-name="orderId" from="orderId"/>
+                                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                                <field-map field-name="shipGroupSeqId" from="shipGroupSeqId"/>
+                            </entity-find-one>
+                            <if condition="!assocRecord"><continue/></if>
+                            <entity-find-one entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" value-field="existingAssoc">
+                                <field-map field-name="orderId" from="orderId"/>
+                                <field-map field-name="orderItemSeqId" from="orderItemSeqId"/>
+                                <field-map field-name="shipGroupSeqId" from="newShipGroupSeqId"/>
+                            </entity-find-one>
+                            <if condition="!existingAssoc">
+                                <service-call name="create#org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc"
+                                              in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, shipGroupSeqId:newShipGroupSeqId, quantity:assocRecord.quantity, cancelQuantity:assocRecord.cancelQuantity]"/>
+                            </if>
+                            <service-call name="delete#org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc"
+                                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, shipGroupSeqId:shipGroupSeqId]"/>
+                            <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
+                                          in-map="[orderId:orderId, orderItemSeqId:orderItemSeqId, shipGroupSeqId:newShipGroupSeqId]"/>
+                        </iterate>
+                    </if>
+                </iterate>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="set" noun="PreOrderPromisedDate">
+        <description>Set promised date and corresponding PO for preorder/backorder items</description>
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader">
+                <return type="warning" message="Order not found for orderId ${orderId}"/>
+            </if>
+            <if condition="['ORDER_CANCELLED','ORDER_COMPLETED','ORDER_REJECTED'].contains(orderHeader.statusId)"><return/></if>
+
+            <entity-find entity-name="org.apache.ofbiz.product.facility.Facility" list="facilityList">
+                <econdition field-name="facilityTypeId" operator="in" from="['PRE_ORDER','BACKORDER']"/>
+            </entity-find>
+            <set field="facilityIds" from="facilityList*.facilityId.findAll{it}"/>
+            <if condition="!facilityIds"><return/></if>
+
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" list="shipGroupList">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="facilityId" operator="in" from="facilityIds"/>
+            </entity-find>
+            <iterate list="shipGroupList" entry="shipGroup">
+                <entity-find entity-name="org.apache.ofbiz.order.order.OldOrderItemShipGroupAssoc" list="assocs">
+                    <econdition field-name="orderId" from="orderId"/>
+                    <econdition field-name="shipGroupSeqId" from="shipGroup.shipGroupSeqId"/>
+                </entity-find>
+                <iterate list="assocs" entry="assoc">
+                    <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItem" value-field="orderItem">
+                        <field-map field-name="orderId" from="orderId"/>
+                        <field-map field-name="orderItemSeqId" from="assoc.orderItemSeqId"/>
+                    </entity-find-one>
+                    <if condition="!orderItem || orderItem.correspondingPoId"><continue/></if>
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderItemAttribute" list="orderItemAttrList" limit="1">
+                        <econdition field-name="orderId" from="orderId"/>
+                        <econdition field-name="orderItemSeqId" from="assoc.orderItemSeqId"/>
+                        <econdition field-name="attrName" operator="in" from="['PreOrderItemProperty','BackOrderItemProperty']"/>
+                    </entity-find>
+                    <if condition="!orderItemAttrList"><continue/></if>
+                    <set field="orderItemQuantity" from="(assoc.quantity ?: orderItem.quantity) - (assoc.cancelQuantity ?: 0)"/>
+                    <if condition="!orderItemQuantity || orderItemQuantity &lt;= 0"><continue/></if>
+
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="poItemList">
+                        <econdition field-name="productId" from="orderItem.productId"/>
+                        <econdition field-name="availableToPromise" operator="greater" value="0"/>
+                        <econdition field-name="estimatedDeliveryDate" operator="is-not-null"/>
+                        <order-by field-name="estimatedDeliveryDate"/>
+                    </entity-find>
+                    <set field="candidate" from="null"/>
+                    <iterate list="poItemList" entry="poItem">
+                        <if condition="candidate"><continue/></if>
+                        <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="poHeader">
+                            <field-map field-name="orderId" from="poItem.orderId"/>
+                        </entity-find-one>
+                        <if condition="!poHeader"><continue/></if>
+                        <if condition="poHeader.orderTypeId != 'PURCHASE_ORDER'"><continue/></if>
+                        <if condition="['ORDER_CANCELLED','ORDER_COMPLETED','ORDER_REJECTED'].contains(poHeader.statusId)"><continue/></if>
+                        <if condition="poItem.availableToPromise &gt;= orderItemQuantity">
+                            <set field="candidate" from="poItem"/>
+                        </if>
+                    </iterate>
+                    <if condition="!candidate"><continue/></if>
+
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
+                                  in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, promisedDatetime:candidate.estimatedDeliveryDate,
+                                    correspondingPoId:candidate.orderId, autoCancelDate:null, isNewProduct:candidate.isNewProduct]"/>
+                    <set field="newAtp" from="candidate.availableToPromise - orderItemQuantity"/>
+                    <if condition="newAtp &lt; 0"><set field="newAtp" from="0"/></if>
+                    <service-call name="update#org.apache.ofbiz.order.order.OrderItem"
+                                  in-map="[orderId:candidate.orderId, orderItemSeqId:candidate.orderItemSeqId, availableToPromise:newAtp]"/>
+                </iterate>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="approve" noun="Order">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="approveOrder"/>
+        </out-parameters>
+        <actions>
+            <set field="approveOrder" from="true"/>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader">
+                <set field="approveOrder" from="false"/>
+            </if>
+            <if condition="approveOrder">
+                <if condition="!(orderHeader.statusId in ['ORDER_CREATED', 'ORDER_HOLD'])">
+                    <set field="approveOrder" from="false"/>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStore" value-field="productStore" cache="true">
+                    <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                </entity-find-one>
+                <if condition="productStore &amp;&amp; !'Y'.equalsIgnoreCase(productStore.autoApproveOrder)">
+                    <set field="approveOrder" from="false"/>
+                </if>
+                <if condition="'N'.equalsIgnoreCase(orderHeader.autoApprove)">
+                    <set field="approveOrder" from="false"/>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <entity-find-one entity-name="org.apache.ofbiz.product.store.ProductStoreSetting" value-field="productStoreSetting" cache="true">
+                    <field-map field-name="productStoreId" from="orderHeader.productStoreId"/>
+                    <field-map field-name="settingTypeEnumId" value="APPR_WO_PMNT_CHK"/>
+                </entity-find-one>
+                <if condition="!(productStoreSetting?.settingValue?.equalsIgnoreCase('Y'))">
+                    <entity-find entity-name="org.apache.ofbiz.order.order.OrderPaymentPreference" list="paymentPreferences">
+                        <econdition field-name="orderId" from="orderId"/>
+                        <econdition field-name="statusId" value="PAYMENT_NOT_RECEIVED"/>
+                    </entity-find>
+                    <set field="isNonCashOnDeliveryMethod" from="false"/>
+                    <iterate list="paymentPreferences" entry="paymentPreference">
+                        <if condition="paymentPreference.paymentMethodTypeId != 'EXT_SHOP_CASH_ON_DEL'">
+                            <set field="isNonCashOnDeliveryMethod" from="true"/>
+                        </if>
+                    </iterate>
+                    <if condition="isNonCashOnDeliveryMethod">
+                        <set field="approveOrder" from="false"/>
+                    </if>
+                </if>
+            </if>
+            <if condition="approveOrder">
+                <service-call name="co.hotwax.oms.order.OrderServices.change#OrderStatus"
+                              in-map="[orderId:orderId, statusId:'ORDER_APPROVED', setItemStatus:true]"/>
+            </if>
+        </actions>
+    </service>
+    <service verb="reserve" noun="OrderItems">
+        <in-parameters>
+            <parameter name="orderId"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="allocatedShipGroupSeqIds"/>
+        </out-parameters>
+        <actions>
+            <entity-find entity-name="org.apache.ofbiz.order.order.OrderItem" list="orderItems">
+                <econdition field-name="orderId" from="orderId"/>
+            </entity-find>
+            <set field="allocatedShipGroupSeqIds" from="[]"/>
+            <iterate list="orderItems" entry="orderItem">
+                <if condition="orderItem.statusId == 'ITEM_COMPLETED'">
+                    <continue/>
+                </if>
+                <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderItemShipGroup" value-field="shipGroup">
+                    <field-map field-name="orderId" from="orderId"/>
+                    <field-map field-name="shipGroupSeqId" from="orderItem.shipGroupSeqId"/>
+                </entity-find-one>
+                <set field="facilityId" from="shipGroup?.facilityId"/>
+                <if condition="facilityId">
+                    <service-call name="co.hotwax.oms.impl.OrderReservationServices.process#OrderItemAllocation"
+                                  in-map="[orderId:orderId, orderItemSeqId:orderItem.orderItemSeqId, facilityId:facilityId, quantity:orderItem.quantity]" out-map="context"/>
+                    <set field="allocatedShipGroupSeqIds" from="allocatedShipGroupSeqIds + allocatedShipGroupSeqId"/>
+                </if>
+            </iterate>
+        </actions>
+    </service>
+    <service verb="create" noun="POSOrderReservationAndIssuance">
+        <in-parameters>
+            <parameter name="orderId" required="true"/>
+        </in-parameters>
+        <actions>
+            <entity-find-one entity-name="org.apache.ofbiz.order.order.OrderHeader" value-field="orderHeader">
+                <field-map field-name="orderId" from="orderId"/>
+            </entity-find-one>
+            <if condition="!orderHeader || orderHeader.salesChannelEnumId != 'POS_SALES_CHANNEL'">
+                <return message="Order: ${orderId} not eligible for issuance"/>
+            </if>
+
+            <entity-find entity-name="co.hotwax.order.OrderItemAndShipGroup" list="posOrderItems">
+                <econdition field-name="orderId" from="orderId"/>
+                <econdition field-name="shipmentMethodTypeId" value="POS_COMPLETED"/>
+                <econdition field-name="statusId" operator="not-equals" value="ITEM_CANCELLED"/>
+            </entity-find>
+            <if condition="posOrderItems">
+                <entity-find-one entity-name="co.hotwax.facility.FacilityAndType" value-field="facilityAndType" cache="true">
+                    <field-map field-name="facilityId" from="posOrderItems[0].facilityId"/>
+                </entity-find-one>
+
+                <if condition="facilityAndType">
+                    <if condition="facilityAndType.parentTypeId != 'PHYSICAL_STORE'">
+                        <return type="warning" message="POS Order: ${orderId} with facility: ${posOrderItems[0].facilityId} is not eligible for issuance."/>
+                    </if>
+                </if>
+            </if>
+
+
+            <iterate list="posOrderItems" entry="orderItem">
+                <set field="itemQuantity" from="orderItem.quantity" type="BigDecimal" default-value="0"/>
+                <set field="cancelQuantity" from="orderItem.cancelQuantity ?: 0" type="BigDecimal"/>
+                <set field="quantityToIssue" from="itemQuantity - cancelQuantity" type="BigDecimal"/>
+                <if condition="quantityToIssue &lt;= 0">
+                    <continue/>
+                </if>
+
+                <entity-find-one entity-name="org.apache.ofbiz.product.product.Product" value-field="product" cache="true">
+                    <field-map field-name="productId" from="orderItem.productId"/>
+                </entity-find-one>
+                <set field="isMarketingPkgPick" from="co.hotwax.oms.util.OmsUtil.hasParentType(ec.ecfi , 'org.apache.ofbiz.product.product.ProductType', 'productTypeId', product?.productTypeId, 'parentTypeId', 'MARKETING_PKG_PICK')" type="Boolean"/>
+                <set field="issueItems" from="[]"/>
+                <if condition="isMarketingPkgPick">
+                    <entity-find entity-name="org.apache.ofbiz.product.product.ProductAssoc" list="components">
+                        <econdition field-name="productId" from="orderItem.productId"/>
+                        <econdition field-name="productAssocTypeId" value="PRODUCT_COMPONENT"/>
+                        <date-filter/>
+                    </entity-find>
+                    <iterate list="components" entry="component">
+                        <set field="componentQty" from="(component.quantity ?: 1) * quantityToIssue" type="BigDecimal"/>
+                        <script>issueItems.add([productId: component.productIdTo, quantity: componentQty])</script>
+                    </iterate>
+                    <script>issueItems.add([productId: orderItem.productId, quantity: quantityToIssue])</script>
+                    <else>
+                        <script>issueItems.add([productId: orderItem.productId, quantity: quantityToIssue])</script>
+                    </else>
+                </if>
+
+                <iterate list="issueItems" entry="issueItem">
+                    <if condition="!issueItem.quantity || issueItem.quantity &lt;= 0">
+                        <continue/>
+                    </if>
+                    <service-call name="co.hotwax.oms.product.ProductServices.findOrCreate#FacilityInventoryItem"
+                                  in-map="[productId:issueItem.productId, facilityId:orderItem.facilityId]" out-map="findOrCreateResult"/>
+                    <set field="inventoryItemId" from="findOrCreateResult.inventoryItemId"/>
+
+                    <service-call name="create#org.apache.ofbiz.shipment.issuance.ItemIssuance" in-map="[orderId:orderItem.orderId,
+                            orderItemSeqId:orderItem.orderItemSeqId, shipGroupSeqId:orderItem.shipGroupSeqId,
+                            inventoryItemId:inventoryItemId, issuedDateTime:ec.user.nowTimestamp,
+                            quantity:issueItem.quantity]" out-map="itemIssuanceOut"/>
+
+                    <service-call name="create#org.apache.ofbiz.product.inventory.PhysicalInventory"
+                                  in-map="[partyId:'system', physicalInventoryDate: ec.user.nowTimestamp]" out-map="physicalInventoryResult"/>
+                    <set field="availableToPromiseDiff" from="issueItem.quantity" type="BigDecimal"/>
+                    <set field="quantityOnHandDiff" from="issueItem.quantity" type="BigDecimal"/>
+                    <!-- Not passing reasonEnumId as 'POS_SALE' as the OOTB OFBiz ProductInventoryView screen shows Sale(Event)
+                    only when only orderId is populated and not the reasonEnumId -->
+                    <set field="inventoryItemVariance" from="[
+                            physicalInventoryId: physicalInventoryResult.physicalInventoryId,
+                            inventoryItemId: inventoryItemId,
+                            availableToPromiseVar: availableToPromiseDiff.negate(),
+                            quantityOnHandVar: quantityOnHandDiff.negate()
+                        ]"/>
+                    <service-call name="create#org.apache.ofbiz.product.inventory.InventoryItemVariance" in-map="inventoryItemVariance"/>
+
+                    <service-call name="co.hotwax.oms.product.InventoryServices.create#InventoryItemDetail"
+                                  in-map="[inventoryItemId:inventoryItemId, effectiveDate:ec.user.nowTimestamp,
+                            orderId:orderItem.orderId, orderItemSeqId:orderItem.orderItemSeqId,
+                            shipGroupSeqId:orderItem.shipGroupSeqId, itemIssuanceId:itemIssuanceOut?.itemIssuanceId,
+                            physicalInventoryId:physicalInventoryResult.physicalInventoryId,
+                            availableToPromiseDiff:availableToPromiseDiff.negate(),
+                            quantityOnHandDiff:quantityOnHandDiff.negate()]"/>
+                </iterate>
+            </iterate>
         </actions>
     </service>
 </services>
