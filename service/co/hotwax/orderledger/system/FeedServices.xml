@@ -811,6 +811,7 @@ under the License.
                         <set field="product.productWeight" from="diff.weightValue"/>
                     </if>
                     <if condition="diff.position &amp;&amp; parentProductId">
+                        <set field="position" from="diff.position"/>
                         <entity-find-one entity-name="org.apache.ofbiz.product.product.ProductAssoc" value-field="productAssoc">
                             <field-map field-name="productId" from="parentProductId"/>
                             <field-map field-name="productIdTo" from="productId"/>
@@ -818,7 +819,7 @@ under the License.
                         </entity-find-one>
                         <if condition="productAssoc &amp;&amp; !position.equals(productAssoc.sequenceNum)">
                             <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc"
-                                          in-map="[productIdTo:productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate: productAssoc.fromDate, sequenceNum:diff.position]"/>
+                                          in-map="[productIdTo:productId, productId:parentProductId, productAssocTypeId:'PRODUCT_VARIANT', fromDate: productAssoc.fromDate, sequenceNum:position]"/>
                         </if>
                     </if>
                     <if condition="diff.price">
