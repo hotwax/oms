@@ -433,7 +433,7 @@ under the License.
                 <entity-find-one entity-name="co.hotwax.shopify.ShopifyShopProduct" value-field="parentProduct" cache="true">
                     <field-map field-name="shopifyProductId" from="productUpdateHistory.parentProductId"/>
                 </entity-find-one>
-                <if condition="parentProduct.productId">
+                <if condition="parentProduct &amp;&amp; parentProduct.productId">
                     <set field="parentProductId" from="parentProduct.productId"/>
                 </if>
             </if>
