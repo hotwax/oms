@@ -36,6 +36,15 @@ under the License.
             <parameter name="response" type="Map"/>
         </out-parameters>
     </service>
+    <service verb="call" noun="DeleteProductsIndex" type="oms-rest" location="service/deleteProductsIndex" method="post" authenticate="false">
+        <description>Call OMS DeleteProductsIndex service.</description>
+        <in-parameters>
+            <parameter name="productId" optional="true"/>
+        </in-parameters>
+        <out-parameters>
+            <parameter name="response" type="Map"/>
+        </out-parameters>
+    </service>
     <service verb="index" noun="OrderItem" type="oms-rest" location="service/createOrderIndex" method="post" authenticate="anonymous-view">
         <description>Create order index</description>
         <in-parameters>
