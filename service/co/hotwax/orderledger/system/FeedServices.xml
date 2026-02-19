@@ -243,7 +243,7 @@ under the License.
 
 
                                         if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                            added = sortedAssocs.findAll { it[0] !in existingAssocsSorted*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
+                                            added = sortedAssocs.findAll { it !in existingAssocsSorted }.collect { [id: it[0], sequenceNumber: it[1]] }
                                             removed = existingAssocsSorted.findAll { it[0] !in sortedAssocs*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                             existingDiffMap.assocs = [added: added, removed: removed]
                                             updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
@@ -349,7 +349,7 @@ under the License.
                                 existingAssocsHash = productUpdateHistory?.assocsHash
 
                                 if (!existingAssocsHash || existingAssocsHash != assocsHash) {
-                                    added = sortedAssocs.findAll { it[0] !in existingAssocsSorted*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
+                                    added = sortedAssocs.findAll { it !in existingAssocsSorted }.collect { [id: it[0], sequenceNumber: it[1]] }
                                     removed = existingAssocsSorted.findAll { it[0] !in sortedAssocs*.get(0) }.collect { [id: it[0], sequenceNumber: it[1]] }
                                     existingDiffMap.assocs = [added: added, removed: removed]
                                     updateParams.assocs = ContextJavaUtil.jacksonMapper.writeValueAsString(variantIds)
@@ -679,8 +679,7 @@ under the License.
                                 <date-filter/>
                             </entity-find>
                             <if condition="productAssocs">
-                                <set field="productAssocs[0].thruDate" from="ec.user.nowTimestamp"/>
-                                <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                                <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
                             </if>
                         </if>
                     </iterate>
