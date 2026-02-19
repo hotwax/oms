@@ -101,7 +101,6 @@
             <service-call name="co.hotwax.oms.search.SearchServices.index#Picker" in-map="[partyId:partyId]"/>
         </actions>
     </seca>
-
     <seca id="ShopifyOrderSplitAsnItems" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="post-service">
         <condition><expression>orderId</expression></condition>
         <actions>
@@ -132,6 +131,15 @@
         </actions>
     </seca>
     <seca id="IndexOrder" service="co.hotwax.oms.order.OrderServices.create#SalesOrder" when="tx-commit">
+        <condition>
+            <expression>orderId</expression>
+        </condition>
+        <actions>
+            <if condition="orderId">
+                <service-call name="co.hotwax.oms.search.SearchServices.index#OrderHeader" in-map="[orderId:orderId]" ignore-error="true"/>
+            </if>
+        </actions>
+    </seca>
 
     <seca id="DispatchOrderCreatedWebhook"
           service="co.hotwax.sob.order.ShopifyOrderServices.create#ShopifyOrder"
