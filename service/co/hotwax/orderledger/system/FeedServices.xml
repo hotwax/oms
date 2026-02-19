@@ -679,7 +679,8 @@ under the License.
                                 <date-filter/>
                             </entity-find>
                             <if condition="productAssocs">
-                                <service-call name="delete#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
+                                <set field="productAssocs[0].thruDate" from="ec.user.nowTimestamp"/>
+                                <service-call name="update#org.apache.ofbiz.product.product.ProductAssoc" in-map="productAssocs[0]"/>
                             </if>
                         </if>
                     </iterate>
