@@ -579,18 +579,6 @@ under the License.
                                   out-map="customerPhoneOut"/>
                     <set field="customerContactMechs" from="customerContactMechs + [[contactMechId:customerPhoneOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_PHONE']]] ]"/>
                 </if>
-                <set field="customerPostalAddress" from="billTo?.postalAddress"/>
-                <if condition="customerPostalAddress?.address1">
-                    <set field="customerPostalAddressIn" from="[toName:customerPostalAddress.toName ?: customerPostalAddress.name,
-                        address1:customerPostalAddress.address1, address2:customerPostalAddress.address2, city:customerPostalAddress.city,
-                        stateProvinceGeoId:customerPostalAddress.stateProvinceGeoId, postalCode:customerPostalAddress.postalCode,
-                        countryGeoId:customerPostalAddress.countryGeoId]"/>
-                    <service-call name="co.hotwax.oms.contact.ContactMechServices.create#PostalAddress"
-                                  in-map="customerPostalAddressIn"
-                                  out-map="customerPostalOut"/>
-                    <set field="customerContactMechs" from="customerContactMechs + [[contactMechId:customerPostalOut.contactMechId, purposes:[[contactMechPurposeTypeId:'PRIMARY_LOCATION']]] ]"/>
-                </if>
-
                 <set field="partyRoles" from="[[roleTypeId:'CUSTOMER'], [roleTypeId:'PLACING_CUSTOMER'], [roleTypeId:'END_USER_CUSTOMER'], [roleTypeId:'SHIP_TO_CUSTOMER'], [roleTypeId:'BILL_TO_CUSTOMER']]"/>
                 <service-call name="create#org.apache.ofbiz.party.party.Party"
                               in-map="[partyTypeId:'PERSON', externalId:customerExternalId, statusId:'PARTY_ENABLED']"
