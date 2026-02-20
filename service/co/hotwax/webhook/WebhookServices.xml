@@ -779,6 +779,7 @@
         <actions>
             <script>
                 // Disable authorization for this service execution
+                import org.moqui.entity.EntityCondition
                 ec.artifactExecutionFacade.disableAuthz()
                 ec.userFacade.loginAnonymousIfNoUser()
             </script>
@@ -799,7 +800,6 @@
 
             <if condition="orderStatusIds">
                 <script>
-                    import org.moqui.entity.EntityCondition
                     def condition = ec.entity.conditionFactory.makeCondition("eventOrderStatusId", EntityCondition.ComparisonOperator.IN, orderStatusIds)
                     context.documentList = ec.entityFacade.getDataDocuments("WebhookOrderStatus", condition, null, null)
                 </script>
